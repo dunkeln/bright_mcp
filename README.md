@@ -7,8 +7,8 @@
 Agent-oriented Bright Data capabilities over MCP, built on Bun. The five-tool
 base profile batches web research, routes explicit ranked/deep discovery,
 searches the caller's live dataset catalog, runs curated collectors and Deep
-Lookup, pages upstream snapshots as resources, and renders results in a React
-MCP App.
+Lookup, pages upstream snapshots as resources, and renders results in a
+transient React MCP workbench.
 
 ## Install
 

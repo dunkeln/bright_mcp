@@ -8,7 +8,7 @@ import { registerDatasetTools } from "./dataset-tools";
 import type { CancellableTaskStore } from "./task-store";
 import { registerWebTools } from "./web-tools";
 
-export { DATASET_TABLE_URI } from "./dataset-tools";
+export { DATASET_WORKBENCH_URI } from "./dataset-tools";
 
 export function createBrightMcpServer(dependencies: {
   datasets: DatasetUseCases;

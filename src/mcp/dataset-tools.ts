@@ -26,7 +26,7 @@ import type { ResultStore } from "../core/results";
 import { jsonResourceReply, reply, requestContext, runTool } from "./support";
 import type { CancellableTaskStore } from "./task-store";
 
-export const DATASET_TABLE_URI = "ui://bright-mcp/dataset-table-v1.html";
+export const DATASET_WORKBENCH_URI = "ui://bright-mcp/dataset-workbench-v2.html";
 
 const annotations = {
   readOnlyHint: true,
@@ -75,11 +75,11 @@ const runDatasetConfig = {
     openWorldHint: true,
   },
   _meta: {
-    ui: { resourceUri: DATASET_TABLE_URI, visibility: ["model", "app"] },
-    "ui/resourceUri": DATASET_TABLE_URI,
-    "openai/outputTemplate": DATASET_TABLE_URI,
+    ui: { resourceUri: DATASET_WORKBENCH_URI, visibility: ["model", "app"] },
+    "ui/resourceUri": DATASET_WORKBENCH_URI,
+    "openai/outputTemplate": DATASET_WORKBENCH_URI,
     "openai/toolInvocation/invoking": "Running dataset…",
-    "openai/toolInvocation/invoked": "Dataset ready",
+    "openai/toolInvocation/invoked": "Dataset workbench ready",
   },
 } as const;
 
@@ -284,24 +284,24 @@ export function registerDatasetTools(
 
   registerAppResource(
     server,
-    "Dataset table",
-    DATASET_TABLE_URI,
+    "Dataset workbench",
+    DATASET_WORKBENCH_URI,
     {
       mimeType: RESOURCE_MIME_TYPE,
-      description: "Interactive projection of a canonical dataset result",
+      description: "Transient inspection and handoff surface for a canonical dataset result",
       _meta: {
         ui: {
           prefersBorder: true,
           csp: { connectDomains: [], resourceDomains: [] },
         },
         "openai/widgetDescription":
-          "Shows the dataset result as a filterable, sortable, paged table with ordered row selection.",
+          "Inspects a dataset through a table, profiles, quality checks, row comparison, provenance, exports, and model handoff.",
       },
     },
     async () => ({
       contents: [
         {
-          uri: DATASET_TABLE_URI,
+          uri: DATASET_WORKBENCH_URI,
           mimeType: RESOURCE_MIME_TYPE,
           text: dependencies.widgetHtml,
           _meta: {
@@ -310,7 +310,7 @@ export function registerDatasetTools(
               csp: { connectDomains: [], resourceDomains: [] },
             },
             "openai/widgetDescription":
-              "Shows the dataset result as a filterable, sortable, paged table with ordered row selection.",
+              "Inspects a dataset through a table, profiles, quality checks, row comparison, provenance, exports, and model handoff.",
           },
         },
       ],

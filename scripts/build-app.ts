@@ -17,7 +17,7 @@ const html = `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Dataset table</title>
+    <title>Dataset workbench</title>
     <style>${css}</style>
   </head>
   <body>

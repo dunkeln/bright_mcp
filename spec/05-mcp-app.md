@@ -2,7 +2,7 @@
 
 ## Role
 
-The app is the interactive projection of `run_dataset` output. It is not an
+The app is the transient interactive workbench for `run_dataset` output. It is not an
 independent capability and MUST NOT be registered as a model-visible tool.
 
 `run_dataset` MUST return useful text content and canonical
@@ -19,17 +19,24 @@ supporting hosts resolve the app resource from tool metadata.
 - Agent-visible and human-visible rows MUST originate from the same result.
 - The app MUST NOT fetch Bright Data APIs or receive service credentials.
 
-## V1 interaction
+## V2 interaction
 
 - Render dataset title, columns, rows, truncation state, and warnings.
 - Support keyboard-accessible sorting, text filtering, pagination, and ordered
   row selection.
+- Support bounded row inspection, selected-row comparison, loaded-row quality
+  checks, profiles and charts, provenance, HTTP link handoff, and CSV/JSON
+  export without adding model-visible tools.
 - Send bounded selected-row context to the host when that capability exists.
+- Selection actions MAY send a user-initiated follow-up after updating model
+  context when the host supports both capabilities.
 - Preserve source row identity when sorting, filtering, or paging.
 - Render arbitrary values as text; never execute result HTML or script.
+- Label exports as loaded or selected rows; the app MUST NOT imply that unloaded
+  continuation pages were exported.
 
-Charts, editing, export, direct network fetching, and browser control are outside
-this app contract. The separate browser profile has no required MCP app in v1.
+Editing, direct network fetching, durable workspaces, and browser control are
+outside this app contract. The separate browser profile has no required MCP app.
 
 ## Host behavior
 
@@ -48,6 +55,8 @@ this app contract. The separate browser profile has no required MCP app in v1.
 - Focus order, selection state, sort state, warnings, and pagination changes
   MUST be programmatically exposed.
 - Light, dark, narrow, and embedded layouts MUST preserve readable data.
+- Breaking widget changes MUST use a new resource URI. V2 is
+  `ui://bright-mcp/dataset-workbench-v2.html`.
 
 ## Payload bounds
 

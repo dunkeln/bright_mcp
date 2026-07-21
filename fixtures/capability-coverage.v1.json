@@ -107,7 +107,7 @@
       "disposition": "composed",
       "routes": [
         "tool:run_dataset",
-        "resource:ui://bright-mcp/dataset-table-v1.html"
+        "resource:ui://bright-mcp/dataset-workbench-v2.html"
       ],
       "verification": {
         "gate": "bun run build && bun run check:compat",

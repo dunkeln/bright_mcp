@@ -7,6 +7,8 @@ const columns = [
   { key: "price", label: "Price", type: "number" },
   { key: "rating", label: "Rating", type: "number" },
   { key: "inStock", label: "In stock", type: "boolean" },
+  { key: "released", label: "Released", type: "date" },
+  { key: "source", label: "Source", type: "string" },
 ];
 
 const rows = [
@@ -16,6 +18,8 @@ const rows = [
     price: 79.99,
     rating: 4.7,
     inStock: true,
+    released: "2026-04-11",
+    source: "https://example.com/quietbuds-pro",
   },
   {
     title: "Commuter Mini",
@@ -23,6 +27,8 @@ const rows = [
     price: 49,
     rating: 4.4,
     inStock: true,
+    released: "2026-02-18",
+    source: "https://example.com/commuter-mini",
   },
   {
     title: "Studio Air 2",
@@ -30,20 +36,26 @@ const rows = [
     price: 129.5,
     rating: 4.8,
     inStock: false,
+    released: "2026-06-02",
+    source: "https://example.com/studio-air-2",
   },
   {
     title: "Everyday Pods",
-    brand: "Juniper",
+    brand: null,
     price: 34.95,
     rating: 4.1,
     inStock: true,
+    released: "2025-11-09",
+    source: "https://example.com/everyday-pods",
   },
   {
     title: "TrailBeat Sport",
     brand: "Summit",
     price: 64,
-    rating: 4.5,
+    rating: "4.5",
     inStock: true,
+    released: "2026-01-27",
+    source: "https://example.com/trailbeat-sport",
   },
 ];
 
@@ -72,5 +84,6 @@ export const devDatasetResult = {
   artifact: {
     uri: "bright://results/preview-products-1",
     mediaType: "application/json",
+    expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
   },
 } satisfies DatasetResult;

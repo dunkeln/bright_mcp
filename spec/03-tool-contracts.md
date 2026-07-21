@@ -68,7 +68,7 @@ Purpose: execute one described dataset capability.
 - Paid operations MUST require an explicit acknowledgement; Deep Lookup full
   runs MUST also require a caller-supplied maximum-cost cap checked before the
   paid trigger.
-- Tool metadata MUST reference the table app resource.
+- Tool metadata MUST reference the versioned workbench app resource.
 
 ## Canonical dataset result
 

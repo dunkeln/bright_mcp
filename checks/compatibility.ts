@@ -7,6 +7,7 @@ import {
   CreateMessageRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { datasetResultSchema } from "../src/core/contracts";
+import { DATASET_WORKBENCH_URI } from "../src/mcp/dataset-tools";
 import {
   assert,
   testEnvironment as environment,
@@ -52,11 +53,10 @@ async function checkStdio() {
           "openai/outputTemplate"?: string;
         }
       | undefined;
-    const datasetTableUri = "ui://bright-mcp/dataset-table-v1.html";
     assert(
-      runDatasetMeta?.ui?.resourceUri === datasetTableUri &&
-        runDatasetMeta["ui/resourceUri"] === datasetTableUri &&
-        runDatasetMeta["openai/outputTemplate"] === datasetTableUri,
+      runDatasetMeta?.ui?.resourceUri === DATASET_WORKBENCH_URI &&
+        runDatasetMeta["ui/resourceUri"] === DATASET_WORKBENCH_URI &&
+        runDatasetMeta["openai/outputTemplate"] === DATASET_WORKBENCH_URI,
       "run_dataset did not advertise the versioned app resource consistently.",
     );
     await assertToolRejected(client, "search_web", { queries: [] });
@@ -189,7 +189,7 @@ async function checkStdio() {
     );
 
     const widget = await client.readResource({
-      uri: datasetTableUri,
+      uri: DATASET_WORKBENCH_URI,
     });
     assert(
       widget.contents[0]?.mimeType === "text/html;profile=mcp-app",

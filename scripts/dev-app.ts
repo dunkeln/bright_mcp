@@ -54,7 +54,7 @@ const server = Bun.serve({
   },
 });
 
-console.log(`Dataset table preview: ${server.url}`);
+console.log(`Dataset workbench preview: ${server.url}`);
 
 let rebuildTimer: ReturnType<typeof setTimeout> | undefined;
 let building = false;
@@ -91,7 +91,7 @@ async function rebuild() {
       for (const client of reloadClients) {
         client.enqueue(encoder.encode("data: reload\n\n"));
       }
-      console.log("Rebuilt dataset table preview.");
+      console.log("Rebuilt dataset workbench preview.");
     } catch (error) {
       console.error(error);
     }
@@ -114,7 +114,7 @@ function previewHtml() {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bright MCP · Dataset table preview</title>
+    <title>Bright MCP · Dataset workbench preview</title>
     <link rel="stylesheet" href="/dataset-table.css" />
   </head>
   <body>

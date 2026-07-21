@@ -18,7 +18,7 @@ Local development uses stdio with your local credential. Hosted HTTP serves
 
 ## Develop the MCP App
 
-Run the dataset table in a normal browser with schema-valid fixture data:
+Run the dataset workbench in a normal browser with schema-valid fixture data:
 
 ```bash
 bun run dev:app

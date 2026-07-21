@@ -6,10 +6,17 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUpSm,
+  AnalyzeData,
   BarChart as BarChartIcon,
+  Compare,
+  DataControls,
   DotsVerticalMoreMenu,
+  Download,
   Eye,
   EyeOff,
+  FileSpreadsheet,
+  InfoCircle,
+  Link,
   Search,
 } from "@openai/apps-sdk-ui/components/Icon";
 import { Input } from "@openai/apps-sdk-ui/components/Input";
@@ -23,12 +30,21 @@ import {
   type JsonObject,
 } from "../core/contracts";
 import { DatasetOverview } from "./DatasetOverview";
+import {
+  DatasetWorkbench,
+  type WorkbenchPanel,
+} from "./DatasetWorkbench";
+import {
+  compareValues,
+  displayValue,
+  downloadRows,
+} from "./dataset-utils";
 
 type Sort = { key: string; direction: "ascending" | "descending" } | null;
 type Selection = { rowRef: string; row: JsonObject };
-type View = "table" | "overview";
+type View = "table" | "overview" | WorkbenchPanel;
 
-function DatasetTable() {
+function DatasetWorkbenchApp() {
   const isBrowserPreview = Boolean(
     (window as Window & { brightMcpPreview?: boolean }).brightMcpPreview,
   );
@@ -45,13 +61,14 @@ function DatasetTable() {
   const [hiddenColumnKeys, setHiddenColumnKeys] = useState<string[]>([]);
   const [menuColumnKey, setMenuColumnKey] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection[]>([]);
+  const [focusedRow, setFocusedRow] = useState<Selection | null>(null);
   const [pageError, setPageError] = useState<string | null>(initial.error ?? null);
   const [contextError, setContextError] = useState<string | null>(null);
   const [loadingPage, setLoadingPage] = useState(false);
   const activeResize = useRef<AbortController | null>(null);
 
   const { app, isConnected, error } = useApp({
-    appInfo: { name: "bright-dataset-table", version: "0.1.0" },
+    appInfo: { name: "bright-dataset-workbench", version: "0.2.0" },
     capabilities: {},
     onAppCreated(createdApp) {
       createdApp.ontoolresult = (toolResult) => {
@@ -68,6 +85,7 @@ function DatasetTable() {
         setHiddenColumnKeys([]);
         setMenuColumnKey(null);
         setSelection([]);
+        setFocusedRow(null);
         setPageError(null);
       };
     },
@@ -98,10 +116,14 @@ function DatasetTable() {
       : rows;
     if (!sort) return filtered;
     return filtered.toSorted((left, right) => {
-      const order = compare(left.row[sort.key], right.row[sort.key]);
+      const order = compareValues(left.row[sort.key], right.row[sort.key]);
       return sort.direction === "ascending" ? order : -order;
     });
   }, [filter, page, sort]);
+  const loadedRows = useMemo(
+    () => pages.flatMap(({ rows }) => rows),
+    [pages],
+  );
 
   const shareSelection = async () => {
     if (!app || !app.getHostCapabilities()?.updateModelContext) return;
@@ -136,6 +158,31 @@ function DatasetTable() {
     return () => window.clearTimeout(timeout);
   }, [app, selection]);
 
+  const sendSelectionAction = async (prompt: string) => {
+    if (!app || !app.getHostCapabilities()?.message?.text) {
+      setContextError("This host cannot start a follow-up from the app.");
+      return;
+    }
+    await shareSelection();
+    try {
+      const result = await app.sendMessage({
+        role: "user",
+        content: [{ type: "text", text: prompt }],
+      });
+      setContextError(result.isError ? "The host rejected the follow-up." : null);
+    } catch {
+      setContextError("The host could not start the follow-up.");
+    }
+  };
+
+  const openLink = async (url: string) => {
+    if (app?.getHostCapabilities()?.openLinks) {
+      const result = await app.openLink({ url });
+      if (!result.isError) return;
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   if (!page) {
     return (
       <main
@@ -145,7 +192,7 @@ function DatasetTable() {
       >
         {pageError ??
           (error
-            ? "This table is waiting for a supported MCP Apps host."
+            ? "This workbench is waiting for a supported MCP Apps host."
             : "Waiting for a dataset result…")}
       </main>
     );
@@ -259,9 +306,9 @@ function DatasetTable() {
       ))}
 
       <section
-        className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 ${
+        className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 ${
           view === "table"
-            ? "sm:grid-cols-[minmax(0,1fr)_auto_224px]"
+            ? "sm:grid-cols-[minmax(0,1fr)_auto_auto_224px]"
             : ""
         }`}
       >
@@ -301,9 +348,54 @@ function DatasetTable() {
         >
           <BarChartIcon className="size-4" aria-hidden="true" />
         </Button>
+        <Menu>
+          <Menu.Trigger>
+            <Button
+              variant="ghost"
+              color="secondary"
+              size="sm"
+              uniform
+              aria-label="Dataset actions"
+              title="Dataset actions"
+            >
+              <DataControls className="size-4" aria-hidden="true" />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content align="end" minWidth={210}>
+            <Menu.Item onSelect={() => setView("quality")}>
+              <AnalyzeData className="size-4" aria-hidden="true" />
+              Data quality
+            </Menu.Item>
+            <Menu.Item onSelect={() => setView("links")}>
+              <Link className="size-4" aria-hidden="true" />
+              Sources and links
+            </Menu.Item>
+            <Menu.Item onSelect={() => setView("provenance")}>
+              <InfoCircle className="size-4" aria-hidden="true" />
+              Provenance
+            </Menu.Item>
+            <Menu.Separator />
+            <Menu.Item
+              onSelect={() =>
+                downloadRows("csv", page.dataset.title, page.columns, loadedRows)
+              }
+            >
+              <Download className="size-4" aria-hidden="true" />
+              Export loaded CSV
+            </Menu.Item>
+            <Menu.Item
+              onSelect={() =>
+                downloadRows("json", page.dataset.title, page.columns, loadedRows)
+              }
+            >
+              <Download className="size-4" aria-hidden="true" />
+              Export loaded JSON
+            </Menu.Item>
+          </Menu.Content>
+        </Menu>
         {view === "table" && (
           <Input
-            className="col-span-2 w-full sm:col-span-1"
+            className="col-span-3 w-full sm:col-span-1"
             type="search"
             aria-label="Filter rows on this page"
             placeholder="Search visible values"
@@ -322,11 +414,21 @@ function DatasetTable() {
           rowCount={page.page.totalRows ?? page.rows.length}
           onProfileIndexChange={setProfileIndex}
         />
+      ) : view !== "table" ? (
+        <DatasetWorkbench
+          panel={view}
+          page={page}
+          rows={loadedRows}
+          selection={selection}
+          focusedRow={focusedRow}
+          onBack={() => setView("table")}
+          onOpenLink={(url) => void openLink(url)}
+        />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-subtle">
           <table className="w-full min-w-max table-fixed border-collapse text-left text-sm">
           <colgroup>
-            <col className="w-10" />
+            <col className="w-16" />
             {visibleColumns.map((column) => (
               <col
                 key={column.key}
@@ -336,7 +438,7 @@ function DatasetTable() {
           </colgroup>
           <thead className="bg-surface-secondary">
             <tr>
-              <th className="w-10 border-b border-subtle px-3 py-2">
+              <th className="w-16 border-b border-subtle px-2 py-2">
                 <span className="sr-only">Select row</span>
               </th>
               {visibleColumns.map((column) => (
@@ -449,18 +551,34 @@ function DatasetTable() {
               const checked = selection.some((item) => item.rowRef === rowRef);
               return (
                 <tr key={rowRef} className="border-b border-subtle last:border-0">
-                  <td className="px-3 py-2 align-top">
-                    <Checkbox
-                      checked={checked}
-                      label={
-                        <span className="sr-only">
-                          {checked ? "Deselect" : "Select"} row {rowRef}
-                        </span>
-                      }
-                      onCheckedChange={(nextChecked) =>
-                        toggleSelection(rowRef, row, nextChecked)
-                      }
-                    />
+                  <td className="px-2 py-1.5 align-top">
+                    <div className="flex items-center gap-1">
+                      <Checkbox
+                        checked={checked}
+                        label={
+                          <span className="sr-only">
+                            {checked ? "Deselect" : "Select"} row {rowRef}
+                          </span>
+                        }
+                        onCheckedChange={(nextChecked) =>
+                          toggleSelection(rowRef, row, nextChecked)
+                        }
+                      />
+                      <Button
+                        variant="ghost"
+                        color="secondary"
+                        size="xs"
+                        uniform
+                        aria-label={`Inspect row ${rowRef}`}
+                        title="Inspect row"
+                        onClick={() => {
+                          setFocusedRow({ rowRef, row });
+                          setView("details");
+                        }}
+                      >
+                        <InfoCircle className="size-3.5" aria-hidden="true" />
+                      </Button>
+                    </div>
                   </td>
                   {visibleColumns.map((column) => (
                     <td key={column.key} className="px-3 py-2 align-top">
@@ -480,6 +598,53 @@ function DatasetTable() {
             </p>
           )}
         </div>
+      )}
+
+      {view === "table" && selection.length > 0 && (
+        <aside className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-secondary p-2" aria-label="Selection actions">
+          <p className="px-1 text-xs text-secondary">{selection.length} rows ready for the model</p>
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              variant="ghost"
+              color="secondary"
+              size="sm"
+              disabled={selection.length < 2}
+              onClick={() => setView("compare")}
+            >
+              <Compare className="size-4" aria-hidden="true" />
+              Compare
+            </Button>
+            <Button
+              variant="ghost"
+              color="secondary"
+              size="sm"
+              onClick={() =>
+                downloadRows("csv", `${page.dataset.title}-selection`, page.columns, selection.map(({ row }) => row))
+              }
+            >
+              <Download className="size-4" aria-hidden="true" />
+              Export
+            </Button>
+            <Button
+              variant="soft"
+              color="secondary"
+              size="sm"
+              onClick={() => void sendSelectionAction("Analyze the selected dataset rows, surface notable patterns, and cite the fields you used.")}
+            >
+              <AnalyzeData className="size-4" aria-hidden="true" />
+              Analyze
+            </Button>
+            <Button
+              variant="soft"
+              color="secondary"
+              size="sm"
+              onClick={() => void sendSelectionAction("Prepare the selected dataset rows for spreadsheet analysis. Preserve field names and explain the cleanest next spreadsheet step.")}
+            >
+              <FileSpreadsheet className="size-4" aria-hidden="true" />
+              Spreadsheet
+            </Button>
+          </div>
+        </aside>
       )}
 
       {view === "table" && (
@@ -572,31 +737,10 @@ function readInitialResult(): { result?: DatasetResult; error?: string } {
   return parsed.ok ? { result: parsed.value } : { error: parsed.message };
 }
 
-function displayValue(value: unknown): string {
-  if (value === null || value === undefined) return "—";
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return "[unavailable value]";
-  }
-}
-
-function compare(left: unknown, right: unknown): number {
-  if (typeof left === "number" && typeof right === "number") return left - right;
-  return displayValue(left).localeCompare(displayValue(right), undefined, {
-    numeric: true,
-    sensitivity: "base",
-  });
-}
-
 const root = document.getElementById("root");
-if (!root) throw new Error("Dataset table root element is missing.");
+if (!root) throw new Error("Dataset workbench root element is missing.");
 createRoot(root).render(
   <StrictMode>
-    <DatasetTable />
+    <DatasetWorkbenchApp />
   </StrictMode>,
 );

@@ -15,7 +15,7 @@ The server MUST expose these application-controlled resource families:
 - `brightdata://results/{resultId}`: completed canonical result artifact backed
   by bounded local rows or lazy upstream snapshot parts.
 - Opaque page URIs returned inside result resources: bounded continuation pages.
-- `ui://bright-mcp/dataset-table`: static table app document.
+- `ui://bright-mcp/dataset-workbench-v2.html`: static workbench app document.
 - Opaque browser session and observation resources when the browser profile is enabled.
 
 `describe_dataset` owns dynamic dataset definitions; duplicating it as a
@@ -41,7 +41,7 @@ one provider and return an actionable capability error if none is available.
 
 ## App routing
 
-The table app is a UI resource linked from `run_dataset` metadata. It projects
+The workbench app is a UI resource linked from `run_dataset` metadata. It projects
 the same structured result and resource pages available to non-app clients.
 App capability negotiation changes presentation only, never execution meaning,
 result ownership, or artifact lifetime.

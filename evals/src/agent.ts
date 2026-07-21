@@ -1,6 +1,6 @@
 import { HostRunner, MCPClientManager } from "@mcpjam/sdk";
 import { useCases } from "./cases";
-import { safeError, type ServerId, writeReport } from "./mcp";
+import { safeError, serverLabel, type ServerId, writeReport } from "./mcp";
 
 const apiKey = required("OPENROUTER_API_KEY");
 const configuredModel = required("OPENROUTER_MODEL");
@@ -67,7 +67,7 @@ try {
       mcpLatencyMs: result.mcpLatencyMs(),
       ...(result.hasError() ? { error: safeError(result.getError()) } : {}),
     });
-    console.log(`${index + 1}/${jobs.length} ${job.useCase.id} ${job.server}`);
+    console.log(`${index + 1}/${jobs.length} ${job.useCase.id} ${serverLabel(job.server)}`);
   }
 } finally {
   await Promise.allSettled([

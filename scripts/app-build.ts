@@ -1,7 +1,7 @@
 import { mkdir, unlink } from "node:fs/promises";
 
 const projectRoot = new URL("../", import.meta.url);
-const stylesheet = new URL("../src/app/styles.css", import.meta.url);
+const defaultStylesheet = new URL("../src/app/styles.css", import.meta.url);
 const tailwind = new URL(
   "../node_modules/@tailwindcss/cli/dist/index.mjs",
   import.meta.url,
@@ -11,6 +11,7 @@ export async function buildAppAssets(options: {
   entrypoint: URL;
   outputDirectory: URL;
   minify: boolean;
+  stylesheet?: URL;
 }) {
   await mkdir(options.outputDirectory, { recursive: true });
   const css = new URL("dataset-table.css", options.outputDirectory);
@@ -22,7 +23,7 @@ export async function buildAppAssets(options: {
       process.execPath,
       tailwind.pathname,
       "-i",
-      stylesheet.pathname,
+      (options.stylesheet ?? defaultStylesheet).pathname,
       "-o",
       tailwindCss.pathname,
       ...(options.minify ? ["--minify"] : []),

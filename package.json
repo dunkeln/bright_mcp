@@ -16,9 +16,9 @@
     "dev": "bun --watch src/main.ts",
     "dev:app": "bun run scripts/dev-app.ts",
     "disconnect:brightdata": "bun run scripts/brightdata-connection.ts disconnect",
-    "evals": "bun --cwd evals run eval",
-    "report:check": "bun --cwd evals run report:check",
-    "report:write": "bun --cwd evals run report:write",
+    "evals": "bun run --cwd evals eval",
+    "report:check": "bun run --cwd evals report:check",
+    "report:write": "bun run --cwd evals report:write",
     "start": "bun run src/main.ts",
     "typecheck": "tsc --noEmit"
   },

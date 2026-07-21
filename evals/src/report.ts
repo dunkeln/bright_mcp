@@ -6,7 +6,6 @@ if (mode !== "--write" && mode !== "--check") throw new Error("Use --write or --
 const projectRoot = new URL("../../", import.meta.url);
 const rootReadme = new URL("README.md", projectRoot);
 const evalReadme = new URL("evals/README.md", projectRoot);
-const chart = new URL("assets/benchmark.svg", projectRoot);
 const report = (await Bun.file(new URL("../.artifacts/agent.json", import.meta.url)).json()) as Report;
 validate(report);
 
@@ -26,9 +25,9 @@ const complete = allSummaries.every(
 const publishable = report.providerParity === "live" && complete;
 const rootBlock = publishable
   ? [
-      "![Forest plot comparing MCP tool-use completion](./assets/benchmark.svg)",
+      "![Grouped bar chart comparing MCP tool-use completion](./assets/benchmark.png)",
       "",
-      `Bright MCP: ${percent(overall.bright.passRate)} pass · ${Math.round(overall.bright.averageTokens)} tokens · ${seconds(overall.bright.medianLatency)} p50. Upstream: ${percent(overall.upstream.passRate)} · ${Math.round(overall.upstream.averageTokens)} tokens · ${seconds(overall.upstream.medianLatency)} p50.`,
+      `Bright MCP: ${percent(overall.bright.passRate)} pass · ${Math.round(overall.bright.averageTokens)} tokens · ${seconds(overall.bright.medianLatency)} p50. BrightData MCP: ${percent(overall.upstream.passRate)} · ${Math.round(overall.upstream.averageTokens)} tokens · ${seconds(overall.upstream.medianLatency)} p50.`,
       `[Method and tables](./evals/README.md#latest-tool-use-benchmark) · \`${report.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}.`,
     ].join("\n")
   : "> Benchmark publication is blocked while the Bright MCP endpoint uses its demo provider.";
@@ -36,21 +35,19 @@ const evalBlock = [
   publishable ? "" : "> **Internal dry run:** provider parity is not live; do not use this table for public claims.\n",
   `\`${report.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}`,
   "",
-  "| Case | Pass B/U | Tokens B/U | p50 latency B/U | Calls B/U |",
+  "| Case | Pass Bright/BrightData | Tokens Bright/BrightData | p50 latency Bright/BrightData | Calls Bright/BrightData |",
   "|---|---:|---:|---:|---:|",
   ...summaries.map(({ label, bright, upstream }) =>
     `| ${label} | ${percent(bright.passRate)} / ${percent(upstream.passRate)} | ${Math.round(bright.averageTokens)} / ${Math.round(upstream.averageTokens)} | ${seconds(bright.medianLatency)} / ${seconds(upstream.medianLatency)} | ${bright.averageTools.toFixed(2)} / ${upstream.averageTools.toFixed(2)} |`,
   ),
   "",
-  "B/U = Bright MCP/upstream. A pass requires the intended search tool, a non-empty query and response, and no runner error; factual answer quality is not graded.",
+  "A pass requires the intended search tool, a non-empty query and response, and no runner error; factual answer quality is not graded.",
 ].join("\n");
 
 const files = [
   { url: rootReadme, expected: replaceBlock(await Bun.file(rootReadme).text(), rootBlock) },
   { url: evalReadme, expected: replaceBlock(await Bun.file(evalReadme).text(), evalBlock) },
 ];
-if (publishable) files.push({ url: chart, expected: renderChart(summaries, report) });
-
 if (mode === "--write") {
   for (const file of files) await Bun.write(file.url, file.expected);
   console.log(`Updated ${files.length} benchmark artifacts.`);
@@ -85,8 +82,6 @@ type Report = {
   providerParity: "demo" | "live";
   results: Result[];
 };
-type Summary = ReturnType<typeof summarize>;
-
 function validate(value: Report) {
   if (
     value.schemaVersion !== 1 ||
@@ -118,57 +113,6 @@ function replaceBlock(markdown: string, content: string) {
   return `${markdown.slice(0, from + start.length)}\n${content}\n${markdown.slice(to)}`;
 }
 
-function renderChart(
-  summaries: Array<{ label: string; bright: Summary; upstream: Summary }>,
-  report: Report,
-) {
-  const width = 1200;
-  const height = 190 + summaries.length * 86;
-  const left = 300;
-  const right = 1080;
-  const x = (value: number) => left + ((value + 1) / 2) * (right - left);
-  const rows = summaries.map(({ label, bright, upstream }, index) => {
-    const difference = bright.passRate - upstream.passRate;
-    const interval = differenceInterval(bright, upstream);
-    const y = 150 + index * 86;
-    return `<text x="40" y="${y + 6}" class="label">${escapeXml(label)}</text>
-    <line x1="${x(interval.low)}" x2="${x(interval.high)}" y1="${y}" y2="${y}" class="interval"/>
-    <circle cx="${x(difference)}" cy="${y}" r="11" fill="url(#dither)"/>
-    <text x="1110" y="${y + 6}" class="value">${signed(difference)}</text>`;
-  });
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="title desc">
-  <title id="title">Bright MCP versus upstream tool-use completion</title>
-  <desc id="desc">Forest plot of pass-rate differences with conservative 95 percent intervals.</desc>
-  <defs>
-    <pattern id="dither" width="6" height="6" patternUnits="userSpaceOnUse"><rect width="3" height="3" fill="#55e7e7"/><rect x="3" y="3" width="3" height="3" fill="#55e7e7"/></pattern>
-    <style>.title{fill:#f4f4f4;font:600 26px Inter,Arial}.meta,.axis,.value{fill:#aaa;font:14px ui-monospace,SFMono-Regular,monospace}.label{fill:#ddd;font:16px Inter,Arial}.grid{stroke:#ffffff18}.zero{stroke:#ffffff55}.interval{stroke:#8da8c7;stroke-width:4;stroke-linecap:round}</style>
-  </defs>
-  <rect width="100%" height="100%" rx="18" fill="#141414"/>
-  <text x="40" y="48" class="title">Tool-use completion advantage</text>
-  <text x="40" y="78" class="meta">${escapeXml(report.model)} · ${report.runsPerCase} runs per case</text>
-  <line x1="${x(-1)}" x2="${x(-1)}" y1="110" y2="${height - 48}" class="grid"/><line x1="${x(0)}" x2="${x(0)}" y1="110" y2="${height - 48}" class="zero"/><line x1="${x(1)}" x2="${x(1)}" y1="110" y2="${height - 48}" class="grid"/>
-  <text x="${x(-1)}" y="106" text-anchor="middle" class="axis">upstream</text><text x="${x(0)}" y="106" text-anchor="middle" class="axis">equal</text><text x="${x(1)}" y="106" text-anchor="middle" class="axis">Bright MCP</text>
-  ${rows.join("\n  ")}
-</svg>\n`;
-}
-
-function differenceInterval(bright: Summary, upstream: Summary) {
-  const a = wilson(bright.passRate, bright.runs);
-  const b = wilson(upstream.passRate, upstream.runs);
-  return { low: Math.max(-1, a.low - b.high), high: Math.min(1, a.high - b.low) };
-}
-
-function wilson(proportion: number, count: number) {
-  if (!count) return { low: 0, high: 1 };
-  const z = 1.96;
-  const denominator = 1 + (z * z) / count;
-  const center = (proportion + (z * z) / (2 * count)) / denominator;
-  const margin =
-    (z / denominator) *
-    Math.sqrt((proportion * (1 - proportion)) / count + (z * z) / (4 * count * count));
-  return { low: center - margin, high: center + margin };
-}
-
 function average(values: number[]) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
@@ -184,19 +128,10 @@ function percent(value: number) {
   return `${Math.round(value * 100)}%`;
 }
 
-function signed(value: number) {
-  const points = Math.round(value * 100);
-  return `${points > 0 ? "+" : ""}${points} pp`;
-}
-
 function seconds(milliseconds: number) {
   return `${(milliseconds / 1000).toFixed(1)}s`;
 }
 
 function title(value: string) {
   return value.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function escapeXml(value: string) {
-  return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }

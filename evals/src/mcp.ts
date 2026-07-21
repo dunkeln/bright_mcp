@@ -12,13 +12,17 @@ export async function connect(server: ServerId) {
   const url = new URL(endpoints[server]);
   if (server === "upstream") {
     const token = process.env.BRIGHTDATA_API_KEY;
-    if (!token) throw new Error("BRIGHTDATA_API_KEY is required for upstream checks.");
+    if (!token) throw new Error("BRIGHTDATA_API_KEY is required for BrightData MCP checks.");
     url.searchParams.set("token", token);
   }
 
   const client = new Client({ name: "bright-mcp-evals", version: "0.1.0" });
   await client.connect(new StreamableHTTPClientTransport(url));
   return client;
+}
+
+export function serverLabel(server: ServerId) {
+  return server === "bright" ? "Bright MCP" : "BrightData MCP";
 }
 
 export function safeError(error: unknown) {

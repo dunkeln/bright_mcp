@@ -6,8 +6,8 @@ root package's dependencies or lockfile.
 
 ## Run
 
-The upstream server requires a Bright Data API key and currently charges one
-credit for each search. The use-case suite makes seven upstream searches.
+BrightData MCP requires a Bright Data API key and currently charges one
+credit for each search. The use-case suite makes seven BrightData MCP searches.
 
 ```bash
 cd evals
@@ -38,7 +38,7 @@ five-tool surfaces, require a search query in their schema, and reject a missing
 query. A failure means the remote contract drifted or became unavailable.
 
 `bun run usecases` directly executes the seven scenarios advertised in the
-upstream README against each server's search tool. It verifies successful,
+BrightData MCP README against each server's search tool. It verifies successful,
 non-empty, bounded MCP results and records latency and result size.
 
 Live facts, search quality, and model tool selection are not deterministic.

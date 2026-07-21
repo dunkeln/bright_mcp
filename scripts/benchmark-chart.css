@@ -1,0 +1,14 @@
+@import "tailwindcss";
+@source "./benchmark-chart.tsx";
+@source "../src/components/dither-kit";
+
+:root {
+  --color-foreground: #171717;
+  --color-muted-foreground: #737373;
+  --color-border: #e5e5e5;
+}
+
+html,
+body {
+  margin: 0;
+}

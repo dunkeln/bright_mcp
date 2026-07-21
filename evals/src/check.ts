@@ -1,5 +1,5 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { connect, safeError, type ServerId, writeReport } from "./mcp";
+import { connect, safeError, serverLabel, type ServerId, writeReport } from "./mcp";
 
 const expectedTools: Record<ServerId, string[]> = {
   bright: ["describe_dataset", "find_datasets", "run_dataset", "scrape", "search_web"],
@@ -60,7 +60,7 @@ await writeReport("contracts", {
 });
 
 for (const report of reports) {
-  console.log(`\n${report.server}`);
+  console.log(`\n${serverLabel(report.server)}`);
   for (const check of report.checks) {
     console.log(`${check.ok ? "PASS" : "FAIL"} ${check.name}${check.ok ? "" : ` — ${check.detail ?? ""}`}`);
   }

@@ -1,6 +1,6 @@
 import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { useCases } from "./cases";
-import { connect, safeError, type ServerId, writeReport } from "./mcp";
+import { connect, safeError, serverLabel, type ServerId, writeReport } from "./mcp";
 
 const MAX_RESULT_BYTES = 2_000_000;
 const results = [];
@@ -64,7 +64,7 @@ await writeReport("usecases", {
 console.table(
   results.map(({ caseId, server, ok, durationMs, resultBytes }) => ({
     case: caseId,
-    server,
+    server: serverLabel(server),
     status: ok ? "PASS" : "FAIL",
     durationMs,
     resultBytes,

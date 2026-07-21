@@ -32,13 +32,13 @@ function BenchmarkChart() {
   }, []);
 
   return (
-    <main id="benchmark" className="h-[640px] w-[1200px] bg-white p-10 text-neutral-950">
+    <main id="benchmark" className="h-[640px] w-[1200px] bg-neutral-950 p-10 text-neutral-50">
       <header className="flex items-start justify-between gap-8">
         <div>
           <h1 className="m-0 text-2xl font-semibold tracking-tight">
             Tool-use completion by task
           </h1>
-          <p className="mt-1 font-mono text-xs text-neutral-500">
+          <p className="mt-1 font-mono text-xs text-neutral-400">
             {model} · {runsPerCase} runs per case
           </p>
         </div>

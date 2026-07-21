@@ -3,9 +3,9 @@
 @source "../src/components/dither-kit";
 
 :root {
-  --color-foreground: #171717;
-  --color-muted-foreground: #737373;
-  --color-border: #e5e5e5;
+  --color-foreground: #fafafa;
+  --color-muted-foreground: #a3a3a3;
+  --color-border: #333333;
 }
 
 html,

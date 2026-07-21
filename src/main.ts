@@ -16,6 +16,7 @@ import { createBrowserUseCases } from "./browser/use-cases";
 import type { BrowserUseCases } from "./browser/use-cases";
 import { LocalResultStore } from "./adapters/result-store";
 import {
+  createBearerCredentialProvider,
   macOsKeychainCredential,
   staticCredential,
 } from "./connections/credentials";
@@ -31,17 +32,20 @@ import { CancellableTaskStore } from "./mcp/task-store";
 
 const transportName = process.env.MCP_TRANSPORT ?? "http";
 const authMode = process.env.MCP_AUTH_MODE?.trim() || "none";
-if (!(authMode === "none" || authMode === "oidc")) {
-  throw new Error('MCP_AUTH_MODE must be either "none" or "oidc".');
+if (!(authMode === "none" || authMode === "byok" || authMode === "oidc")) {
+  throw new Error('MCP_AUTH_MODE must be "none", "byok", or "oidc".');
 }
-if (authMode === "oidc" && transportName !== "http") {
-  throw new Error("OIDC authorization is only supported by the HTTP transport.");
+if (authMode !== "none" && transportName !== "http") {
+  throw new Error("Remote authorization is only supported by the HTTP transport.");
 }
-const publicMcpUrl = authMode === "oidc"
+const publicMcpUrl = authMode !== "none"
   ? configuredUrl("MCP_PUBLIC_URL", process.env.MCP_PUBLIC_URL)
   : undefined;
 if (publicMcpUrl && (publicMcpUrl.pathname !== "/mcp" || publicMcpUrl.search)) {
   throw new Error("MCP_PUBLIC_URL must identify the /mcp endpoint without a query.");
+}
+if (authMode === "byok" && publicMcpUrl?.protocol !== "https:") {
+  throw new Error("BYOK mode requires an HTTPS MCP_PUBLIC_URL.");
 }
 const httpAuthorization = authMode === "oidc"
   ? await createOidcAuthorization({
@@ -49,6 +53,9 @@ const httpAuthorization = authMode === "oidc"
       resource: publicMcpUrl!,
       maxTokenAgeSeconds: readMaxTokenAge(process.env.MCP_MAX_TOKEN_AGE_SECONDS),
     })
+  : undefined;
+const bearerCredentials = authMode === "byok"
+  ? createBearerCredentialProvider()
   : undefined;
 const allowedOrigins = new Set(
   (process.env.MCP_ALLOWED_ORIGINS ?? "")
@@ -79,9 +86,9 @@ if (credentialSource === "keychain" && apiKey) {
 if (credentialSource === "keychain" && process.platform !== "darwin") {
   throw new Error("The built-in keychain credential source currently supports macOS only.");
 }
-if (httpAuthorization && (apiKey || credentialSource === "keychain")) {
+if ((httpAuthorization || bearerCredentials) && (apiKey || credentialSource === "keychain")) {
   throw new Error(
-    "Hosted OIDC mode cannot use deployment-global Bright Data credentials; configure a principal-bound credential vault.",
+    "Hosted authorization cannot use deployment-global Bright Data credentials.",
   );
 }
 if (dataProfile === "demo" && (apiKey || credentialSource === "keychain")) {
@@ -93,8 +100,9 @@ const localCredentials = apiKey
     ? macOsKeychainCredential()
     : undefined;
 const liveData = dataProfile === "live" ||
-  (dataProfile === "auto" && (httpAuthorization !== undefined || localCredentials !== undefined));
-if (liveData && !httpAuthorization && !localCredentials) {
+  (dataProfile === "auto" &&
+    (httpAuthorization !== undefined || bearerCredentials !== undefined || localCredentials !== undefined));
+if (liveData && !httpAuthorization && !bearerCredentials && !localCredentials) {
   throw new Error(
     "The live Bright Data profile requires BRIGHTDATA_API_KEY or BRIGHTDATA_CREDENTIAL_SOURCE=keychain.",
   );
@@ -120,7 +128,7 @@ const hostedConnection = credentialVault && httpAuthorization
       audit: (event) => console.error(JSON.stringify(event)),
     })
   : undefined;
-const credentials = credentialVault?.credentials ?? localCredentials;
+const credentials = credentialVault?.credentials ?? bearerCredentials?.credentials ?? localCredentials;
 const gateway = credentials
   ? new BrightDataGateway({
         credentials,
@@ -172,7 +180,7 @@ const icon = {
   sizes: ["1254x1254"],
 };
 const activeBrowsers = new Set<BrowserUseCases>();
-const createServer = () => {
+const createServer = (requestPrincipal = principalId) => {
   const browser = browserProvider ? createBrowser(browserProvider) : undefined;
   const server = createBrightMcpServer({
     datasets,
@@ -185,7 +193,7 @@ const createServer = () => {
     results: resultStore,
     tasks: httpAuthorization ? undefined : taskStore,
     widgetHtml,
-    principalId,
+    principalId: requestPrincipal,
     icon,
     connection: hostedConnection,
   });
@@ -282,6 +290,7 @@ if (transportName === "stdio") {
     publicUrl: publicMcpUrl,
     allowedOrigins,
     authorization: httpAuthorization,
+    bearerCredentials,
     connection: hostedConnection,
     widgetHtml,
     localPrincipalId: principalId,

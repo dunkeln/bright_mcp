@@ -5,11 +5,12 @@ trust boundaries with separate tokens, storage, and failure semantics.
 
 ## Remote MCP authorization
 
-Hosted Streamable HTTP deployments MUST implement the authorization profile of
-their negotiated MCP protocol version, with `2025-11-25` as the v1 compatibility
-baseline. They MUST use established authorization-server and token-validation
-libraries. The MCP server acts as a protected resource server; it MUST NOT
-implement an ad-hoc login protocol.
+Hosted Streamable HTTP deployments that separate MCP access from Bright Data
+credentials MUST implement the authorization profile of their negotiated MCP
+protocol version, with `2025-11-25` as the v1 compatibility baseline. They MUST
+use established authorization-server and token-validation libraries. The MCP
+server acts as a protected resource server; it MUST NOT implement an ad-hoc
+login protocol.
 
 - Publish OAuth Protected Resource Metadata and require the configured
   authorization server to publish OAuth or OpenID Connect discovery metadata.
@@ -21,6 +22,12 @@ implement an ad-hoc login protocol.
 - Require short-lived access tokens and refresh-token rotation where applicable;
   reject expired or invalid tokens.
 - Never forward the MCP access token to Bright Data.
+
+Public BYOK deployments MAY instead accept the user's Bright Data API key as an
+environment-backed Bearer header over HTTPS. In this profile the bearer is the
+upstream credential, not an MCP OAuth access token. The server MUST bind
+sessions to a one-way credential digest, retain the raw key only in bounded
+memory, require it on every MCP request, and MUST NOT persist or log it.
 
 The authorization policy owns the mapping from scopes to use cases. Dataset
 execution and other cost-incurring calls MUST be distinguishable from catalog

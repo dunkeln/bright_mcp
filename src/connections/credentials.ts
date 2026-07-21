@@ -1,3 +1,5 @@
+import { LRUCache } from "lru-cache";
+
 export type CredentialProvider = (
   principalId: string,
 ) => Promise<{ apiKey: string }>;
@@ -11,6 +13,36 @@ export class CredentialResolutionError extends Error {
 
 export function staticCredential(apiKey: string): CredentialProvider {
   return async () => ({ apiKey });
+}
+
+export function createBearerCredentialProvider() {
+  const apiKeys = new LRUCache<string, string>({
+    max: 1_000,
+    ttl: 60 * 60_000,
+    updateAgeOnGet: true,
+    ttlAutopurge: true,
+  });
+  return {
+    credentials: async (principalId: string) => {
+      const apiKey = apiKeys.get(principalId);
+      if (!apiKey) {
+        throw new CredentialResolutionError(
+          "missing",
+          "No Bright Data API key is bound to this MCP session.",
+        );
+      }
+      return { apiKey };
+    },
+    bind(authorization: string | null) {
+      const match = /^Bearer ([^\s]{1,4096})$/.exec(authorization ?? "");
+      if (!match) return undefined;
+      const apiKey = match[1]!;
+      const digest = new Bun.CryptoHasher("sha256").update(apiKey).digest("hex");
+      const principalId = `byok_${digest.slice(0, 32)}`;
+      apiKeys.set(principalId, apiKey);
+      return principalId;
+    },
+  };
 }
 
 export function macOsKeychainCredential(): CredentialProvider {

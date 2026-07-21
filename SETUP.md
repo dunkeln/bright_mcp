@@ -89,6 +89,18 @@ bun run check:compat
 
 ## Hosted authorization
 
+For the public BYOK profile, set `MCP_AUTH_MODE=byok`,
+`MCP_PUBLIC_URL=https://<host>/mcp`, and `BRIGHTDATA_PROFILE=live`. Clients send
+their Bright Data API key as a Bearer token from their own environment. The
+server uses its hash as the session identity, keeps the key only in bounded
+memory for at most one hour, and never stores it or includes it in MCP
+content. Active SERP and Web Unlocker zones are discovered from the caller's
+account when deployment-wide zone overrides are absent. This profile must run
+behind HTTPS.
+
+The OIDC profile below is for deployments that need separate MCP access tokens
+and persistent per-user Bright Data connections.
+
 Put the HTTP server behind TLS and set `MCP_AUTH_MODE=oidc`,
 `MCP_PUBLIC_URL=https://<host>/mcp`, and `MCP_OIDC_ISSUER` to an HTTPS issuer
 with OAuth/OIDC discovery, a JWKS endpoint, and PKCE S256 support. Access tokens

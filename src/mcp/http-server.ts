@@ -13,11 +13,13 @@ export function startHttpServer(options: {
   publicUrl?: URL;
   allowedOrigins: Set<string>;
   authorization?: HttpAuthorization;
+  bearerCredentials?: { bind(authorization: string | null): string | undefined };
   connection?: { handle(request: Request): Promise<Response | undefined> };
   widgetHtml: string;
   localPrincipalId: string;
-  createServer(): McpServer;
+  createServer(principalId?: string): McpServer;
 }) {
+  const protectedMode = Boolean(options.authorization || options.bearerCredentials);
   const sessions = new LRUCache<
     string,
     {
@@ -35,6 +37,7 @@ export function startHttpServer(options: {
 
   const httpServer = Bun.serve({
     port: options.port,
+    idleTimeout: 40,
     async fetch(request) {
       const url = new URL(request.url);
       const rejectedEdgeRequest = validateHostedEdge(
@@ -71,7 +74,7 @@ export function startHttpServer(options: {
         return withCors(
           new Response(null, { status: 204 }),
           request,
-          options.authorization !== undefined,
+          protectedMode,
           options.allowedOrigins,
         );
       }
@@ -80,12 +83,31 @@ export function startHttpServer(options: {
       }
 
       let authInfo: AuthInfo | undefined;
+      let bearerPrincipal: string | undefined;
       if (options.authorization) {
         const authenticated = await options.authorization.authenticate(request);
         if (authenticated instanceof Response) {
           return withCors(authenticated, request, true, options.allowedOrigins);
         }
         authInfo = authenticated;
+      } else if (options.bearerCredentials) {
+        bearerPrincipal = options.bearerCredentials.bind(
+          request.headers.get("authorization"),
+        );
+        if (!bearerPrincipal) {
+          return withCors(
+            new Response("Bright Data API key required", {
+              status: 401,
+              headers: {
+                "cache-control": "no-store",
+                "www-authenticate": 'Bearer realm="Bright MCP"',
+              },
+            }),
+            request,
+            true,
+            options.allowedOrigins,
+          );
+        }
       }
 
       let parsedBody: unknown;
@@ -102,7 +124,7 @@ export function startHttpServer(options: {
               { status: 400 },
             ),
             request,
-            options.authorization !== undefined,
+            protectedMode,
             options.allowedOrigins,
           );
         }
@@ -121,7 +143,7 @@ export function startHttpServer(options: {
       let session = sessionId ? sessions.get(sessionId) : undefined;
       const requestPrincipal = authenticatedPrincipal(
         authInfo,
-        options.localPrincipalId,
+        bearerPrincipal ?? options.localPrincipalId,
       );
       if (sessionId && (!session || session.principalId !== requestPrincipal)) {
         return withCors(
@@ -134,7 +156,7 @@ export function startHttpServer(options: {
             { status: 404 },
           ),
           request,
-          options.authorization !== undefined,
+          protectedMode,
           options.allowedOrigins,
         );
       }
@@ -153,11 +175,11 @@ export function startHttpServer(options: {
               { status: 400 },
             ),
             request,
-            options.authorization !== undefined,
+            protectedMode,
             options.allowedOrigins,
           );
         }
-        const server = options.createServer();
+        const server = options.createServer(requestPrincipal);
         const transport = new WebStandardStreamableHTTPServerTransport({
           sessionIdGenerator: () => crypto.randomUUID(),
           enableJsonResponse: true,
@@ -182,7 +204,7 @@ export function startHttpServer(options: {
       return withCors(
         response,
         request,
-        options.authorization !== undefined,
+        protectedMode,
         options.allowedOrigins,
       );
     },

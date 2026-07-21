@@ -22,7 +22,10 @@ const manager = new MCPClientManager(undefined, { defaultTimeout: 60_000 });
 const results: AgentResult[] = [];
 try {
   await Promise.all([
-    manager.connectToServer("bright", { url: "https://bright-mcp.onrender.com/mcp" }),
+    manager.connectToServer("bright", {
+      url: "https://bright-mcp.onrender.com/mcp",
+      accessToken: required("BRIGHTDATA_API_KEY"),
+    }),
     manager.connectToServer("upstream", { url: upstream.toString() }),
     manager.connectToServer("upstream-ecommerce", { url: upstreamEcommerce.toString() }),
   ]);

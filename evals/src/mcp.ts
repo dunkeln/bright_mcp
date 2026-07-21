@@ -10,14 +10,20 @@ const endpoints: Record<ServerId, string> = {
 
 export async function connect(server: ServerId) {
   const url = new URL(endpoints[server]);
+  const token = process.env.BRIGHTDATA_API_KEY;
+  if (!token) throw new Error("BRIGHTDATA_API_KEY is required for published MCP checks.");
   if (server === "upstream") {
-    const token = process.env.BRIGHTDATA_API_KEY;
-    if (!token) throw new Error("BRIGHTDATA_API_KEY is required for BrightData MCP checks.");
     url.searchParams.set("token", token);
   }
 
   const client = new Client({ name: "bright-mcp-evals", version: "0.1.0" });
-  await client.connect(new StreamableHTTPClientTransport(url));
+  await client.connect(
+    new StreamableHTTPClientTransport(url, {
+      requestInit: server === "bright"
+        ? { headers: { authorization: `Bearer ${token}` } }
+        : undefined,
+    }),
+  );
   return client;
 }
 

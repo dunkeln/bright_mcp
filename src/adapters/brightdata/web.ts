@@ -1,5 +1,6 @@
+import { LRUCache } from "lru-cache";
 import { z } from "zod";
-import { CapabilityError } from "../../core/contracts";
+import { CapabilityError, type RequestContext } from "../../core/contracts";
 import type {
   ItemFailure,
   ScrapePort,
@@ -25,15 +26,30 @@ const searchEnvelopeSchema = z.object({
   organic: z.array(organicResultSchema).optional(),
   results: z.array(organicResultSchema).optional(),
 });
+const activeZonesSchema = z.array(z.object({
+  name: z.string().min(1),
+  type: z.string(),
+}));
 
 export function createBrightDataWebAdapter(
   gateway: BrightDataGateway,
   zones: { serp?: string; unlocker?: string },
 ): { search: SearchPort; scrape: ScrapePort } {
+  const activeZones = new LRUCache<string, z.infer<typeof activeZonesSchema>>({
+    max: 1_000,
+    ttl: 5 * 60_000,
+  });
   return {
     search: {
       async search(input, context) {
-        const zone = requiredZone(zones.serp, "SERP API");
+        const zone = await resolveZone(
+          gateway,
+          activeZones,
+          zones.serp,
+          /^serp$/i,
+          "SERP API",
+          context,
+        );
         const offset = parseCursor(input.cursor);
         const response = await gateway.requestJson(
           {
@@ -74,7 +90,14 @@ export function createBrightDataWebAdapter(
     },
     scrape: {
       async scrape(input, context) {
-        const zone = requiredZone(zones.unlocker, "Web Unlocker API");
+        const zone = await resolveZone(
+          gateway,
+          activeZones,
+          zones.unlocker,
+          /unblocker|unlocker/i,
+          "Web Unlocker API",
+          context,
+        );
         return Promise.all(
           input.urls.map(async (url) => {
             try {
@@ -125,13 +148,42 @@ export function createBrightDataWebAdapter(
   };
 }
 
-function requiredZone(value: string | undefined, product: string) {
-  if (value) return value;
+async function resolveZone(
+  gateway: BrightDataGateway,
+  cache: LRUCache<string, z.infer<typeof activeZonesSchema>>,
+  configured: string | undefined,
+  type: RegExp,
+  product: string,
+  context: RequestContext,
+) {
+  if (configured) return configured;
+  let zones = cache.get(context.principalId);
+  if (!zones) {
+    const response = await gateway.requestJson(
+      { method: "GET", path: "/zone/get_active_zones" },
+      context,
+    );
+    const parsed = activeZonesSchema.safeParse(response.data);
+    if (!parsed.success) throw malformedZones();
+    zones = parsed.data;
+    cache.set(context.principalId, zones);
+  }
+  const zone = zones.find((candidate) => type.test(candidate.type))?.name;
+  if (zone) return zone;
   throw new CapabilityError(
     "brightdata_zone_required",
-    `${product} requires a configured Bright Data zone.`,
+    `${product} requires an active Bright Data zone.`,
     false,
-    "Configure the deployment's product zone and retry.",
+    `Enable ${product} in Bright Data, then retry.`,
+  );
+}
+
+function malformedZones() {
+  return new CapabilityError(
+    "malformed_upstream_response",
+    "Bright Data returned an unexpected active-zone response.",
+    false,
+    "Retry once. If this persists, inspect the account's active products.",
   );
 }
 

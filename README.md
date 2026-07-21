@@ -14,14 +14,21 @@ MCP App.
 Codex:
 
 ```bash
-codex mcp add bright --url https://bright-mcp.onrender.com/mcp
+codex mcp add bright --url https://bright-mcp.onrender.com/mcp \
+  --bearer-token-env-var BRIGHTDATA_API_KEY
 ```
 
 Claude Code:
 
 ```bash
-claude mcp add --transport http bright https://bright-mcp.onrender.com/mcp
+claude mcp add-json bright \
+  '{"type":"http","url":"https://bright-mcp.onrender.com/mcp","headers":{"Authorization":"Bearer ${BRIGHTDATA_API_KEY}"}}'
 ```
+
+Set `BRIGHTDATA_API_KEY` in the client environment first. The key is forwarded
+over HTTPS and kept only in a bounded in-memory cache; Bright MCP does not
+persist it. Available live capabilities follow the products enabled on that
+Bright Data account.
 
 See [SETUP.md](./SETUP.md) for local development, credentials, live checks, and
 hosted authorization.
@@ -42,6 +49,6 @@ hosted authorization.
 | API-specific code | Repeated across tools | Central adapters |
 | Polling implementations | Repeated | One shared mechanism |
 | Schema definitions | Repeated per tool | Catalog/operation-driven |
-| Authentication | Mostly embedded configuration | Separate provider boundary |
+| Credentials | API key in endpoint configuration | BYOK from the client environment; never server-funded |
 | Resources/tasks | Limited | First-class |
 | Security/session controls | Relatively implicit | Explicit and bounded |

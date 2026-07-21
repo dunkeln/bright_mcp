@@ -263,7 +263,7 @@ function translateNetworkError(
       error.message,
       false,
       error.reason === "missing"
-        ? "Run bun run connect:brightdata, then retry the tool call."
+        ? "Configure a Bright Data credential for this MCP connection, then retry."
         : "Unlock macOS Keychain or use explicit headless credential configuration.",
     );
   }

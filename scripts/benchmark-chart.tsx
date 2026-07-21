@@ -31,7 +31,7 @@ function BenchmarkChart() {
   }, []);
 
   return (
-    <main id="benchmark" className="h-[640px] w-[1200px] bg-neutral-950 p-10 text-neutral-50">
+    <main id="benchmark" className="h-[640px] w-[1200px] bg-[#0d1117] p-10 text-neutral-50">
       <header className="flex items-start justify-between gap-8">
         <div>
           <h1 className="m-0 text-2xl font-semibold tracking-tight">

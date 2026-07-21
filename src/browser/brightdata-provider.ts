@@ -47,7 +47,7 @@ export function createBrightDataBrowserProvider(
           page.on("response", (response) => {
             network.push({
               method: response.request().method().slice(0, 20),
-              url: safeUrl(response.url()).slice(0, 2_048),
+              url: redactBrowserUrl(response.url()).slice(0, 2_048),
               status: response.status(),
               contentType: response.headers()["content-type"]?.slice(0, 200),
             });
@@ -65,12 +65,12 @@ export function createBrightDataBrowserProvider(
           sessions.set(providerSessionId, { browser, page, network });
           return {
             providerSessionId,
-            url: safeUrl(page.url()),
+            url: redactBrowserUrl(page.url()),
             title: await page.title(),
           };
         } catch (error) {
           await browser?.close().catch(() => undefined);
-          throw browserError(error);
+          throw normalizeBrowserError(error);
         }
       });
     },
@@ -100,11 +100,11 @@ export function createBrightDataBrowserProvider(
             );
           }
           return {
-            url: safeUrl(session.page.url()),
+            url: redactBrowserUrl(session.page.url()),
             title: await session.page.title(),
           };
         } catch (error) {
-          throw browserError(error);
+          throw normalizeBrowserError(error);
         }
       });
     },
@@ -139,7 +139,7 @@ export function createBrightDataBrowserProvider(
           );
           return { kind, content: content.slice(0, 100_000) };
         } catch (error) {
-          throw browserError(error);
+          throw normalizeBrowserError(error);
         }
       });
     },
@@ -154,11 +154,11 @@ export function createBrightDataBrowserProvider(
             () => closeSession(sessions, providerSessionId),
           );
           return {
-            url: safeUrl(session.page.url()),
+            url: redactBrowserUrl(session.page.url()),
             title: await session.page.title(),
           };
         } catch (error) {
-          throw browserError(error);
+          throw normalizeBrowserError(error);
         }
       });
     },
@@ -218,7 +218,7 @@ function browserEndpoint(credential: { username: string; password: string }) {
   return `wss://${encodeURIComponent(credential.username)}:${encodeURIComponent(credential.password)}@brd.superproxy.io:9222`;
 }
 
-function safeUrl(value: string) {
+export function redactBrowserUrl(value: string) {
   try {
     const url = new URL(value);
     url.username = "";
@@ -257,7 +257,7 @@ async function abortable<T>(
   });
 }
 
-function browserError(error: unknown) {
+export function normalizeBrowserError(error: unknown) {
   if (error instanceof CapabilityError) return error;
   const message = error instanceof Error ? error.message : "";
   if (/timeout/i.test(message)) {

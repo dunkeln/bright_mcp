@@ -16,10 +16,11 @@ export class LocalBrowserSessionStore implements BrowserSessionStore {
   constructor(
     provider: Pick<BrowserProvider, "close">,
     private readonly limits = { global: 10, perPrincipal: 2 },
+    private readonly ttlMs = SESSION_TTL_MS,
   ) {
     this.sessions = new LRUCache({
       max: limits.global,
-      ttl: SESSION_TTL_MS,
+      ttl: ttlMs,
       ttlAutopurge: true,
       dispose: (session, _key, reason) => {
         if (reason !== "delete") void provider.close(session.providerSessionId);
@@ -47,7 +48,7 @@ export class LocalBrowserSessionStore implements BrowserSessionStore {
       id: `browser_${crypto.randomUUID()}`,
       providerSessionId,
       principalId,
-      expiresAt: new Date(Date.now() + SESSION_TTL_MS).toISOString(),
+      expiresAt: new Date(Date.now() + this.ttlMs).toISOString(),
     };
     this.sessions.set(session.id, session);
     return session;

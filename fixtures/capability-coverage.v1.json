@@ -93,8 +93,8 @@
         "resource:brightbrowser://observations/{artifactId}"
       ],
       "verification": {
-        "gate": "bun run check:compat",
-        "scenario": "Navigate, observe, interact, use history, read a screenshot resource, and close an owned demo session."
+        "gate": "bun run check:compat && bun run check:browser",
+        "scenario": "Navigate, observe, interact, use history, and close through MCP; separately prove principal and artifact ownership, expiry, cancellation cleanup, idempotent close, and credential/CDP redaction."
       }
     },
     {

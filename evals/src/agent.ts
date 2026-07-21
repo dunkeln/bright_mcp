@@ -84,22 +84,29 @@ try {
     const responseComplete = result.text.trim().length > 0;
     const outcomeValid = validatesOutcome(result.text, job.useCase);
     const toolEvidence = result.getToolMessages();
-    const toolExecutionValid =
+    const successfulTools = successfulToolExecutions(toolEvidence);
+    const toolExecutionValid = path.every((choices) =>
+      choices.some((tool) => successfulTools.has(tool))
+    );
+    const toolExecutionClean =
       !result.hasError() && !hasToolExecutionError(toolEvidence);
+    const passed =
+      toolSelected &&
+      argumentsValid &&
+      toolExecutionValid &&
+      responseComplete &&
+      outcomeValid;
     results.push({
       caseId: job.useCase.id,
       pillar: job.useCase.pillar,
       server: job.server,
       run: job.run,
-      passed:
-        toolSelected &&
-        argumentsValid &&
-        toolExecutionValid &&
-        responseComplete &&
-        outcomeValid,
+      passed,
       toolSelected,
       argumentsValid,
       toolExecutionValid,
+      toolExecutionClean,
+      recovered: passed && !toolExecutionClean,
       responseComplete,
       outcomeValid,
       toolsCalled: called,
@@ -112,7 +119,7 @@ try {
       toolEvidence,
       ...(result.hasError()
         ? { error: safeError(result.getError()) }
-        : toolExecutionValid
+        : toolExecutionClean || passed
           ? {}
           : { error: "MCP tool execution failed." }),
     });
@@ -138,6 +145,8 @@ type AgentResult = {
   toolSelected: boolean;
   argumentsValid: boolean;
   toolExecutionValid: boolean;
+  toolExecutionClean: boolean;
+  recovered: boolean;
   responseComplete: boolean;
   outcomeValid: boolean;
   toolsCalled: string[];
@@ -187,6 +196,21 @@ function hasToolExecutionError(value: unknown): boolean {
     Object.values(record).some(hasToolExecutionError);
 }
 
+function successfulToolExecutions(value: unknown, tools = new Set<string>()) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => successfulToolExecutions(item, tools));
+    return tools;
+  }
+  if (!value || typeof value !== "object") return tools;
+  const record = value as Record<string, unknown>;
+  if (record.type === "tool-result" && typeof record.toolName === "string") {
+    const output = record.output as { value?: { isError?: boolean } } | undefined;
+    if (output?.value?.isError !== true) tools.add(record.toolName);
+  }
+  Object.values(record).forEach((item) => successfulToolExecutions(item, tools));
+  return tools;
+}
+
 function required(name: string) {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is required.`);
@@ -216,7 +240,7 @@ async function readPrevious(): Promise<AgentResult[]> {
     runsPerCase?: number;
     results?: AgentResult[];
   };
-  return report.schemaVersion === 3 && report.model === model && report.runsPerCase === runs && Array.isArray(report.results)
+  return report.schemaVersion === 4 && report.model === model && report.runsPerCase === runs && Array.isArray(report.results)
     ? report.results
     : [];
 }
@@ -227,13 +251,13 @@ function resultKey(result: Pick<AgentResult, "caseId" | "server" | "run">) {
 
 async function persist() {
   await writeReport("agent", {
-    schemaVersion: 3,
+    schemaVersion: 4,
     generatedAt: new Date().toISOString(),
     mode: "mcpjam-openrouter-tool-use",
     model,
     runsPerCase: runs,
     grading:
-      "Pass requires the case's valid tool path, non-empty tool arguments, successful tool execution, required output fields and provenance, and no runner error. Factual values are not independently graded.",
+      "Pass requires a valid tool path, populated arguments, at least one successful execution for each required workflow step, and the required outcome fields and provenance. Recovered tool errors are reported separately. Factual values are not independently graded.",
     results,
   });
 }

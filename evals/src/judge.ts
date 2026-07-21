@@ -17,7 +17,7 @@ const apiKey = required("OPENROUTER_API_KEY");
 const judgeModel = required("OPENROUTER_JUDGE");
 const artifact = (await Bun.file(new URL("../.artifacts/agent.json", import.meta.url)).json()) as AgentReport;
 const judgeArtifact = Bun.file(new URL("../.artifacts/judge.json", import.meta.url));
-if (artifact.schemaVersion !== 3) throw new Error("Run the agent evaluation before judging it.");
+if (artifact.schemaVersion !== 4) throw new Error("Run the agent evaluation before judging it.");
 
 const expected = workflowCases.length * artifact.runsPerCase * 2;
 if (artifact.results.length !== expected) throw new Error(`Agent evaluation is incomplete (${artifact.results.length}/${expected}).`);

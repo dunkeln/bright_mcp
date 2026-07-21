@@ -50,13 +50,13 @@ const evalBlock = [
   publishable ? "" : "> **Incomplete run:** do not use this table for public claims.\n",
   `Agent \`${report.model}\` · judge \`${judge.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}`,
   "",
-  "| Case | Pass Bright/BrightData | Quality Bright/BrightData | Tokens Bright/BrightData | p50 latency Bright/BrightData | Calls Bright/BrightData |",
-  "|---|---:|---:|---:|---:|---:|",
+  "| Case | Pass Bright/BrightData | Recovered Bright/BrightData | Quality Bright/BrightData | Tokens Bright/BrightData | p50 latency Bright/BrightData | Calls Bright/BrightData |",
+  "|---|---:|---:|---:|---:|---:|---:|",
   ...summaries.map(({ label, bright, upstream, brightQuality, upstreamQuality }) =>
-    `| ${label} | ${percent(bright.passRate)} / ${percent(upstream.passRate)} | ${brightQuality.toFixed(2)} / ${upstreamQuality.toFixed(2)} | ${Math.round(bright.averageTokens)} / ${Math.round(upstream.averageTokens)} | ${seconds(bright.medianLatency)} / ${seconds(upstream.medianLatency)} | ${bright.averageTools.toFixed(2)} / ${upstream.averageTools.toFixed(2)} |`,
+    `| ${label} | ${percent(bright.passRate)} / ${percent(upstream.passRate)} | ${percent(bright.recoveryRate)} / ${percent(upstream.recoveryRate)} | ${brightQuality.toFixed(2)} / ${upstreamQuality.toFixed(2)} | ${Math.round(bright.averageTokens)} / ${Math.round(upstream.averageTokens)} | ${seconds(bright.medianLatency)} / ${seconds(upstream.medianLatency)} | ${bright.averageTools.toFixed(2)} / ${upstream.averageTools.toFixed(2)} |`,
   ),
   "",
-  `A pass requires a valid workflow tool path, populated arguments, requested output fields and provenance, and no runner error. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement: ${percent(judge.sideAgreement)}.`,
+  `A pass requires a valid workflow path, populated arguments, a successful execution for each required step, and requested output fields and provenance. Recovered tool errors are tracked separately. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement: ${percent(judge.sideAgreement)}.`,
 ].join("\n");
 
 const files = [
@@ -81,6 +81,7 @@ type Result = {
   caseId: string;
   server: "bright" | "upstream";
   passed: boolean;
+  recovered: boolean;
   toolsCalled: string[];
   inputTokens: number;
   outputTokens: number;
@@ -106,7 +107,7 @@ type JudgeReport = {
 };
 function validate(value: Report) {
   if (
-    value.schemaVersion !== 3 ||
+    value.schemaVersion !== 4 ||
     !value.model ||
     !Number.isInteger(value.runsPerCase) ||
     !Array.isArray(value.results)
@@ -137,6 +138,7 @@ function summarize(results: Result[]) {
   return {
     runs,
     passRate: runs ? results.filter(({ passed }) => passed).length / runs : 0,
+    recoveryRate: runs ? results.filter(({ recovered }) => recovered).length / runs : 0,
     averageTools: average(results.map(({ toolsCalled }) => toolsCalled.length)),
     averageTokens: average(results.map(({ tokenCount }) => tokenCount)),
     medianLatency: median(results.map(({ latencyMs }) => latencyMs)),

@@ -1,7 +1,31 @@
 ---
 import HeroDither from "../components/HeroDither";
+import { Check, ChevronDown, Copy, Download } from "lucide-astro";
 
 const startUrl = "#install";
+const cursorInstallUrl =
+  "cursor://anysphere.cursor-deeplink/mcp/install?name=bright&config=eyJ1cmwiOiJodHRwczovL2JyaWdodC1tY3Aub25yZW5kZXIuY29tL21jcCJ9";
+const clients = [
+  {
+    name: "Codex",
+    icon: "/assets/openai.svg",
+    command: "codex mcp add bright --url https://bright-mcp.onrender.com/mcp",
+    action: "copy",
+  },
+  {
+    name: "Claude Code",
+    icon: "/assets/anthropic.svg",
+    command: "claude mcp add --transport http bright https://bright-mcp.onrender.com/mcp",
+    action: "copy",
+  },
+  {
+    name: "Cursor",
+    icon: "/assets/cursor.svg",
+    command: "Install Bright MCP in Cursor",
+    action: "open",
+    href: cursorInstallUrl,
+  },
+];
 ---
 
 <!doctype html>
@@ -54,14 +78,43 @@ const startUrl = "#install";
 
       <section class="section-shell" id="install">
         <div class="command-intro dot-grid rail gutter-left gutter-right">
-          <p class="label">Lorem ipsum</p>
-          <h2>Lorem ipsum dolor sit amet</h2>
+          <p class="label">Install</p>
+          <h2>Connect Bright MCP to your agent</h2>
           <div class="install-command">
-            <span class="package">lorem <b>⌄</b></span>
-            <code>lorem ipsum dolor sit amet</code>
-            <span class="copy" aria-hidden="true">▢</span>
+            <details class="client-picker">
+              <summary>
+                <img class="client-icon" src={clients[0].icon} alt="" />
+                <span>{clients[0].name}</span>
+                <ChevronDown class="chevron-icon" aria-hidden="true" />
+              </summary>
+              <div class="client-menu">
+                {clients.map((client) => (
+                  <button
+                    class="client-option"
+                    type="button"
+                    data-name={client.name}
+                    data-icon={client.icon}
+                    data-command={client.command}
+                    data-action={client.action}
+                    data-href={client.href}
+                  >
+                    <img class="client-icon" src={client.icon} alt="" />
+                    <span>{client.name}</span>
+                  </button>
+                ))}
+              </div>
+            </details>
+            <code class="install-value">{clients[0].command}</code>
+            <button class="copy" type="button" aria-label="Copy install command">
+              <Copy class="copy-icon" aria-hidden="true" />
+              <Check class="check-icon" aria-hidden="true" />
+              <Download class="install-icon" aria-hidden="true" />
+            </button>
           </div>
-          <p class="meta">Lorem ipsum <span>·</span> dolor sit amet <span>★</span> 0.0K</p>
+          <p class="meta">
+            Open source <span>·</span> MIT licensed <span>|</span>
+            <img class="bun-logo" src="/assets/bun.svg" alt="Built with Bun" title="Built with Bun" />
+          </p>
         </div>
       </section>
 
@@ -112,6 +165,43 @@ const startUrl = "#install";
     </footer>
   </body>
 </html>
+
+<script>
+  const picker = document.querySelector<HTMLDetailsElement>(".client-picker");
+  const selectedIcon = picker?.querySelector<HTMLImageElement>("summary img");
+  const selectedName = picker?.querySelector<HTMLElement>("summary span");
+  const command = document.querySelector<HTMLElement>(".install-value");
+  const copy = document.querySelector<HTMLButtonElement>(".install-command .copy");
+
+  picker?.querySelectorAll<HTMLButtonElement>(".client-option").forEach((option) => {
+    option.addEventListener("click", () => {
+      if (selectedIcon) selectedIcon.src = option.dataset.icon ?? "";
+      if (selectedName) selectedName.textContent = option.dataset.name ?? "";
+      if (command) command.textContent = option.dataset.command ?? "";
+      if (copy) {
+        copy.dataset.action = option.dataset.action ?? "copy";
+        copy.dataset.href = option.dataset.href ?? "";
+        copy.classList.toggle("install-action", option.dataset.action === "open");
+      }
+      picker.open = false;
+      copy?.classList.remove("copied");
+      copy?.setAttribute(
+        "aria-label",
+        option.dataset.action === "open" ? "Install Bright MCP in Cursor" : "Copy install command",
+      );
+    });
+  });
+
+  copy?.addEventListener("click", async () => {
+    if (copy.dataset.action === "open") {
+      window.location.href = copy.dataset.href ?? "";
+      return;
+    }
+    await navigator.clipboard.writeText(command?.textContent ?? "");
+    copy.classList.add("copied");
+    copy.setAttribute("aria-label", "Copied");
+  });
+</script>
 
 <style>
   :global(*) { box-sizing: border-box; }
@@ -310,36 +400,89 @@ const startUrl = "#install";
     border: 1px solid var(--line);
     border-radius: 7px;
     display: grid;
-    grid-template-columns: 80px 1fr 55px;
+    grid-template-columns: 150px minmax(0, 1fr) 64px;
     margin-top: 32px;
-    max-width: 640px;
-    overflow: hidden;
+    max-width: 820px;
     width: 100%;
   }
 
-  .install-command .package,
+  .client-picker { border-right: 1px solid var(--line); position: relative; }
+  .client-picker summary,
+  .client-option,
   .install-command .copy {
     align-items: center;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
     display: flex;
+    font: inherit;
     font-size: 13px;
-    justify-content: center;
     min-height: 50px;
   }
 
-  .install-command .package { border-right: 1px solid var(--line); gap: 8px; }
-  .install-command .package b { font-size: 11px; font-weight: 400; }
-  .install-command .copy { border-left: 1px solid var(--line); font-size: 19px; }
+  .client-picker summary {
+    gap: 10px;
+    list-style: none;
+    padding: 0 16px;
+  }
+
+  .client-picker summary::-webkit-details-marker { display: none; }
+  .client-picker summary :global(.chevron-icon) {
+    flex: 0 0 auto;
+    height: 16px;
+    margin-left: auto;
+    stroke-width: 1.8;
+    width: 16px;
+  }
+  .client-icon { display: block; height: 20px; object-fit: contain; width: 20px; }
+  .client-icon[src$="openai.svg"] { filter: invert(1); }
+
+  .client-menu {
+    background: #202020;
+    border: 1px solid #ffffff24;
+    border-radius: 7px;
+    box-shadow: 0 16px 40px #0008;
+    left: -1px;
+    overflow: hidden;
+    padding: 5px;
+    position: absolute;
+    top: calc(100% + 8px);
+    width: 182px;
+    z-index: 4;
+  }
+
+  .client-option { gap: 10px; min-height: 42px; padding: 0 11px; width: 100%; }
+  .client-option:hover,
+  .client-option:focus-visible { background: #ffffff0d; border-radius: 5px; outline: none; }
+
+  .install-command .copy {
+    border-left: 1px solid var(--line);
+    justify-content: center;
+  }
+
+  .copy :global(svg) { height: 21px; stroke-width: 1.6; width: 21px; }
+  .copy :global(.check-icon),
+  .copy :global(.install-icon) { display: none; }
+  .copy.copied :global(.copy-icon),
+  .copy.install-action :global(.copy-icon) { display: none; }
+  .copy.copied :global(.check-icon) { color: #9fc4a7; display: block; }
+  .copy.install-action :global(.install-icon) { display: block; }
+
   .install-command code {
     align-items: center;
     color: #c8c8c8;
     display: flex;
     font: 13px "SFMono-Regular", Consolas, monospace;
+    overflow-x: auto;
     padding: 0 18px;
     text-align: left;
+    white-space: nowrap;
   }
 
-  .meta { color: #9d9d9d; font-size: 13px; margin: 24px 0 0; }
+  .meta { align-items: center; color: #9d9d9d; display: flex; font-size: 13px; margin: 24px 0 0; }
   .meta span { margin: 0 8px; }
+  .bun-logo { height: 21px; margin-left: 1px; width: 24px; }
 
   .bench-heading {
     align-items: center;
@@ -488,7 +631,10 @@ const startUrl = "#install";
   }
 
   @media (max-width: 480px) {
-    .install-command { grid-template-columns: 72px 1fr 46px; }
+    .install-command { grid-template-columns: 54px minmax(0, 1fr) 46px; }
+    .client-picker summary { justify-content: center; padding: 0; }
+    .client-picker summary span,
+    .client-picker summary :global(.chevron-icon) { display: none; }
     .install-command code { font-size: 11px; padding: 0 10px; }
   }
 </style>

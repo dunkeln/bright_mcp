@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "build": "bun run scripts/build-app.ts",
+    "check:adapters": "bun run scripts/adapter-compatibility.ts",
     "check:auth": "bun run scripts/auth-compatibility.ts",
     "check:compat": "bun run scripts/compatibility.ts",
     "check:connection": "bun run scripts/connection-compatibility.ts",

@@ -7,8 +7,8 @@
       "disposition": "composed",
       "routes": ["tool:search_web"],
       "verification": {
-        "gate": "bun run check:compat",
-        "scenario": "Invoke canonical search; the Bright adapter owns engine, locale, cursor, and upstream envelope mapping."
+        "gate": "bun run check:compat && bun run check:adapters",
+        "scenario": "Invoke canonical search, then prove equivalent Bright Data envelope shapes preserve the same result while credentials remain header-only."
       }
     },
     {
@@ -57,8 +57,8 @@
       "disposition": "internalized",
       "routes": ["tool:run_dataset", "protocol:tasks", "adapter:bounded-polling"],
       "verification": {
-        "gate": "bun run check:compat",
-        "scenario": "Run the same logical dataset call synchronously and through an optional MCP task; upstream job IDs remain private."
+        "gate": "bun run check:compat && bun run check:adapters",
+        "scenario": "Run the same logical dataset call synchronously and through an optional MCP task; the Bright adapter separately proves trigger, polling, download, timeout, and cancellation while upstream job IDs remain private."
       }
     },
     {

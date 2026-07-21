@@ -99,13 +99,14 @@ type JudgeReport = {
   schemaVersion: number;
   model: string;
   agentModel: string;
+  agentGeneratedAt: string;
   runsPerCase: number;
   sideAgreement: number;
   judgments: Array<{ pairId: string; scores: Record<"bright" | "upstream", Scores>; winner: "bright" | "upstream" | "tie" }>;
 };
 function validate(value: Report) {
   if (
-    value.schemaVersion !== 2 ||
+    value.schemaVersion !== 3 ||
     !value.model ||
     !Number.isInteger(value.runsPerCase) ||
     !Array.isArray(value.results)
@@ -116,9 +117,10 @@ function validate(value: Report) {
 
 function validateJudge(value: JudgeReport, agent: Report) {
   if (
-    value.schemaVersion !== 1 ||
+    value.schemaVersion !== 2 ||
     !value.model ||
     value.agentModel !== agent.model ||
+    value.agentGeneratedAt !== agent.generatedAt ||
     value.runsPerCase !== agent.runsPerCase ||
     !Array.isArray(value.judgments) ||
     value.judgments.length !== workflowCases.length * agent.runsPerCase

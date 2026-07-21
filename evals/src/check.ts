@@ -28,6 +28,15 @@ for (const server of ["bright", "upstream"] as const) {
       JSON.stringify(actual) === JSON.stringify(expectedTools[server]),
       `expected ${expectedTools[server].join(", ")}; received ${actual.join(", ")}`,
     );
+    const incompatibleSchemas = tools
+      .filter(({ outputSchema }) => !hasCompatibleDialect(outputSchema))
+      .map(({ name }) => name);
+    record(
+      checks,
+      "output schemas use an MCP-compatible dialect",
+      incompatibleSchemas.length === 0,
+      `incompatible tools: ${incompatibleSchemas.join(", ")}`,
+    );
 
     const searchName = server === "bright" ? "search_web" : "search_engine";
     const search = tools.find(({ name }) => name === searchName);
@@ -85,4 +94,11 @@ async function rejects(client: Client, name: string, args: Record<string, unknow
   } catch {
     return true;
   }
+}
+
+function hasCompatibleDialect(schema: unknown) {
+  if (!schema || typeof schema !== "object") return true;
+  const dialect = (schema as Record<string, unknown>)["$schema"];
+  return typeof dialect !== "string" ||
+    /^https?:\/\/json-schema\.org\/draft\/2020-12\/schema#?$/.test(dialect);
 }

@@ -83,15 +83,23 @@ try {
     const argumentsValid = pathArgumentsValid && openedSources;
     const responseComplete = result.text.trim().length > 0;
     const outcomeValid = validatesOutcome(result.text, job.useCase);
+    const toolEvidence = result.getToolMessages();
+    const toolExecutionValid =
+      !result.hasError() && !hasToolExecutionError(toolEvidence);
     results.push({
       caseId: job.useCase.id,
       pillar: job.useCase.pillar,
       server: job.server,
       run: job.run,
       passed:
-        toolSelected && argumentsValid && responseComplete && outcomeValid && !result.hasError(),
+        toolSelected &&
+        argumentsValid &&
+        toolExecutionValid &&
+        responseComplete &&
+        outcomeValid,
       toolSelected,
       argumentsValid,
+      toolExecutionValid,
       responseComplete,
       outcomeValid,
       toolsCalled: called,
@@ -101,8 +109,12 @@ try {
       latencyMs: Math.round(performance.now() - startedAt),
       response: result.text,
       toolCalls: result.getToolCalls(),
-      toolEvidence: result.getToolMessages(),
-      ...(result.hasError() ? { error: safeError(result.getError()) } : {}),
+      toolEvidence,
+      ...(result.hasError()
+        ? { error: safeError(result.getError()) }
+        : toolExecutionValid
+          ? {}
+          : { error: "MCP tool execution failed." }),
     });
     await persist();
     console.log(`${index + 1}/${jobs.length} ${job.useCase.id} ${serverLabel(job.server)}`);
@@ -125,6 +137,7 @@ type AgentResult = {
   passed: boolean;
   toolSelected: boolean;
   argumentsValid: boolean;
+  toolExecutionValid: boolean;
   responseComplete: boolean;
   outcomeValid: boolean;
   toolsCalled: string[];
@@ -170,6 +183,15 @@ function contentInclusiveSearch(value: Record<string, unknown> | undefined) {
     (value.depth === "ranked" || value.depth === "deep");
 }
 
+function hasToolExecutionError(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(hasToolExecutionError);
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return record.type === "error-text" ||
+    record.isError === true ||
+    Object.values(record).some(hasToolExecutionError);
+}
+
 function required(name: string) {
   const value = process.env[name]?.trim();
   if (!value) throw new Error(`${name} is required.`);
@@ -199,7 +221,7 @@ async function readPrevious(): Promise<AgentResult[]> {
     runsPerCase?: number;
     results?: AgentResult[];
   };
-  return report.schemaVersion === 2 && report.model === model && report.runsPerCase === runs && Array.isArray(report.results)
+  return report.schemaVersion === 3 && report.model === model && report.runsPerCase === runs && Array.isArray(report.results)
     ? report.results
     : [];
 }
@@ -210,13 +232,13 @@ function resultKey(result: Pick<AgentResult, "caseId" | "server" | "run">) {
 
 async function persist() {
   await writeReport("agent", {
-    schemaVersion: 2,
+    schemaVersion: 3,
     generatedAt: new Date().toISOString(),
     mode: "mcpjam-openrouter-tool-use",
     model,
     runsPerCase: runs,
     grading:
-      "Pass requires the case's valid tool path, non-empty tool arguments, required output fields and provenance, and no runner error. Factual values are not independently graded.",
+      "Pass requires the case's valid tool path, non-empty tool arguments, successful tool execution, required output fields and provenance, and no runner error. Factual values are not independently graded.",
     results,
   });
 }

@@ -1,0 +1,74 @@
+diff --git a/dist/cjs/server/zod-json-schema-compat.js b/dist/cjs/server/zod-json-schema-compat.js
+index bc067dad0ab4f63b52b0889c10ff30d64e132a01..69ea8a6452c4990a6d9fd27e1fb0043bd13e872f 100644
+--- a/dist/cjs/server/zod-json-schema-compat.js
++++ b/dist/cjs/server/zod-json-schema-compat.js
+@@ -36,26 +36,28 @@ const zod_compat_js_1 = require("./zod-compat.js");
+ const zod_to_json_schema_1 = require("zod-to-json-schema");
+ function mapMiniTarget(t) {
+     if (!t)
+-        return 'draft-7';
++        return 'draft-2020-12';
+     if (t === 'jsonSchema7' || t === 'draft-7')
+         return 'draft-7';
+     if (t === 'jsonSchema2019-09' || t === 'draft-2020-12')
+         return 'draft-2020-12';
+-    return 'draft-7'; // fallback
++    return 'draft-2020-12'; // fallback
+ }
+ function toJsonSchemaCompat(schema, opts) {
+     if ((0, zod_compat_js_1.isZ4Schema)(schema)) {
+         // v4 branch — use Mini's built-in toJSONSchema
+-        return z4mini.toJSONSchema(schema, {
++        const { $schema: _dialect, ...jsonSchema } = z4mini.toJSONSchema(schema, {
+             target: mapMiniTarget(opts?.target),
+             io: opts?.pipeStrategy ?? 'input'
+         });
++        return jsonSchema;
+     }
+     // v3 branch — use vendored converter
+-    return (0, zod_to_json_schema_1.zodToJsonSchema)(schema, {
++    const { $schema: _dialect, ...jsonSchema } = (0, zod_to_json_schema_1.zodToJsonSchema)(schema, {
+         strictUnions: opts?.strictUnions ?? true,
+         pipeStrategy: opts?.pipeStrategy ?? 'input'
+     });
++    return jsonSchema;
+ }
+ function getMethodLiteral(schema) {
+     const shape = (0, zod_compat_js_1.getObjectShape)(schema);
+diff --git a/dist/esm/server/zod-json-schema-compat.js b/dist/esm/server/zod-json-schema-compat.js
+index 62f7fd0ef1a323d674f003a305bfa359e6e744e5..f698cfbcb756b2bce240471648034ea1cd152a72 100644
+--- a/dist/esm/server/zod-json-schema-compat.js
++++ b/dist/esm/server/zod-json-schema-compat.js
+@@ -8,26 +8,28 @@ import { getObjectShape, safeParse, isZ4Schema, getLiteralValue } from './zod-co
+ import { zodToJsonSchema } from 'zod-to-json-schema';
+ function mapMiniTarget(t) {
+     if (!t)
+-        return 'draft-7';
++        return 'draft-2020-12';
+     if (t === 'jsonSchema7' || t === 'draft-7')
+         return 'draft-7';
+     if (t === 'jsonSchema2019-09' || t === 'draft-2020-12')
+         return 'draft-2020-12';
+-    return 'draft-7'; // fallback
++    return 'draft-2020-12'; // fallback
+ }
+ export function toJsonSchemaCompat(schema, opts) {
+     if (isZ4Schema(schema)) {
+         // v4 branch — use Mini's built-in toJSONSchema
+-        return z4mini.toJSONSchema(schema, {
++        const { $schema: _dialect, ...jsonSchema } = z4mini.toJSONSchema(schema, {
+             target: mapMiniTarget(opts?.target),
+             io: opts?.pipeStrategy ?? 'input'
+         });
++        return jsonSchema;
+     }
+     // v3 branch — use vendored converter
+-    return zodToJsonSchema(schema, {
++    const { $schema: _dialect, ...jsonSchema } = zodToJsonSchema(schema, {
+         strictUnions: opts?.strictUnions ?? true,
+         pipeStrategy: opts?.pipeStrategy ?? 'input'
+     });
++    return jsonSchema;
+ }
+ export function getMethodLiteral(schema) {
+     const shape = getObjectShape(schema);

@@ -290,7 +290,7 @@ async function resolveZone(
   }
   const zone = zones.find((candidate) =>
     kind === "serp"
-      ? candidate.plan?.serp === true || /^serp$/i.test(candidate.type)
+      ? candidate.plan?.serp === true || /serp|unblocker|unlocker/i.test(candidate.type)
       : /unblocker|unlocker/i.test(candidate.type) && candidate.plan?.serp !== true,
   )?.name;
   if (zone) return zone;

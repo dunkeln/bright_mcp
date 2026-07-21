@@ -17,7 +17,7 @@ const records: Array<Record<string, unknown>> = [];
 
 await checkSearchShapes();
 await checkBatchAndDiscover();
-await checkSerpZoneCreation();
+await checkSearchReusesUnlocker();
 await checkDatasetPolling();
 await checkMarketplaceAndDeepLookup();
 await checkExpectedFailures();
@@ -63,7 +63,7 @@ async function checkSearchShapes() {
   );
 }
 
-async function checkSerpZoneCreation() {
+async function checkSearchReusesUnlocker() {
   const requests: Array<{ path: string; body?: unknown }> = [];
   const adapter = createBrightDataWebAdapter(
     gateway(async (input, init) => {
@@ -75,7 +75,6 @@ async function checkSerpZoneCreation() {
       if (path === "/zone/get_active_zones") {
         return json([{ name: "fixture-unlocker", type: "unblocker" }]);
       }
-      if (path === "/zone") return json({ name: "bright_mcp_serp" });
       return json({ organic: [] });
     }),
     {},
@@ -91,9 +90,9 @@ async function checkSerpZoneCreation() {
   );
   assert(
     requests.map(({ path }) => path).join(",") ===
-      "/zone/get_active_zones,/zone,/request" &&
-      (requests[2]?.body as { zone?: string })?.zone === "bright_mcp_serp",
-    "Search did not create and use its deterministic SERP zone.",
+      "/zone/get_active_zones,/request" &&
+      (requests[1]?.body as { zone?: string })?.zone === "fixture-unlocker",
+    "Search did not reuse the caller's active Web Unlocker zone.",
   );
 }
 

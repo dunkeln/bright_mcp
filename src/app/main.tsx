@@ -8,6 +8,7 @@ import {
   DotsVerticalMoreMenu,
   Eye,
   EyeOff,
+  Search,
 } from "@openai/apps-sdk-ui/components/Icon";
 import { Input } from "@openai/apps-sdk-ui/components/Input";
 import { Menu } from "@openai/apps-sdk-ui/components/Menu";
@@ -243,9 +244,6 @@ function DatasetTable() {
         <div>
           <p className="text-xs text-secondary">Dataset result</p>
           <h1 className="heading-lg">{page.dataset.title}</h1>
-          <p className="mt-1 text-xs text-secondary">
-            {page.page.totalRows ?? page.rows.length} rows · page {pageIndex + 1}
-          </p>
         </div>
         <div className="flex items-center gap-2">
           {selection.length > 0 && (
@@ -267,16 +265,18 @@ function DatasetTable() {
         </p>
       ))}
 
-      <label className="flex max-w-sm flex-col gap-1 text-xs font-medium text-secondary">
-        Filter this page
+      <div className="flex justify-end">
         <Input
+          className="w-full max-w-sm"
+          type="search"
           aria-label="Filter rows on this page"
           placeholder="Search visible values"
+          startAdornment={<Search className="size-4" aria-hidden="true" />}
           size="sm"
           value={filter}
           onChange={(event) => setFilter(event.currentTarget.value)}
         />
-      </label>
+      </div>
 
       <div className="overflow-x-auto rounded-xl border border-subtle">
         <table className="w-full min-w-max table-fixed border-collapse text-left text-sm">
@@ -434,20 +434,27 @@ function DatasetTable() {
         )}
       </div>
 
-      <footer className="flex flex-wrap items-center justify-between gap-2">
-        {!isBrowserPreview && (
-          <p className="text-xs text-secondary" aria-live="polite">
-            {pageError ??
-              contextError ??
-              (isConnected ? "Connected to host" : "Display remains available offline")}
-          </p>
-        )}
-        <div className="ml-auto flex gap-2">
+      <footer className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          {!isBrowserPreview && (
+            <p className="truncate text-xs text-secondary" aria-live="polite">
+              {pageError ??
+                contextError ??
+                (isConnected
+                  ? "Connected to host"
+                  : "Display remains available offline")}
+            </p>
+          )}
           {contextError && (
             <Button color="secondary" variant="ghost" size="sm" onClick={shareSelection}>
               Retry selection context
             </Button>
           )}
+        </div>
+        <p className="text-center text-xs text-secondary" aria-live="polite">
+          {page.page.totalRows ?? page.rows.length} rows · page {pageIndex + 1}
+        </p>
+        <div className="flex justify-self-end gap-2">
           <Button
             color="secondary"
             variant="soft"

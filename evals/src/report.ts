@@ -22,7 +22,7 @@ const overall = {
 const complete = allSummaries.every(
   ({ bright, upstream }) => bright.runs === report.runsPerCase && upstream.runs === report.runsPerCase,
 );
-const publishable = report.providerParity === "live" && complete;
+const publishable = complete && report.runsPerCase >= 20;
 const rootBlock = publishable
   ? [
       "![Grouped bar chart comparing MCP tool-use completion](./assets/benchmark.png)",
@@ -30,9 +30,9 @@ const rootBlock = publishable
       `Bright MCP: ${percent(overall.bright.passRate)} pass · ${Math.round(overall.bright.averageTokens)} tokens · ${seconds(overall.bright.medianLatency)} p50. BrightData MCP: ${percent(overall.upstream.passRate)} · ${Math.round(overall.upstream.averageTokens)} tokens · ${seconds(overall.upstream.medianLatency)} p50.`,
       `[Method and tables](./evals/README.md#latest-tool-use-benchmark) · \`${report.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}.`,
     ].join("\n")
-  : "> Benchmark publication is blocked while the Bright MCP endpoint uses its demo provider.";
+  : "> Benchmark publication requires a complete 20-run comparison across both live MCPs.";
 const evalBlock = [
-  publishable ? "" : "> **Internal dry run:** provider parity is not live; do not use this table for public claims.\n",
+  publishable ? "" : "> **Incomplete run:** do not use this table for public claims.\n",
   `\`${report.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}`,
   "",
   "| Case | Pass Bright/BrightData | Tokens Bright/BrightData | p50 latency Bright/BrightData | Calls Bright/BrightData |",
@@ -79,7 +79,6 @@ type Report = {
   generatedAt: string;
   model: string;
   runsPerCase: number;
-  providerParity: "demo" | "live";
   results: Result[];
 };
 function validate(value: Report) {

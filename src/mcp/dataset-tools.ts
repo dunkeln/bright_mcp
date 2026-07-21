@@ -98,11 +98,6 @@ type DatasetToolDependencies = {
 export function registerDatasetTools(
   server: McpServer,
   dependencies: DatasetToolDependencies,
-  connectionError: (
-    context: RequestContext,
-  ) => (
-    error: unknown,
-  ) => CapabilityError | undefined | Promise<CapabilityError | undefined>,
 ) {
   server.registerTool(
     "find_datasets",
@@ -235,7 +230,6 @@ export function registerDatasetTools(
         input,
         dependencies,
         context,
-        connectionError(context),
       );
     });
   }

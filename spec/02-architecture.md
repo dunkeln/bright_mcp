@@ -3,7 +3,7 @@
 ## Dependency direction
 
 ```text
-MCP transport / optional HTTP authorization
+MCP transport / BYOK credential boundary
             ↓
 MCP tools, resources, and tasks
             ↓
@@ -29,11 +29,11 @@ MUST NOT become core domain models.
   meaning.
 - Contains no credential collection, polling, or upstream response parsing.
 
-### Authorization and connection boundary
+### Credential boundary
 
-- Authenticates remote MCP requests and produces a trusted principal context.
-- Resolves the deployment-appropriate Bright Data credential provider.
-- Keeps MCP access tokens and Bright Data credentials out of use-case input,
+- Binds hosted sessions to a digest of the caller's Bright Data key.
+- Resolves local credentials from explicit environment or Keychain input.
+- Keeps Bright Data credentials out of use-case input,
   tool schemas, canonical results, resources, and app payloads.
 
 ### Core
@@ -64,7 +64,7 @@ MUST NOT become core domain models.
 The executable entrypoint MUST perform all wiring:
 
 1. Read and validate Bun runtime configuration.
-2. Construct transport authorization and the credential provider.
+2. Construct the transport-bound credential provider.
 3. Construct the Bright Data gateway, adapter implementations, and catalog.
 4. Inject ports into core use cases.
 5. Register MCP tools, resources, optional tasks, and the app resource.
@@ -79,7 +79,7 @@ construct production dependencies.
 src/core/          canonical contracts, ports, use cases, errors
 src/adapters/      Bright Data client, catalog, polling, normalization
 src/browser/       browser contracts, sessions, and Bright Data CDP adapter
-src/connections/   credential providers and account-connection flow
+src/connections/   local and hosted credential providers
 src/mcp/           tool/resource registration and MCP result mapping
 src/app/           interactive result projection
 src/main.*         composition root

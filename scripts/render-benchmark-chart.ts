@@ -21,7 +21,7 @@ const complete = workflowCases.every((useCase) =>
     (server) => report.results.filter((result) => result.caseId === useCase.id && result.server === server).length === report.runsPerCase,
   ),
 );
-if (mode !== "--preview" && (report.providerParity !== "live" || !complete)) process.exit(0);
+if (mode !== "--preview" && !complete) process.exit(0);
 
 const temporaryDirectory = await mkdtemp(join(tmpdir(), "bright-benchmark-"));
 try {
@@ -64,7 +64,6 @@ try {
 type Report = {
   model: string;
   runsPerCase: number;
-  providerParity: "demo" | "live";
   results: Array<{ caseId: string; server: "bright" | "upstream"; passed: boolean }>;
 };
 

@@ -1,9 +1,6 @@
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { LRUCache } from "lru-cache";
-import type { HttpAuthorization } from "../auth/oidc";
-import { requiredScopesForRequest } from "../auth/scopes";
 import type { createBrightMcpServer } from "./server";
 
 type McpServer = ReturnType<typeof createBrightMcpServer>;
@@ -12,14 +9,12 @@ export function startHttpServer(options: {
   port: number;
   publicUrl?: URL;
   allowedOrigins: Set<string>;
-  authorization?: HttpAuthorization;
   bearerCredentials?: { bind(authorization: string | null): string | undefined };
-  connection?: { handle(request: Request): Promise<Response | undefined> };
   widgetHtml: string;
   localPrincipalId: string;
   createServer(principalId?: string): McpServer;
 }) {
-  const protectedMode = Boolean(options.authorization || options.bearerCredentials);
+  const protectedMode = Boolean(options.bearerCredentials);
   const sessions = new LRUCache<
     string,
     {
@@ -46,22 +41,6 @@ export function startHttpServer(options: {
         options.allowedOrigins,
       );
       if (rejectedEdgeRequest) return rejectedEdgeRequest;
-      const connectionResponse = await options.connection?.handle(request);
-      if (connectionResponse) return connectionResponse;
-      if (
-        options.authorization &&
-        request.method === "GET" &&
-        url.pathname === options.authorization.metadataPath
-      ) {
-        return withCors(
-          Response.json(options.authorization.protectedResourceMetadata, {
-            headers: { "cache-control": "public, max-age=300" },
-          }),
-          request,
-          true,
-          options.allowedOrigins,
-        );
-      }
       if (request.method === "GET" && url.pathname === "/") {
         return new Response("Bright MCP", { status: 200 });
       }
@@ -82,15 +61,8 @@ export function startHttpServer(options: {
         return new Response("Not found", { status: 404 });
       }
 
-      let authInfo: AuthInfo | undefined;
       let bearerPrincipal: string | undefined;
-      if (options.authorization) {
-        const authenticated = await options.authorization.authenticate(request);
-        if (authenticated instanceof Response) {
-          return withCors(authenticated, request, true, options.allowedOrigins);
-        }
-        authInfo = authenticated;
-      } else if (options.bearerCredentials) {
+      if (options.bearerCredentials) {
         bearerPrincipal = options.bearerCredentials.bind(
           request.headers.get("authorization"),
         );
@@ -129,22 +101,9 @@ export function startHttpServer(options: {
           );
         }
       }
-      if (options.authorization && authInfo) {
-        const insufficient = options.authorization.requireScopes(
-          authInfo,
-          requiredScopesForRequest(parsedBody),
-        );
-        if (insufficient) {
-          return withCors(insufficient, request, true, options.allowedOrigins);
-        }
-      }
-
       const sessionId = request.headers.get("mcp-session-id");
       let session = sessionId ? sessions.get(sessionId) : undefined;
-      const requestPrincipal = authenticatedPrincipal(
-        authInfo,
-        bearerPrincipal ?? options.localPrincipalId,
-      );
+      const requestPrincipal = bearerPrincipal ?? options.localPrincipalId;
       if (sessionId && (!session || session.principalId !== requestPrincipal)) {
         return withCors(
           Response.json(
@@ -198,7 +157,6 @@ export function startHttpServer(options: {
         await server.connect(transport);
       }
       const response = await session.transport.handleRequest(request, {
-        authInfo,
         parsedBody,
       });
       return withCors(
@@ -217,14 +175,6 @@ export function startHttpServer(options: {
       httpServer.stop(true);
     },
   };
-}
-
-function authenticatedPrincipal(
-  authInfo: AuthInfo | undefined,
-  localPrincipalId: string,
-) {
-  const authenticated = authInfo?.extra?.principalId;
-  return typeof authenticated === "string" ? authenticated : localPrincipalId;
 }
 
 function validateHostedEdge(

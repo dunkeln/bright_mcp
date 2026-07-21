@@ -12,6 +12,7 @@ import { BrightDataGateway } from "./gateway";
 const SEARCH_PAGE_SIZE = 10;
 const MAX_SEARCH_OFFSET = 90;
 const MAX_SCRAPE_BYTES = 100_000;
+const DEFAULT_ZONES = { serp: "bright_mcp_serp", unlocker: "bright_mcp_unlocker" } as const;
 
 const organicResultSchema = z.object({
   title: z.string(),
@@ -29,6 +30,7 @@ const searchEnvelopeSchema = z.object({
 const activeZonesSchema = z.array(z.object({
   name: z.string().min(1),
   type: z.string(),
+  plan: z.object({ serp: z.boolean().optional() }).optional(),
 }));
 
 export function createBrightDataWebAdapter(
@@ -39,15 +41,16 @@ export function createBrightDataWebAdapter(
     max: 1_000,
     ttl: 5 * 60_000,
   });
+  const zoneCreations = new Map<string, Promise<string>>();
   return {
     search: {
       async search(input, context) {
         const zone = await resolveZone(
           gateway,
           activeZones,
+          zoneCreations,
           zones.serp,
-          /^serp$/i,
-          "SERP API",
+          "serp",
           context,
         );
         const offset = parseCursor(input.cursor);
@@ -93,9 +96,9 @@ export function createBrightDataWebAdapter(
         const zone = await resolveZone(
           gateway,
           activeZones,
+          zoneCreations,
           zones.unlocker,
-          /unblocker|unlocker/i,
-          "Web Unlocker API",
+          "unlocker",
           context,
         );
         return Promise.all(
@@ -151,9 +154,9 @@ export function createBrightDataWebAdapter(
 async function resolveZone(
   gateway: BrightDataGateway,
   cache: LRUCache<string, z.infer<typeof activeZonesSchema>>,
+  creations: Map<string, Promise<string>>,
   configured: string | undefined,
-  type: RegExp,
-  product: string,
+  kind: keyof typeof DEFAULT_ZONES,
   context: RequestContext,
 ) {
   if (configured) return configured;
@@ -168,14 +171,52 @@ async function resolveZone(
     zones = parsed.data;
     cache.set(context.principalId, zones);
   }
-  const zone = zones.find((candidate) => type.test(candidate.type))?.name;
+  const zone = zones.find((candidate) =>
+    kind === "serp"
+      ? candidate.plan?.serp === true || candidate.name === DEFAULT_ZONES.serp
+      : /unblocker|unlocker/i.test(candidate.type) && candidate.plan?.serp !== true,
+  )?.name;
   if (zone) return zone;
-  throw new CapabilityError(
-    "brightdata_zone_required",
-    `${product} requires an active Bright Data zone.`,
-    false,
-    `Enable ${product} in Bright Data, then retry.`,
+  const key = `${context.principalId}:${kind}`;
+  const pending = creations.get(key) ?? createZone(gateway, kind, context);
+  creations.set(key, pending);
+  try {
+    const created = await pending;
+    cache.set(context.principalId, [
+      ...zones,
+      { name: created, type: "unblocker", plan: { serp: kind === "serp" } },
+    ]);
+    return created;
+  } finally {
+    creations.delete(key);
+  }
+}
+
+async function createZone(
+  gateway: BrightDataGateway,
+  kind: keyof typeof DEFAULT_ZONES,
+  context: RequestContext,
+) {
+  const name = DEFAULT_ZONES[kind];
+  const serp = kind === "serp";
+  await gateway.requestJson(
+    {
+      method: "POST",
+      path: "/zone",
+      body: {
+        zone: { name, type: "unblocker" },
+        plan: {
+          type: "unblocker",
+          serp,
+          country: "any",
+          solve_captcha_disable: true,
+          custom_headers: false,
+        },
+      },
+    },
+    context,
   );
+  return name;
 }
 
 function malformedZones() {

@@ -2,7 +2,6 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { createBrightDataDatasetAdapter } from "./adapters/brightdata/datasets";
 import { BrightDataGateway } from "./adapters/brightdata/gateway";
 import { createBrightDataWebAdapter } from "./adapters/brightdata/web";
-import { createOidcAuthorization } from "./auth/oidc";
 import { createDemoDatasetAdapter } from "./adapters/demo-datasets";
 import { createDemoWebAdapter } from "./adapters/demo-web";
 import { createFakeBrowserProvider } from "./browser/fake-provider";
@@ -21,8 +20,6 @@ import {
   staticCredential,
 } from "./connections/credentials";
 import { staticBrowserCredential } from "./connections/browser-credentials";
-import { createEncryptedCredentialVault } from "./connections/encrypted-vault";
-import { createHostedConnectionService } from "./connections/hosted-connection";
 import { createDatasetUseCases } from "./core/datasets";
 import { createWebUseCases } from "./core/web";
 import { createBrightMcpServer } from "./mcp/server";
@@ -31,30 +28,24 @@ import { createSamplingExtractionProvider } from "./mcp/sampling-extraction";
 import { CancellableTaskStore } from "./mcp/task-store";
 
 const transportName = process.env.MCP_TRANSPORT ?? "http";
-const authMode = process.env.MCP_AUTH_MODE?.trim() || "none";
-if (!(authMode === "none" || authMode === "byok" || authMode === "oidc")) {
-  throw new Error('MCP_AUTH_MODE must be "none", "byok", or "oidc".');
+if (!(transportName === "http" || transportName === "stdio")) {
+  throw new Error('MCP_TRANSPORT must be either "http" or "stdio".');
 }
-if (authMode !== "none" && transportName !== "http") {
-  throw new Error("Remote authorization is only supported by the HTTP transport.");
+const testFixtures = process.env.BRIGHT_MCP_TEST_FIXTURES === "1";
+if (testFixtures && process.env.NODE_ENV !== "test") {
+  throw new Error("Bright MCP test fixtures require NODE_ENV=test.");
 }
-const publicMcpUrl = authMode !== "none"
+const hosted = transportName === "http" && !testFixtures;
+const publicMcpUrl = hosted
   ? configuredUrl("MCP_PUBLIC_URL", process.env.MCP_PUBLIC_URL)
   : undefined;
 if (publicMcpUrl && (publicMcpUrl.pathname !== "/mcp" || publicMcpUrl.search)) {
   throw new Error("MCP_PUBLIC_URL must identify the /mcp endpoint without a query.");
 }
-if (authMode === "byok" && publicMcpUrl?.protocol !== "https:") {
-  throw new Error("BYOK mode requires an HTTPS MCP_PUBLIC_URL.");
+if (hosted && publicMcpUrl?.protocol !== "https:") {
+  throw new Error("Hosted HTTP requires an HTTPS MCP_PUBLIC_URL.");
 }
-const httpAuthorization = authMode === "oidc"
-  ? await createOidcAuthorization({
-      issuer: configuredUrl("MCP_OIDC_ISSUER", process.env.MCP_OIDC_ISSUER),
-      resource: publicMcpUrl!,
-      maxTokenAgeSeconds: readMaxTokenAge(process.env.MCP_MAX_TOKEN_AGE_SECONDS),
-    })
-  : undefined;
-const bearerCredentials = authMode === "byok"
+const bearerCredentials = hosted
   ? createBearerCredentialProvider()
   : undefined;
 const allowedOrigins = new Set(
@@ -74,10 +65,6 @@ if (!(credentialSource === "auto" || credentialSource === "keychain")) {
   );
 }
 const apiKey = process.env.BRIGHTDATA_API_KEY?.trim();
-const dataProfile = process.env.BRIGHTDATA_PROFILE?.trim() || "auto";
-if (!(dataProfile === "auto" || dataProfile === "demo" || dataProfile === "live")) {
-  throw new Error('BRIGHTDATA_PROFILE must be "auto", "demo", or "live".');
-}
 if (credentialSource === "keychain" && apiKey) {
   throw new Error(
     "Choose either BRIGHTDATA_API_KEY or BRIGHTDATA_CREDENTIAL_SOURCE=keychain, not both.",
@@ -86,49 +73,30 @@ if (credentialSource === "keychain" && apiKey) {
 if (credentialSource === "keychain" && process.platform !== "darwin") {
   throw new Error("The built-in keychain credential source currently supports macOS only.");
 }
-if ((httpAuthorization || bearerCredentials) && (apiKey || credentialSource === "keychain")) {
+if (hosted && (apiKey || credentialSource === "keychain")) {
   throw new Error(
-    "Hosted authorization cannot use deployment-global Bright Data credentials.",
+    "Hosted HTTP accepts each caller's Bright Data key and cannot use deployment-global credentials.",
   );
 }
-if (dataProfile === "demo" && (apiKey || credentialSource === "keychain")) {
-  throw new Error("The demo Bright Data profile cannot accept live credentials.");
+if (
+  hosted &&
+  (process.env.BRIGHTDATA_SERP_ZONE || process.env.BRIGHTDATA_UNLOCKER_ZONE)
+) {
+  throw new Error(
+    "Hosted HTTP discovers zones per caller and cannot use deployment-global zone names.",
+  );
 }
 const localCredentials = apiKey
   ? staticCredential(apiKey)
   : credentialSource === "keychain"
     ? macOsKeychainCredential()
     : undefined;
-const liveData = dataProfile === "live" ||
-  (dataProfile === "auto" &&
-    (httpAuthorization !== undefined || bearerCredentials !== undefined || localCredentials !== undefined));
-if (liveData && !httpAuthorization && !bearerCredentials && !localCredentials) {
+if (!testFixtures && !bearerCredentials && !localCredentials) {
   throw new Error(
-    "The live Bright Data profile requires BRIGHTDATA_API_KEY or BRIGHTDATA_CREDENTIAL_SOURCE=keychain.",
+    "Stdio requires BRIGHTDATA_API_KEY or BRIGHTDATA_CREDENTIAL_SOURCE=keychain.",
   );
 }
-const credentialVault = liveData && httpAuthorization
-  ? await createEncryptedCredentialVault({
-      path: requiredSetting("MCP_VAULT_PATH", process.env.MCP_VAULT_PATH),
-      keyHex: requiredSetting("MCP_VAULT_KEY", process.env.MCP_VAULT_KEY),
-      deploymentId: publicMcpUrl!.href,
-    })
-  : undefined;
-const hostedConnection = credentialVault && httpAuthorization
-  ? createHostedConnectionService({
-      authorization: httpAuthorization,
-      publicMcpUrl: publicMcpUrl!,
-      clientId: requiredSetting(
-        "MCP_OIDC_CLIENT_ID",
-        process.env.MCP_OIDC_CLIENT_ID,
-      ),
-      clientSecret: process.env.MCP_OIDC_CLIENT_SECRET || undefined,
-      vault: credentialVault,
-      validateCredential: validateBrightDataCredential,
-      audit: (event) => console.error(JSON.stringify(event)),
-    })
-  : undefined;
-const credentials = credentialVault?.credentials ?? bearerCredentials?.credentials ?? localCredentials;
+const credentials = bearerCredentials?.credentials ?? localCredentials;
 const gateway = credentials
   ? new BrightDataGateway({
         credentials,
@@ -138,25 +106,28 @@ const gateway = credentials
         },
       })
   : undefined;
-const datasetAdapter = gateway
-  ? createBrightDataDatasetAdapter(gateway, resultStore)
-  : createDemoDatasetAdapter(resultStore);
-const webAdapter = gateway
-  ? createBrightDataWebAdapter(gateway, {
+const datasetAdapter = testFixtures
+  ? createDemoDatasetAdapter(resultStore)
+  : createBrightDataDatasetAdapter(gateway!, resultStore);
+const webAdapter = testFixtures
+  ? createDemoWebAdapter()
+  : createBrightDataWebAdapter(gateway!, {
       serp: process.env.BRIGHTDATA_SERP_ZONE?.trim() || undefined,
       unlocker: process.env.BRIGHTDATA_UNLOCKER_ZONE?.trim() || undefined,
-    })
-  : createDemoWebAdapter();
+    });
 const datasets = createDatasetUseCases(datasetAdapter);
 const browserProfile = process.env.MCP_BROWSER_PROFILE?.trim() || "disabled";
 if (
   browserProfile !== "disabled" &&
-  browserProfile !== "demo" &&
+  browserProfile !== "fixture" &&
   browserProfile !== "brightdata"
 ) {
   throw new Error(
-    'MCP_BROWSER_PROFILE must be "disabled", "demo", or "brightdata".',
+    'MCP_BROWSER_PROFILE must be "disabled", "fixture", or "brightdata".',
   );
+}
+if (browserProfile === "fixture" && !testFixtures) {
+  throw new Error("The fixture browser profile is test-only.");
 }
 const browserProvider = browserProfile === "disabled"
   ? undefined
@@ -191,11 +162,10 @@ const createServer = (requestPrincipal = principalId) => {
       }),
     browser,
     results: resultStore,
-    tasks: httpAuthorization ? undefined : taskStore,
+    tasks: taskStore,
     widgetHtml,
     principalId: requestPrincipal,
     icon,
-    connection: hostedConnection,
   });
   if (browser) {
     activeBrowsers.add(browser);
@@ -217,44 +187,20 @@ const shutdown = async () => {
   activeBrowsers.clear();
   await Promise.allSettled(browsers.map((browser) => browser.shutdown()));
   closeTransport();
-  credentialVault?.close();
   process.exit(0);
 };
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);
 
-async function validateBrightDataCredential(
-  apiKey: string,
-): Promise<"rejected_or_expired" | "permission" | "unavailable" | undefined> {
-  const validationGateway = new BrightDataGateway({
-    credentials: staticCredential(apiKey),
-    logger: { info() {}, error() {} },
-  });
-  try {
-    await validationGateway.requestJson(
-      { method: "GET", path: "/status", timeoutMs: 10_000 },
-      { principalId: "connection-validation", requestId: crypto.randomUUID() },
-    );
-    return undefined;
-  } catch (error) {
-    const code = error && typeof error === "object" && "code" in error
-      ? String(error.code)
-      : "unavailable";
-    if (code === "brightdata_authentication_failed") return "rejected_or_expired";
-    if (code === "brightdata_permission_denied") return "permission";
-    return "unavailable";
-  }
-}
-
 function createBrowserProvider(
-  profile: "demo" | "brightdata",
+  profile: "fixture" | "brightdata",
 ): BrowserProvider {
-  if (httpAuthorization && profile === "brightdata") {
+  if (hosted && profile === "brightdata") {
     throw new Error(
-      "Hosted OIDC mode cannot use deployment-global Browser API credentials.",
+      "Hosted HTTP cannot use deployment-global Browser API credentials.",
     );
   }
-  return profile === "demo"
+  return profile === "fixture"
     ? createFakeBrowserProvider()
     : brightDataBrowserProvider();
 }
@@ -289,16 +235,12 @@ if (transportName === "stdio") {
     port,
     publicUrl: publicMcpUrl,
     allowedOrigins,
-    authorization: httpAuthorization,
     bearerCredentials,
-    connection: hostedConnection,
     widgetHtml,
     localPrincipalId: principalId,
     createServer,
   });
   closeTransport = httpServer.close;
-} else {
-  throw new Error('MCP_TRANSPORT must be either "http" or "stdio".');
 }
 
 function readPort(value: string | undefined): number {
@@ -316,18 +258,4 @@ function configuredUrl(name: string, value: string | undefined) {
   } catch {
     throw new Error(`${name} must be an absolute URL.`);
   }
-}
-
-function requiredSetting(name: string, value: string | undefined) {
-  const configured = value?.trim();
-  if (!configured) throw new Error(`${name} is required.`);
-  return configured;
-}
-
-function readMaxTokenAge(value: string | undefined) {
-  const seconds = Number(value ?? 3_600);
-  if (!Number.isInteger(seconds) || seconds < 60 || seconds > 3_600) {
-    throw new Error("MCP_MAX_TOKEN_AGE_SECONDS must be between 60 and 3600.");
-  }
-  return seconds;
 }

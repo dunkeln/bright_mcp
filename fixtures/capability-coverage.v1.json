@@ -67,7 +67,7 @@
       "disposition": "composed",
       "routes": ["resource:brightdata://results/{resultId}", "resource:brightdata://pages/{pageToken}"],
       "verification": {
-        "gate": "bun run check:compat && bun run check:auth",
+        "gate": "bun run check:compat",
         "scenario": "Read a result and continuation page, then prove another authenticated principal cannot read the artifact."
       }
     },
@@ -124,10 +124,10 @@
       "id": "credential-and-zone-setup",
       "referenceCapability": "Credential and zone setup",
       "disposition": "composed",
-      "routes": ["connection:macos-keychain", "connection:hosted-oidc", "config:brightdata-zones", "boundary:principal-credential-provider"],
+      "routes": ["connection:macos-keychain", "connection:hosted-bearer", "adapter:auto-zone", "boundary:principal-credential-provider"],
       "verification": {
-        "gate": "bun run scripts/brightdata-connection.ts help && bun run check:connection",
-        "scenario": "Local setup uses a Keychain prompt; hosted setup re-authenticates the principal, validates and encrypts the token, notifies URL elicitation, supports manual fallback and revocation, and rejects cross-principal sessions."
+        "gate": "bun run scripts/brightdata-connection.ts help && bun run check:adapters && bun run check:compat",
+        "scenario": "Local setup uses Keychain or explicit injection; hosted requests use the caller's Bearer key, bind state to its digest, auto-create missing product zones, and reject cross-principal sessions."
       }
     },
     {

@@ -43,7 +43,7 @@ const transport = new StdioClientTransport({
   command: process.execPath,
   args: ["run", "src/main.ts"],
   cwd: projectRoot,
-  env: testEnvironment({ MCP_TRANSPORT: "stdio", MCP_BROWSER_PROFILE: "demo" }),
+  env: testEnvironment({ MCP_TRANSPORT: "stdio", MCP_BROWSER_PROFILE: "fixture" }),
   stderr: "pipe",
 });
 const client = new Client({ name: "bright-coverage-check", version: "0.1.0" });

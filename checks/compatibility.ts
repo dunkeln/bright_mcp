@@ -255,7 +255,7 @@ async function checkBrowserProfile() {
     command: bun,
     args: ["run", "src/main.ts"],
     cwd: projectRoot,
-    env: environment({ MCP_TRANSPORT: "stdio", MCP_BROWSER_PROFILE: "demo" }),
+    env: environment({ MCP_TRANSPORT: "stdio", MCP_BROWSER_PROFILE: "fixture" }),
     stderr: "pipe",
   });
   const client = new Client({ name: "bright-browser-check", version: "0.1.0" });
@@ -432,7 +432,7 @@ async function checkHttp() {
     cwd: projectRoot,
     env: environment({
       MCP_TRANSPORT: "http",
-      MCP_BROWSER_PROFILE: "demo",
+      MCP_BROWSER_PROFILE: "fixture",
       PORT: String(port),
     }),
     stdout: "ignore",

@@ -16,7 +16,8 @@ export function testEnvironment(overrides: Record<string, string> = {}) {
     BRIGHTDATA_BROWSER_USERNAME: "",
     BRIGHTDATA_BROWSER_PASSWORD: "",
     MCP_BROWSER_PROFILE: "disabled",
-    BRIGHTDATA_PROFILE: "demo",
+    BRIGHT_MCP_TEST_FIXTURES: "1",
+    NODE_ENV: "test",
     ...overrides,
   };
 }

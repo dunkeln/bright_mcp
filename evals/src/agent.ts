@@ -104,7 +104,6 @@ await writeReport("agent", {
   mode: "mcpjam-openrouter-tool-use",
   model,
   runsPerCase: runs,
-  providerParity: process.env.EVAL_PROVIDER_PARITY === "live" ? "live" : "demo",
   grading:
     "Pass requires the case's valid tool path, non-empty tool arguments, required output fields and provenance, and no runner error. Factual values are not independently graded.",
   results,

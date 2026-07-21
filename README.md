@@ -36,7 +36,7 @@ hosted authorization.
 ## Benchmarks
 
 <!-- benchmark:start -->
-> Benchmark publication is blocked while the Bright MCP endpoint uses its demo provider.
+> Benchmark publication requires a complete 20-run comparison across both live MCPs.
 <!-- benchmark:end -->
 
 | Dimension | BrightData MCP | Bright MCP |

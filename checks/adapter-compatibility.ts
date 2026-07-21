@@ -16,6 +16,7 @@ const context: RequestContext = {
 const records: Array<Record<string, unknown>> = [];
 
 await checkSearchShapes();
+await checkZoneCreation();
 await checkDatasetPolling();
 await checkExpectedFailures();
 
@@ -57,6 +58,39 @@ async function checkSearchShapes() {
         !request.url.includes(secret),
     ),
     "The gateway did not isolate credentials to the authorization header.",
+  );
+}
+
+async function checkZoneCreation() {
+  const requests: Array<{ path: string; body?: unknown }> = [];
+  const adapter = createBrightDataWebAdapter(
+    gateway(async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      requests.push({
+        path,
+        body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
+      });
+      if (path === "/zone/get_active_zones") return json([]);
+      if (path === "/zone") return json({});
+      return json({ organic: [] });
+    }),
+    {},
+  );
+
+  await adapter.search.search(
+    { query: "Bright Data", engine: "google", locale: "en-US" },
+    context,
+  );
+  const creation = requests.find(({ path }) => path === "/zone")?.body as {
+    zone?: { name?: string };
+    plan?: { serp?: boolean };
+  } | undefined;
+  assert(
+    requests.map(({ path }) => path).join(",") ===
+      "/zone/get_active_zones,/zone,/request" &&
+      creation?.zone?.name === "bright_mcp_serp" &&
+      creation.plan?.serp === true,
+    "Missing SERP zones were not created before search.",
   );
 }
 

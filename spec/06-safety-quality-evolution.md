@@ -54,7 +54,7 @@
 5. Render the canonical result in the table app with text fallback.
 6. Add `search_web` and `scrape` through the same core/adapter boundaries.
 7. Add the opt-in browser profile through a fake provider, then Bright Data CDP.
-8. Add hosted authorization and credential connection as a deployment slice.
+8. Add hosted caller-funded Bearer authorization as a deployment slice.
 9. Expand the catalog as data; do not expand either profile's tool surface.
 
 Each slice MUST run end to end before the next begins. Full upstream parity is

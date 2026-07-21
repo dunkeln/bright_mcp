@@ -45,8 +45,6 @@ The repeated agent suite covers two workflows each for Acquire, Extract,
 Research, and Operate. It accepts different valid tool paths for each MCP, then
 checks requested output fields, provenance, honest capability boundaries,
 latency, calls, and token use. Live factual values are not independently graded.
-The current Bright MCP deployment also uses its demo provider, so this scaffold
-does not yet claim provider-quality parity.
 
 ## Latest tool-use benchmark
 

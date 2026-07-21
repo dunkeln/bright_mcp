@@ -3,7 +3,6 @@ import { z } from "zod";
 import {
   CapabilityError,
   jsonValueSchema,
-  type RequestContext,
 } from "../core/contracts";
 import { isPublicHttpUrl } from "../core/public-url";
 import type { FieldProjection, WebUseCases } from "../core/web";
@@ -92,18 +91,13 @@ export function registerWebTools(
   server: McpServer,
   web: WebUseCases,
   principalId: string,
-  connectionError: (
-    context: RequestContext,
-  ) => (
-    error: unknown,
-  ) => CapabilityError | undefined | Promise<CapabilityError | undefined>,
 ) {
   server.registerTool(
     "search_web",
     {
       title: "Search web",
       description:
-        "Use this to find current public web resources. Returns canonical organic results rather than engine-specific response data.",
+        "Find current public web resources with Google, Bing, or DuckDuckGo. Returns canonical organic results rather than engine-specific response data. On first use, Bright MCP may create the required SERP zone in the caller's Bright Data account.",
       inputSchema: {
         query: z.string().trim().min(1).max(500),
         engine: z.enum(["google", "bing", "duckduckgo"]).default("google"),
@@ -117,7 +111,12 @@ export function registerWebTools(
         results: z.array(searchResultSchema),
         nextCursor: z.string().optional(),
       },
-      annotations: { ...annotations, openWorldHint: true },
+      annotations: {
+        ...annotations,
+        readOnlyHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     async (input, extra) => {
       const context = requestContext(principalId, extra.signal, extra.authInfo);
@@ -127,7 +126,7 @@ export function registerWebTools(
           structuredContent,
           `Found ${structuredContent.results.length} web results.`,
         );
-      }, connectionError(context));
+      });
     },
   );
 
@@ -136,7 +135,7 @@ export function registerWebTools(
     {
       title: "Scrape URLs",
       description:
-        "Use this to retrieve readable content from one to five known public HTTP(S) URLs. Results preserve input order and isolate per-URL failures.",
+        "Use this to retrieve readable content from one to five known public HTTP(S) URLs. Results preserve input order and isolate per-URL failures. On first use, Bright MCP may create the required Web Unlocker zone in the caller's Bright Data account.",
       inputSchema: {
         urls: z
           .array(z.url().refine(isPublicHttpUrl, "URL must be a public HTTP(S) URL."))
@@ -146,7 +145,12 @@ export function registerWebTools(
         extraction: extractionSchema.optional(),
       },
       outputSchema: { results: z.array(scrapeItemSchema) },
-      annotations: { ...annotations, openWorldHint: true },
+      annotations: {
+        ...annotations,
+        readOnlyHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
     },
     async (input, extra) => {
       const context = requestContext(principalId, extra.signal, extra.authInfo);
@@ -157,7 +161,7 @@ export function registerWebTools(
           structuredContent,
           `Scraped ${structuredContent.results.length - failures} of ${structuredContent.results.length} URLs.`,
         );
-      }, connectionError(context));
+      });
     },
   );
 }

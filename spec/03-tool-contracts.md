@@ -23,16 +23,13 @@ Purpose: find current web resources for one or more related research angles.
 
 Purpose: retrieve readable content from one or more known URLs.
 
-- Input: one to five HTTP(S) URLs and an optional `markdown` or `html` format.
-- Output: one ordered result per URL with content or a normalized item error.
+- Input: one to five HTTP(S) URLs.
+- Output: one ordered Markdown result per URL with content or a normalized item
+  error.
 - Batch execution is part of this contract; no separate batch tool is exposed.
-- Optional `extraction` contains bounded instructions plus a typed field
-  projection using the contract's supported scalar, object, and array kinds.
-  The MCP compiles that projection to Zod 4; it does not accept arbitrary JSON
-  Schema or add an `extract` tool.
-- Extraction MUST use an injected provider and declare provenance and validation
-  failure. It MAY use negotiated MCP sampling but MUST NOT require sampling when
-  another configured provider supplies the capability.
+- The contract has no format or extraction modes. Agents read the Markdown to
+  answer questions or extract ad hoc fields; maintained structured records use
+  `run_dataset`.
 
 ## `find_datasets`
 

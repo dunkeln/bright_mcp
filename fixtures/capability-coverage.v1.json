@@ -13,32 +13,44 @@
     },
     {
       "id": "web-scrape",
-      "referenceCapability": "Markdown/HTML scrape and ordered batch scrape",
+      "referenceCapability": "Markdown and ordered batch scrape",
       "disposition": "composed",
       "routes": ["tool:scrape"],
       "verification": {
         "gate": "bun run check:compat",
-        "scenario": "Scrape two URLs and verify format-independent input ordering plus private-network rejection."
+        "scenario": "Scrape two URLs to Markdown and verify input ordering, rejection of obsolete modes, and private-network rejection."
       }
+    },
+    {
+      "id": "raw-html-scrape",
+      "referenceCapability": "Raw HTML scrape",
+      "disposition": "excluded",
+      "routes": [],
+      "verification": {
+        "gate": "bun run check:compat && bun run check:coverage",
+        "scenario": "Reject format modes so scrape has one deterministic result contract."
+      },
+      "exclusionReason": "Raw markup adds a second result mode to the common agent-reading path without improving its web-data outcome.",
+      "userConsequence": "The base scrape tool returns readable Markdown rather than exact page markup."
     },
     {
       "id": "ranked-web-research",
       "referenceCapability": "Intent-ranked discovery with optional page content",
       "disposition": "composed",
-      "routes": ["tool:search_web#ranked", "tool:search_web#deep"],
+      "routes": ["tool:search_web#ranked", "tool:search_web#deep", "tool:scrape"],
       "verification": {
         "gate": "bun run check:adapters",
-        "scenario": "Trigger and poll Discover through an explicit research depth, then retain ranked URLs and optional page content without a separate scrape call."
+        "scenario": "Trigger and poll Discover through an explicit research depth, retain compact ranked URLs, then scrape only selected pages."
       }
     },
     {
       "id": "structured-extraction",
-      "referenceCapability": "Schema-directed extraction",
+      "referenceCapability": "Ad hoc field extraction from a known page",
       "disposition": "composed",
-      "routes": ["tool:scrape#extraction", "protocol:sampling"],
+      "routes": ["tool:scrape", "client:agent-extraction"],
       "verification": {
-        "gate": "bun run check:compat",
-        "scenario": "A sampling-capable host returns Zod-validated data and provenance; an unsupported host receives an actionable per-page fallback."
+        "gate": "bun run check:compat && bun run evals",
+        "scenario": "Fetch Markdown once and let the calling agent return the requested fields; use run_dataset when a managed structured extractor exists."
       }
     },
     {

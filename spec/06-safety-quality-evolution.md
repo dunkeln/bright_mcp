@@ -38,8 +38,8 @@
   the browser profile is enabled, then complete each representative workflow.
 - Protocol checks MUST cover `run_dataset` with and without task support,
   authorized result-resource paging, and a host without app support.
-- Coverage checks MUST exercise dataset collection, filtered dataset search,
-  browser history navigation, and schema-validated structured extraction.
+- Coverage checks MUST exercise ordered Markdown scraping, dataset collection,
+  filtered dataset search, and browser history navigation.
 - App checks MUST cover fallback content, schema-version rejection, keyboard
   interaction, safe text rendering, and selected-row context.
 - Browser checks MUST cover session ownership, expiry, navigation, observation,

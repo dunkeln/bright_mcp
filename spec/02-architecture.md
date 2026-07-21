@@ -40,8 +40,8 @@ MUST NOT become core domain models.
 
 - Defines search, scrape, catalog discovery, dataset description, and dataset
   execution use cases, plus browser session use cases when that profile is enabled.
-- Structured extraction depends on an injected `ExtractionProvider`; provider
-  choice and sampling protocol objects MUST NOT enter the scrape contract.
+- Scrape returns ordered Markdown; ad hoc field extraction remains with the
+  calling agent and maintained structured extraction remains in dataset execution.
 - Owns canonical result and error contracts.
 - Depends only on injected ports.
 

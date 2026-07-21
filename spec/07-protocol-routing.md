@@ -32,13 +32,6 @@ Without task support, `run_dataset` MUST complete through bounded synchronous
 waiting with progress and cancellation where supported, or return a normalized
 timeout. It MUST NOT expose start, poll, status, or cancel as model-visible tools.
 
-## Sampling
-
-Structured `scrape` extraction MAY use negotiated MCP sampling behind an injected
-provider. Sampling is an execution mechanism, not a model-visible tool or public
-result type. A deployment claiming extraction coverage MUST configure at least
-one provider and return an actionable capability error if none is available.
-
 ## App routing
 
 The workbench app is a UI resource linked from `run_dataset` metadata. It projects
@@ -50,7 +43,7 @@ result ownership, or artifact lifetime.
 
 - Prompts are outside v1; future prompts must be explicitly user-invoked
   workflows rather than hidden tool routing.
-- Sampling for purposes other than the bounded extraction contract is outside v1.
+- Sampling is outside v1.
 - Resource subscriptions and roots are outside v1 until a measured workflow
   requires them.
 - App-only tools require the same evidence gate as any other added surface and

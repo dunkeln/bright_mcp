@@ -23,8 +23,10 @@ capability, not endpoint inventory.
 |---|---|
 | Search, batch search, engines, pagination | `search_web` |
 | Intent-ranked research with selected page content | `search_web: ranked | deep` composed with `scrape` |
-| Markdown/HTML scrape and batch scrape | `scrape` |
-| Schema-directed extraction | `scrape.extraction` via `ExtractionProvider` |
+| Markdown scrape and batch scrape | `scrape` |
+| Raw HTML scrape | excluded; the base tool returns one agent-readable format |
+| Ad hoc field extraction | `scrape` composed with the calling agent |
+| Managed structured extraction | dataset discovery and `run_dataset` |
 | Web Data collectors | dataset discovery, description, `run_dataset: collect` |
 | Dataset fields and filtered record search | description, `run_dataset: search` |
 | Deep Lookup question-to-table research | virtual dataset through discovery and `run_dataset: search` |

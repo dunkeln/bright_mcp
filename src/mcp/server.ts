@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { DatasetAdapter } from "../core/datasets";
 import type { ResultStore } from "../core/results";
-import type { WebUseCases } from "../core/web";
+import type { WebAdapter } from "../core/web";
 import type { BrowserUseCases } from "../browser/use-cases";
 import { registerBrowserTools } from "./browser-tools";
 import { registerDatasetTools } from "./dataset-tools";
@@ -12,7 +12,7 @@ export { DATASET_WORKBENCH_URI } from "./dataset-tools";
 
 export function createBrightMcpServer(dependencies: {
   datasets: DatasetAdapter;
-  createWeb: (server: McpServer) => WebUseCases;
+  web: WebAdapter;
   browser?: BrowserUseCases;
   results: ResultStore;
   tasks?: CancellableTaskStore;
@@ -41,14 +41,10 @@ export function createBrightMcpServer(dependencies: {
           }
         : {}),
       instructions:
-        "Batch related web queries in one search_web call, then scrape only the selected pages whose full text is needed. For structured data, call find_datasets once, run direct candidates immediately, and use describe_dataset only when discovery omits an operation and example.",
+        "Batch related web queries in one search_web call, then scrape only selected pages and read their Markdown to answer or extract fields. For maintained structured data, call find_datasets once, run direct candidates immediately, and use describe_dataset only when discovery omits an operation and example.",
     },
   );
-  registerWebTools(
-    server,
-    dependencies.createWeb(server),
-    dependencies.principalId,
-  );
+  registerWebTools(server, dependencies.web, dependencies.principalId);
   registerDatasetTools(server, dependencies);
   if (dependencies.browser) {
     registerBrowserTools(server, dependencies.browser, dependencies.principalId);

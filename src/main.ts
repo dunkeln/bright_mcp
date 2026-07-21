@@ -20,10 +20,8 @@ import {
   staticCredential,
 } from "./connections/credentials";
 import { staticBrowserCredential } from "./connections/browser-credentials";
-import { createWebUseCases } from "./core/web";
 import { createBrightMcpServer } from "./mcp/server";
 import { startHttpServer } from "./mcp/http-server";
-import { createSamplingExtractionProvider } from "./mcp/sampling-extraction";
 import { CancellableTaskStore } from "./mcp/task-store";
 
 const transportName = process.env.MCP_TRANSPORT ?? "http";
@@ -153,11 +151,7 @@ const createServer = (requestPrincipal = principalId) => {
   const browser = browserProvider ? createBrowser(browserProvider) : undefined;
   const server = createBrightMcpServer({
     datasets: datasetAdapter,
-    createWeb: (server) =>
-      createWebUseCases({
-        ...webAdapter,
-        extraction: createSamplingExtractionProvider(server),
-      }),
+    web: webAdapter,
     browser,
     results: resultStore,
     tasks: taskStore,

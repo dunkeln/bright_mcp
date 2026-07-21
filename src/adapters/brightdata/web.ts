@@ -105,9 +105,7 @@ export function createBrightDataWebAdapter(
                     zone,
                     url,
                     format: "raw",
-                    ...(input.format === "markdown"
-                      ? { data_format: "markdown" }
-                      : {}),
+                    data_format: "markdown",
                   },
                   timeoutMs: 30_000,
                 },
@@ -117,7 +115,6 @@ export function createBrightDataWebAdapter(
               const bounded = boundText(content);
               return {
                 url,
-                format: input.format,
                 content: bounded.content,
                 truncated: bounded.truncated || undefined,
               };
@@ -133,7 +130,6 @@ export function createBrightDataWebAdapter(
               if (failure.code === "brightdata_connection_required") throw failure;
               return {
                 url,
-                format: input.format,
                 error: failureRecord(failure),
               };
             }

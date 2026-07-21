@@ -34,11 +34,7 @@ export function createDemoWebAdapter(): {
       async scrape(input) {
         return input.urls.map((url) => ({
           url,
-          format: input.format,
-          content:
-            input.format === "markdown"
-              ? `# Demo page\n\nLocally generated preview for ${url}`
-              : `<main><h1>Demo page</h1><p>Locally generated preview for ${Bun.escapeHTML(url)}</p></main>`,
+          content: `# Demo page\n\nLocally generated preview for ${url}`,
         }));
       },
     },

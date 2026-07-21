@@ -61,9 +61,6 @@ affect billing. Explicit `BRIGHTDATA_SERP_ZONE` and
 Never commit a populated environment file. Credentials and zone names are read
 only by the composition root and never enter tool inputs or results.
 
-Structured extraction uses MCP host sampling. Hosts without sampling receive an
-actionable per-page extraction error while retaining scraped content.
-
 `search_web` uses caller-funded SERP for `fast` depth and restricted Discover
 access for explicit `ranked` or `deep` depth. Dataset collection, Marketplace
 search/filter, and full Deep Lookup runs are paid on the caller's account and

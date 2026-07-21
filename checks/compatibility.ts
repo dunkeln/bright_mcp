@@ -4,7 +4,6 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { InMemoryTaskStore } from "@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js";
 import {
   CallToolResultSchema,
-  CreateMessageRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { datasetResultSchema } from "../src/core/contracts";
 import { DATASET_WORKBENCH_URI } from "../src/mcp/dataset-tools";
@@ -18,7 +17,6 @@ const bun = process.execPath;
 const projectRoot = new URL("../", import.meta.url).pathname;
 
 await checkStdio();
-await checkSamplingExtraction();
 await checkTaskExecution();
 await checkBrowserProfile();
 if (process.env.BRIGHTDATA_BROWSER_CHECK === "1") {
@@ -79,7 +77,6 @@ async function checkStdio() {
       name: "scrape",
       arguments: {
         urls: ["https://example.com/one", "https://example.com/two"],
-        format: "markdown",
       },
     });
     assert(!scraped.isError, "scrape failed.");
@@ -92,24 +89,14 @@ async function checkStdio() {
       "scrape did not preserve input order.",
     );
 
-    const extraction = await client.callTool({
-      name: "scrape",
-      arguments: {
-        urls: ["https://example.com/"],
-        extraction: {
-          instructions: "Return the page title.",
-          fields: { title: { kind: "string" } },
-        },
-      },
+    await assertToolRejected(client, "scrape", {
+      urls: ["https://example.com/"],
+      format: "html",
     });
-    const unavailable = extraction.structuredContent as {
-      results?: Array<{ extractionError?: { code?: string } }>;
-    };
-    assert(
-      unavailable.results?.[0]?.extractionError?.code ===
-        "extraction_provider_unavailable",
-      "scrape did not explain that the host lacks a sampling provider.",
-    );
+    await assertToolRejected(client, "scrape", {
+      urls: ["https://example.com/"],
+      extraction: { instructions: "Return the page title." },
+    });
 
     const privateTarget = await client.callTool({
       name: "scrape",
@@ -194,56 +181,6 @@ async function checkStdio() {
     assert(
       widget.contents[0]?.mimeType === "text/html;profile=mcp-app",
       "The app resource has the wrong MIME type.",
-    );
-  } finally {
-    await client.close();
-  }
-}
-
-async function checkSamplingExtraction() {
-  const transport = new StdioClientTransport({
-    command: bun,
-    args: ["run", "src/main.ts"],
-    cwd: projectRoot,
-    env: environment({ MCP_TRANSPORT: "stdio" }),
-    stderr: "pipe",
-  });
-  const client = new Client(
-    { name: "bright-extraction-check", version: "0.1.0" },
-    { capabilities: { sampling: {} } },
-  );
-  client.setRequestHandler(CreateMessageRequestSchema, async () => ({
-    role: "assistant",
-    content: { type: "text", text: JSON.stringify({ title: "Demo page" }) },
-    model: "compatibility-fixture",
-    stopReason: "endTurn",
-  }));
-  await client.connect(transport);
-  try {
-    const extraction = await client.callTool({
-      name: "scrape",
-      arguments: {
-        urls: ["https://example.com/"],
-        extraction: {
-          instructions: "Return the page title.",
-          fields: { title: { kind: "string" } },
-        },
-      },
-    });
-    const result = extraction.structuredContent as {
-      results?: Array<{
-        extraction?: {
-          data?: { title?: string };
-          provenance?: { provider?: string; model?: string };
-        };
-      }>;
-    };
-    assert(!extraction.isError, "Sampling-backed extraction failed.");
-    assert(
-      result.results?.[0]?.extraction?.data?.title === "Demo page" &&
-        result.results[0].extraction?.provenance?.provider === "mcp-sampling" &&
-        result.results[0].extraction?.provenance?.model === "compatibility-fixture",
-      "Sampling-backed extraction lost validated data or provenance.",
     );
   } finally {
     await client.close();

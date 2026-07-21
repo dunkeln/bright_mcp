@@ -1,8 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { jsonValueSchema } from "../core/contracts";
 import { isPublicHttpUrl } from "../core/public-url";
-import type { FieldProjection, WebUseCases } from "../core/web";
+import type { WebAdapter } from "../core/web";
 import { reply, requestContext, runTool } from "./support";
 
 const annotations = {
@@ -25,68 +24,23 @@ const itemFailureSchema = z.object({
   nextAction: z.string().optional(),
 });
 
-const fieldProjectionSchema: z.ZodType<FieldProjection> = z.lazy(() =>
-  z.discriminatedUnion("kind", [
-    z.object({ kind: z.enum(["string", "number", "boolean"]) }),
-    z.object({
-      kind: z.literal("object"),
-      fields: z.record(z.string().min(1).max(80), fieldProjectionSchema),
-    }),
-    z.object({ kind: z.literal("array"), items: fieldProjectionSchema }),
-  ]),
-);
-
-const extractionSchema = z
-  .object({
-    instructions: z.string().trim().min(1).max(1_000),
-    fields: z
-      .record(z.string().min(1).max(80), fieldProjectionSchema)
-      .refine((fields) => Object.keys(fields).length > 0, "At least one field is required."),
-  })
-  .superRefine((value, context) => {
-    let fieldCount = 0;
-    const visit = (field: FieldProjection, depth: number) => {
-      if (depth > 4) {
-        context.addIssue({
-          code: "custom",
-          message: "Extraction projections support at most four nested levels.",
-        });
-        return;
-      }
-      fieldCount += 1;
-      if (field.kind === "object") {
-        Object.values(field.fields).forEach((item) => visit(item, depth + 1));
-      } else if (field.kind === "array") {
-        visit(field.items, depth + 1);
-      }
-    };
-    Object.values(value.fields).forEach((field) => visit(field, 1));
-    if (fieldCount > 20) {
-      context.addIssue({
-        code: "custom",
-        message: "Extraction projections support at most 20 fields.",
-      });
-    }
-  });
-
 const scrapeItemSchema = z.object({
   url: z.url(),
-  format: z.enum(["markdown", "html"]),
   content: z.string().optional(),
   truncated: z.boolean().optional(),
   error: itemFailureSchema.optional(),
-  extraction: z
-    .object({
-      data: z.record(z.string(), jsonValueSchema),
-      provenance: z.object({ provider: z.string(), model: z.string().optional() }),
-    })
-    .optional(),
-  extractionError: itemFailureSchema.optional(),
 });
+
+const scrapeInputSchema = z.object({
+  urls: z
+    .array(z.url().refine(isPublicHttpUrl, "URL must be a public HTTP(S) URL."))
+    .min(1)
+    .max(5),
+}).strict();
 
 export function registerWebTools(
   server: McpServer,
-  web: WebUseCases,
+  web: WebAdapter,
   principalId: string,
 ) {
   server.registerTool(
@@ -94,7 +48,7 @@ export function registerWebTools(
     {
       title: "Search web",
       description:
-        "Discover current public-web sources when the relevant pages are not yet known. Submit one to five distinct queries together when they investigate the same objective. Use fast to locate current sources, ranked to prioritize relevant evidence, and deep for broader source discovery. Results contain compact titles, URLs, and summaries; call scrape with markdown for only the selected pages whose full text is needed. Use returned cursors only to continue an incomplete result set. Do not use this tool for already-known URLs, structured dataset records, or unchanged queries that already returned useful results.",
+        "Discover current public-web sources when the relevant pages are not yet known. Submit one to five distinct queries together when they investigate the same objective. Use fast to locate current sources, ranked to prioritize relevant evidence, and deep for broader source discovery. Results contain compact titles, URLs, and summaries; call scrape only for the selected pages whose full text is needed. Use returned cursors only to continue an incomplete result set. Do not use this tool for already-known URLs, structured dataset records, or unchanged queries that already returned useful results.",
       inputSchema: {
         queries: z.array(z.object({
           query: z.string().trim().min(1).max(500),
@@ -123,7 +77,7 @@ export function registerWebTools(
     async (input, extra) => {
       const context = requestContext(principalId, extra.signal, extra.authInfo);
       return runTool(async () => {
-        const structuredContent = await web.searchWeb(input, context);
+        const structuredContent = await web.search.search(input, context);
         const resultCount = structuredContent.searches.reduce(
           (total, search) => total + search.results.length,
           0,
@@ -141,15 +95,8 @@ export function registerWebTools(
     {
       title: "Scrape URLs",
       description:
-        "Acquire readable content from one to five known public URLs. Use when the user supplied the URLs or search_web identified specific pages that must be opened. Choose markdown for reading and synthesis, or html when document structure or markup matters. Provide an extraction projection only when the required fields and their types are already known. Results preserve URL order and report failures independently, so continue with successful pages instead of repeating the whole batch. Do not use this tool to discover sources or retrieve maintained structured datasets.",
-      inputSchema: {
-        urls: z
-          .array(z.url().refine(isPublicHttpUrl, "URL must be a public HTTP(S) URL."))
-          .min(1)
-          .max(5),
-        format: z.enum(["markdown", "html"]).default("markdown"),
-        extraction: extractionSchema.optional(),
-      },
+        "Fetch readable Markdown from one to five known public URLs. Use when the user supplied URLs or search_web identified pages that must be read. Read the returned Markdown to answer questions or extract requested fields. Results preserve URL order and report failures independently, so continue with successful pages instead of repeating the whole batch. Use run_dataset for maintained structured records; do not use this tool to discover sources.",
+      inputSchema: scrapeInputSchema,
       outputSchema: { results: z.array(scrapeItemSchema) },
       annotations: {
         ...annotations,
@@ -161,7 +108,9 @@ export function registerWebTools(
     async (input, extra) => {
       const context = requestContext(principalId, extra.signal, extra.authInfo);
       return runTool(async () => {
-        const structuredContent = await web.scrape(input, context);
+        const structuredContent = {
+          results: await web.scrape.scrape(input, context),
+        };
         const failures = structuredContent.results.filter((item) => item.error).length;
         return reply(
           structuredContent,

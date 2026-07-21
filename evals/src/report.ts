@@ -26,7 +26,8 @@ const publishable = complete && report.runsPerCase >= 10;
 const rootBlock = publishable
   ? [
       "![Paired horizontal bars comparing MCP completion by workflow](./assets/benchmark-completion.png)",
-      "![Scatter plot comparing completion and token cost](./assets/benchmark-efficiency.png)",
+      "![Radar chart comparing MCP capability fingerprints across workflows](./assets/benchmark-radar.png)",
+      "![Paired horizontal bars comparing benchmark passes per token budget](./assets/benchmark-efficiency.png)",
       "![Cumulative latency distribution across all benchmark runs](./assets/benchmark-latency.png)",
       "![Paired horizontal bars comparing average tool calls by workflow](./assets/benchmark-complexity.png)",
       "",

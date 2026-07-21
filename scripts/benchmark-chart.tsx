@@ -42,8 +42,16 @@ function BenchmarkCharts() {
       <Chart id="benchmark-completion" title="Where each MCP completes the job" subtitle="Tool-use pass rate by workflow" meta={meta(model, runsPerCase)}>
         <PairedBars tasks={tasks} value={(datum) => datum.passRate * 100} domain={100} format={(value) => `${Math.round(value)}%`} />
       </Chart>
-      <Chart id="benchmark-efficiency" title="Completion versus token cost" subtitle="Upper-left is better: more completed jobs with fewer tokens" meta={meta(model, runsPerCase)}>
-        <Efficiency tasks={tasks} />
+      <Chart id="benchmark-radar" title="Capability fingerprint across workflows" subtitle="Tool-use pass rate · every spoke uses the same 0–100% scale" meta={meta(model, runsPerCase)}>
+        <Radar tasks={tasks} />
+      </Chart>
+      <Chart id="benchmark-efficiency" title="How many passing runs each token budget buys" subtitle="Benchmark passes per 10k total tokens · higher is better" meta={meta(model, runsPerCase)}>
+        <PairedBars
+          tasks={tasks}
+          value={(datum) => datum.averageTokens ? datum.passRate * 10_000 / datum.averageTokens : 0}
+          domain={efficiencyDomain(tasks)}
+          format={(value) => value.toFixed(1)}
+        />
       </Chart>
       <Chart id="benchmark-latency" title="How often each MCP finishes quickly" subtitle="Cumulative share of all runs by end-to-end latency" meta={`${latency.bright.length + latency.brightData.length} live runs`}>
         <Latency values={latency} />
@@ -102,29 +110,39 @@ function PairedBars({ tasks, value, domain, format }: { tasks: TaskDatum[]; valu
   );
 }
 
-function Efficiency({ tasks }: { tasks: TaskDatum[] }) {
-  const maxTokens = Math.ceil(Math.max(...tasks.flatMap(({ bright, brightData }) => [bright.averageTokens, brightData.averageTokens])) / 10_000) * 10_000;
+function Radar({ tasks }: { tasks: TaskDatum[] }) {
+  const center = { x: 560, y: 225 };
+  const radius = 155;
+  const point = (index: number, value: number, extra = 0) => {
+    const angle = -Math.PI / 2 + (index / tasks.length) * Math.PI * 2;
+    const distance = radius * value + extra;
+    return { x: center.x + Math.cos(angle) * distance, y: center.y + Math.sin(angle) * distance };
+  };
+  const points = (server: "bright" | "brightData") => tasks.map((task, index) => {
+    const position = point(index, task[server].passRate);
+    return `${position.x},${position.y}`;
+  }).join(" ");
   return (
     <svg viewBox="0 0 1120 460" role="img" className="h-full w-full">
       <Patterns />
+      {[0.25, 0.5, 0.75, 1].map((level) => <polygon key={level} points={tasks.map((_, index) => { const p = point(index, level); return `${p.x},${p.y}`; }).join(" ")} fill="none" stroke="#30363d" />)}
       {tasks.map((task, index) => {
-        const column = index % 2;
-        const row = Math.floor(index / 2);
-        const left = 20 + column * 555;
-        const top = row * 108;
-        const x = (tokens: number) => left + 150 + (tokens / maxTokens) * 370;
-        const y = (rate: number) => top + 88 - rate * 0.58;
+        const edge = point(index, 1);
+        const label = point(index, 1, 38);
+        const anchor = label.x < center.x - 20 ? "end" : label.x > center.x + 20 ? "start" : "middle";
         return <g key={task.label}>
-          <text x={left} y={top + 34} className="label">{task.label}</text>
-          <line x1={left + 150} x2={left + 520} y1={top + 88} y2={top + 88} stroke="#30363d" />
-          <line x1={x(task.bright.averageTokens)} y1={y(task.bright.passRate * 100)} x2={x(task.brightData.averageTokens)} y2={y(task.brightData.passRate * 100)} stroke="#6e7681" />
-          <circle cx={x(task.brightData.averageTokens)} cy={y(task.brightData.passRate * 100) - 3} r="8" fill="url(#purple-dither)" stroke={colors.brightData} />
-          <circle cx={x(task.bright.averageTokens)} cy={y(task.bright.passRate * 100) + 3} r="8" fill="url(#blue-dither)" stroke={colors.bright} />
-          <text x={x(task.brightData.averageTokens) + 11} y={y(task.brightData.passRate * 100) - 9} className="value">{Math.round(task.brightData.averageTokens / 1000)}k · {Math.round(task.brightData.passRate * 100)}%</text>
-          <text x={x(task.bright.averageTokens) + 11} y={y(task.bright.passRate * 100) + 18} className="value">{Math.round(task.bright.averageTokens / 1000)}k · {Math.round(task.bright.passRate * 100)}%</text>
+          <line x1={center.x} y1={center.y} x2={edge.x} y2={edge.y} stroke="#30363d" />
+          <text x={label.x} y={label.y + 5} textAnchor={anchor} className="label">{task.label}</text>
         </g>;
       })}
-      <text x="1100" y="454" textAnchor="end" className="axis-title">fewer tokens ← shared scale → more tokens</text>
+      <polygon points={points("brightData")} fill="url(#purple-dither)" fillOpacity="0.35" stroke={colors.brightData} strokeWidth="3" />
+      <polygon points={points("bright")} fill="url(#blue-dither)" fillOpacity="0.35" stroke={colors.bright} strokeWidth="3" />
+      {(["brightData", "bright"] as const).flatMap((server) => tasks.map((task, index) => {
+        const p = point(index, task[server].passRate);
+        return <circle key={`${server}-${task.label}`} cx={p.x} cy={p.y} r="5" fill={`url(#${server === "bright" ? "blue" : "purple"}-dither)`} stroke={colors[server]} />;
+      }))}
+      <text x={center.x + 8} y={center.y - radius * 0.5} className="axis">50%</text>
+      <text x={center.x + 8} y={center.y - radius} className="axis">100%</text>
     </svg>
   );
 }
@@ -153,6 +171,11 @@ function Patterns() {
 
 function meta(model: string, runs: number) {
   return `${model} · ${runs} runs/case`;
+}
+
+function efficiencyDomain(tasks: TaskDatum[]) {
+  const maximum = Math.max(...tasks.flatMap(({ bright, brightData }) => [bright, brightData]).map((datum) => datum.averageTokens ? datum.passRate * 10_000 / datum.averageTokens : 0));
+  return Math.ceil(maximum * 2) / 2;
 }
 
 const root = document.getElementById("root");

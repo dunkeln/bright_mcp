@@ -17,7 +17,7 @@ const tasks = workflowCases.map(({ id, shortLabel }) => ({
 const complete = workflowCases.every(({ id }) => (["bright", "upstream"] as const).every((server) => report.results.filter((result) => result.caseId === id && result.server === server).length === report.runsPerCase));
 if (mode !== "--preview" && !complete) process.exit(0);
 
-const charts = ["completion", "efficiency", "latency", "complexity"] as const;
+const charts = ["completion", "radar", "efficiency", "latency", "complexity"] as const;
 const temporaryDirectory = await mkdtemp(join(tmpdir(), "bright-benchmark-"));
 try {
   const assets = await buildAppAssets({
@@ -40,7 +40,7 @@ try {
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body><div id="root"></div><script>window.benchmark=${safeJson(data)}</script><script type="module">${javascript.replaceAll("</script", "<\\/script")}</script></body></html>`;
   const browser = await chromium.launch({ executablePath: await browserPath(), headless: true });
   try {
-    const page = await browser.newPage({ viewport: { width: 1200, height: 2560 }, deviceScaleFactor: 1 });
+    const page = await browser.newPage({ viewport: { width: 1200, height: 3200 }, deviceScaleFactor: 1 });
     await page.setContent(html, { waitUntil: "load" });
     await page.waitForSelector("body[data-ready=true]");
     for (const chart of charts) {

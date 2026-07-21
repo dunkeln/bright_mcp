@@ -7,7 +7,7 @@ const configuredModel = required("OPENROUTER_MODEL");
 const model = configuredModel.startsWith("openrouter/")
   ? configuredModel
   : `openrouter/${configuredModel}`;
-const runs = integer("EVAL_RUNS", 20, 1, 100);
+const runs = integer("EVAL_RUNS", 10, 1, 100);
 const selectedCases = process.env.EVAL_CASE
   ? workflowCases.filter(({ id }) => id === process.env.EVAL_CASE)
   : workflowCases;

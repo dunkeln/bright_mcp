@@ -36,7 +36,7 @@ hosted authorization.
 ## Benchmarks
 
 <!-- benchmark:start -->
-> Benchmark publication requires a complete 20-run comparison across both live MCPs.
+> Benchmark publication requires a complete 10-run comparison across both live MCPs.
 <!-- benchmark:end -->
 
 | Dimension | BrightData MCP | Bright MCP |

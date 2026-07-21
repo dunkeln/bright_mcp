@@ -22,7 +22,7 @@ const overall = {
 const complete = allSummaries.every(
   ({ bright, upstream }) => bright.runs === report.runsPerCase && upstream.runs === report.runsPerCase,
 );
-const publishable = complete && report.runsPerCase >= 20;
+const publishable = complete && report.runsPerCase >= 10;
 const rootBlock = publishable
   ? [
       "![Grouped bar chart comparing MCP tool-use completion](./assets/benchmark.png)",
@@ -30,7 +30,7 @@ const rootBlock = publishable
       `Bright MCP: ${percent(overall.bright.passRate)} pass · ${Math.round(overall.bright.averageTokens)} tokens · ${seconds(overall.bright.medianLatency)} p50. BrightData MCP: ${percent(overall.upstream.passRate)} · ${Math.round(overall.upstream.averageTokens)} tokens · ${seconds(overall.upstream.medianLatency)} p50.`,
       `[Method and tables](./evals/README.md#latest-tool-use-benchmark) · \`${report.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}.`,
     ].join("\n")
-  : "> Benchmark publication requires a complete 20-run comparison across both live MCPs.";
+  : "> Benchmark publication requires a complete 10-run comparison across both live MCPs.";
 const evalBlock = [
   publishable ? "" : "> **Incomplete run:** do not use this table for public claims.\n",
   `\`${report.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}`,

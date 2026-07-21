@@ -10,13 +10,18 @@ import {
 import type { DatasetCatalog } from "../../core/datasets";
 import { BrightDataGateway } from "./gateway";
 
+/**
+ * Adapter-only capabilities omitted by Bright Data's live dataset list and
+ * metadata responses. Dataset identity and fields remain account-discovered;
+ * these IDs only select the supported synchronous execution path.
+ */
 export const SYNC_SEARCH_DATASETS = new Set([
   "gd_l1viktl72bvl7bjuj0",
   "gd_me5ppxjr2ge6icjuh0",
   "gd_l1vikfnt1wgvvqz95w",
 ]);
 
-export const filterSchema: z.ZodType<JsonObject> = z.lazy(() =>
+const filterSchema: z.ZodType<JsonObject> = z.lazy(() =>
   z.union([
     z.object({
       name: z.string().trim().min(1).max(160),
@@ -78,29 +83,29 @@ const metadataSchema = z.object({
   }).passthrough()),
 });
 
-export type Collector = {
-  id: string;
-  upstreamId: string;
-  title: string;
-  summary: string;
-  kind: "urls" | "keyword";
-};
+type CollectorInputKind = "urls" | "keyword";
 
-export const collectors: Collector[] = [
-  ["amazon-product", "gd_l7q7dkf244hwjntr0", "Amazon products", "Collect structured Amazon product records from known product URLs.", "urls"],
-  ["amazon-products-search", "gd_lwdb4vjm1ehb499uxs", "Amazon product search", "Search Amazon product listings by keyword.", "keyword"],
-  ["walmart-product", "gd_l95fol7l1ru6rlo116", "Walmart products", "Collect structured Walmart product records from known URLs.", "urls"],
-  ["linkedin-profile", "gd_l1viktl72bvl7bjuj0", "LinkedIn profiles", "Collect structured LinkedIn person profiles from known URLs.", "urls"],
-  ["linkedin-company", "gd_l1vikfnt1wgvvqz95w", "LinkedIn companies", "Collect structured LinkedIn company records from known URLs.", "urls"],
-  ["linkedin-job", "gd_lpfll7v5hcqtkxl6l", "LinkedIn jobs", "Collect structured LinkedIn job listings from known URLs.", "urls"],
-  ["instagram-profile", "gd_l1vikfch901nx3by4", "Instagram profiles", "Collect structured Instagram profile records from known URLs.", "urls"],
-  ["instagram-post", "gd_lk5ns7kz21pck8jpis", "Instagram posts", "Collect structured Instagram post records from known URLs.", "urls"],
-  ["facebook-post", "gd_lyclm1571iy3mv57zw", "Facebook posts", "Collect structured Facebook post records from known URLs.", "urls"],
-  ["crunchbase-company", "gd_l1vijqt9jfj7olije", "Crunchbase companies", "Collect structured Crunchbase company records from known URLs.", "urls"],
-].map(([id, upstreamId, title, summary, kind]) => ({
-  id: String(id), upstreamId: String(upstreamId), title: String(title),
-  summary: String(summary), kind: kind as Collector["kind"],
-}));
+/**
+ * Trigger input shapes omitted by Bright Data's live dataset metadata.
+ * Entries enrich account-discovered datasets; they do not create or rank them.
+ */
+const collectorInputKinds = new Map<string, CollectorInputKind>([
+  ["gd_l7q7dkf244hwjntr0", "urls"],
+  ["gd_lwdb4vjm1ehb499uxs", "keyword"],
+  ["gd_l95fol7l1ru6rlo116", "urls"],
+  ["gd_l1viktl72bvl7bjuj0", "urls"],
+  ["gd_l1vikfnt1wgvvqz95w", "urls"],
+  ["gd_lpfll7v5hcqtkxl6l", "urls"],
+  ["gd_l1vikfch901nx3by4", "urls"],
+  ["gd_lk5ns7kz21pck8jpis", "urls"],
+  ["gd_lyclm1571iy3mv57zw", "urls"],
+  ["gd_l1vijqt9jfj7olije", "urls"],
+]);
+
+export function collectorFor(upstreamId: string) {
+  const kind = collectorInputKinds.get(upstreamId);
+  return kind ? { upstreamId, kind } : undefined;
+}
 
 const urlCollectorInput = z.object({
   urls: z.array(z.url()).min(1).max(20),
@@ -154,11 +159,6 @@ export function createBrightDataCatalog(gateway: BrightDataGateway): DatasetCata
     async find(query, limit, context) {
       const terms = query.toLowerCase().split(/\W+/).filter((term) => term.length > 1);
       const available = await list(context);
-      const availableIds = new Set(available.map(({ id }) => id));
-      const curated = collectors.filter(({ upstreamId }) => availableIds.has(upstreamId)).map((collector) => ({
-        score: rank(`${collector.title} ${collector.summary}`, terms) + 2,
-        value: collectorSummary(collector),
-      }));
       const marketplace = available.map((dataset) => ({
         score: rank(dataset.name, terms),
         value: marketplaceSummary(dataset),
@@ -168,7 +168,7 @@ export function createBrightDataCatalog(gateway: BrightDataGateway): DatasetCata
           (terms.some((term) => ["research", "find", "list", "table"].includes(term)) ? 2 : 0),
         value: deepLookupSummary,
       };
-      return [...curated, ...marketplace, deep]
+      return [...marketplace, deep]
         .filter(({ score }) => score > 0)
         .sort((left, right) => right.score - left.score || left.value.title.localeCompare(right.value.title))
         .slice(0, limit)
@@ -177,13 +177,6 @@ export function createBrightDataCatalog(gateway: BrightDataGateway): DatasetCata
 
     async describe(datasetId, context) {
       if (datasetId === deepLookupDefinition.id) return deepLookupDefinition;
-      if (datasetId.startsWith("collector:")) {
-        const collector = collectors.find(({ id }) => `collector:${id}` === datasetId);
-        if (!collector || !(await list(context)).some(({ id }) => id === collector.upstreamId)) {
-          throw unknownDataset(datasetId);
-        }
-        return collectorDefinition(collector);
-      }
       if (!datasetId.startsWith("marketplace:")) throw unknownDataset(datasetId);
       const upstreamId = datasetId.slice("marketplace:".length);
       const available = (await list(context)).find(({ id }) => id === upstreamId);
@@ -193,44 +186,30 @@ export function createBrightDataCatalog(gateway: BrightDataGateway): DatasetCata
   };
 }
 
-export function collectorDefinition(collector: Collector): DatasetDefinition {
+function collectorOperation(collector: NonNullable<ReturnType<typeof collectorFor>>) {
   const schema = collector.kind === "urls" ? urlCollectorInput : keywordCollectorInput;
   return {
-    id: `collector:${collector.id}`,
-    title: collector.title,
-    description: collector.summary,
-    operations: [{
-      kind: collector.kind === "urls" ? "collect" : "search",
-      inputSchema: z.toJSONSchema(schema, { target: "draft-7" }) as JsonObject,
-      limits: ["Runs a paid managed scraper and returns an upstream-backed result resource."],
-      examples: [collector.kind === "urls"
-        ? { urls: ["https://example.com/record"], acknowledgeCost: true }
-        : { query: "wireless earbuds", pages: 1, acknowledgeCost: true }],
-    }],
-  };
-}
-
-function collectorSummary(collector: Collector): DatasetSummary {
-  const definition = collectorDefinition(collector);
-  const operation = definition.operations[0]!;
-  return {
-    id: definition.id,
-    title: definition.title,
-    summary: definition.description,
-    operation: operation.kind,
-    requiredInputs: collector.kind === "urls"
-      ? ["urls", "acknowledgeCost"]
-      : ["query", "acknowledgeCost"],
-    example: operation.examples?.[0],
+    kind: "collect" as const,
+    inputSchema: z.toJSONSchema(schema, { target: "draft-7" }) as JsonObject,
+    limits: ["Runs a paid managed scraper and returns an upstream-backed result resource."],
+    examples: [collector.kind === "urls"
+      ? { urls: ["https://example.com/record"], acknowledgeCost: true }
+      : { query: "wireless earbuds", pages: 1, acknowledgeCost: true }],
   };
 }
 
 function marketplaceSummary(dataset: z.infer<typeof datasetListSchema>[number]): DatasetSummary {
+  const collector = collectorFor(dataset.id);
+  const operation = collector && collectorOperation(collector);
   return {
     id: `marketplace:${dataset.id}`,
     title: dataset.name,
-    summary: `Search ${dataset.size?.toLocaleString() ?? "available"} maintained marketplace records with typed filters.`,
-    requiredInputs: ["filter", "acknowledgeCost"],
+    summary: `${collector ? "Collect fresh structured records or search" : "Search"} ${dataset.size?.toLocaleString() ?? "available"} maintained marketplace records.`,
+    requiredInputs: collector
+      ? [collector.kind === "urls" ? "urls" : "query", "acknowledgeCost"]
+      : ["filter", "acknowledgeCost"],
+    operation: operation?.kind,
+    example: operation?.examples[0],
   };
 }
 
@@ -238,6 +217,7 @@ function marketplaceDefinition(
   dataset: z.infer<typeof datasetListSchema>[number],
   metadata: z.infer<typeof metadataSchema>,
 ): DatasetDefinition {
+  const collector = collectorFor(dataset.id);
   const visibleFields = Object.entries(metadata.fields)
     .filter(([, field]) => field.active !== false)
     .slice(0, 100)
@@ -246,7 +226,7 @@ function marketplaceDefinition(
     id: `marketplace:${dataset.id}`,
     title: dataset.name,
     description: `Search maintained Bright Data marketplace records. Available fields:\n${visibleFields.join("\n")}`,
-    operations: [{
+    operations: [...(collector ? [collectorOperation(collector)] : []), {
       kind: "search",
       inputSchema: z.toJSONSchema(marketplaceInputSchema, { target: "draft-7" }) as JsonObject,
       limits: [

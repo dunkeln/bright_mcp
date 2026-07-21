@@ -247,24 +247,6 @@ export function registerDatasetTools(
   }
 
   server.registerResource(
-    "dataset-definition",
-    new ResourceTemplate("brightdata://datasets/{datasetId}", { list: undefined }),
-    { mimeType: "application/json", description: "Dataset capability definition" },
-    async (uri, { datasetId }, extra) =>
-      jsonResourceReply(
-        uri,
-        await dependencies.datasets.describeDataset(
-          String(datasetId),
-          requestContext(
-            dependencies.principalId,
-            extra.signal,
-            extra.authInfo,
-          ),
-        ),
-      ),
-  );
-
-  server.registerResource(
     "dataset-result",
     new ResourceTemplate("brightdata://results/{resultId}", { list: undefined }),
     { mimeType: "application/json", description: "Completed dataset result" },

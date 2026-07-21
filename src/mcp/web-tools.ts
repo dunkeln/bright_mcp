@@ -1,9 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import {
-  CapabilityError,
-  jsonValueSchema,
-} from "../core/contracts";
+import { jsonValueSchema } from "../core/contracts";
 import { isPublicHttpUrl } from "../core/public-url";
 import type { FieldProjection, WebUseCases } from "../core/web";
 import { reply, requestContext, runTool } from "./support";

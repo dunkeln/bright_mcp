@@ -175,6 +175,9 @@ async function checkDatasetPolling() {
       if (url.pathname === "/datasets/list") {
         return json([{ id: "gd_lwdb4vjm1ehb499uxs", name: "Amazon product search", size: 100 }]);
       }
+      if (url.pathname === "/datasets/gd_lwdb4vjm1ehb499uxs/metadata") {
+        return json({ id: "gd_lwdb4vjm1ehb499uxs", fields: { title: { type: "text" } } });
+      }
       if (url.pathname === "/datasets/v3/trigger") {
         return json({ snapshot_id: "fixture-snapshot" }, 202);
       }
@@ -201,8 +204,8 @@ async function checkDatasetPolling() {
 
   const result = await adapter.runner.run(
     {
-      datasetId: "collector:amazon-products-search",
-      operation: "search",
+      datasetId: "marketplace:gd_lwdb4vjm1ehb499uxs",
+      operation: "collect",
       arguments: { query: "fixture", pages: 1, acknowledgeCost: true },
     },
     context,
@@ -210,7 +213,7 @@ async function checkDatasetPolling() {
 
   assert(
     paths.join(",") ===
-      "/datasets/list,/datasets/v3/trigger,/datasets/snapshots/fixture-snapshot,/datasets/snapshots/fixture-snapshot/download",
+      "/datasets/list,/datasets/gd_lwdb4vjm1ehb499uxs/metadata,/datasets/v3/trigger,/datasets/snapshots/fixture-snapshot,/datasets/snapshots/fixture-snapshot/download",
     "Dataset execution did not trigger, poll, and download in order.",
   );
   assert(
@@ -281,7 +284,15 @@ async function checkMarketplaceAndDeepLookup() {
     definition.description.includes("name (text)"),
     "Marketplace metadata did not reach the executable definition.",
   );
-  const sync = await adapter.runner.run({
+  const known = await adapter.catalog.describe(
+    "marketplace:gd_l1vikfnt1wgvvqz95w",
+    context,
+  );
+  assert(
+    known.operations.map(({ kind }) => kind).join(",") === "collect,search",
+    "Known live datasets did not merge collection and Marketplace search under one ID.",
+  );
+  const searched = await adapter.runner.run({
     datasetId: "marketplace:gd_l1vikfnt1wgvvqz95w",
     operation: "search",
     arguments: {
@@ -290,7 +301,7 @@ async function checkMarketplaceAndDeepLookup() {
       acknowledgeCost: true,
     },
   }, context);
-  assert(sync.rows[0]?.name === "Synchronous company", "Marketplace Search was not routed synchronously.");
+  assert(searched.rows[0]?.name === "Synchronous company", "Supported Marketplace search was not routed synchronously.");
   const filtered = await adapter.runner.run({
     datasetId: "marketplace:gd_custom",
     operation: "search",

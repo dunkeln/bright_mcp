@@ -68,7 +68,7 @@
       "routes": ["tool:find_datasets", "tool:describe_dataset", "adapter:account-catalog"],
       "verification": {
         "gate": "bun run check:adapters",
-        "scenario": "Search the caller's live dataset list, fetch active field metadata, and route supported datasets synchronously while routing the wider catalog through filtered snapshots."
+        "scenario": "Search the caller's live dataset list, fetch active field metadata, merge known collection schemas into the same dataset IDs, and route record search through synchronous or filtered snapshot paths."
       }
     },
     {

@@ -35,15 +35,14 @@ resource URI, app payload, or log record.
 
 ## Dataset catalog
 
-- Catalog entries MUST use stable local capability IDs independent of endpoint
-  paths and upstream display names.
-- Each entry MUST define upstream identity, agent description, input schema,
-  defaults, limits, and normalization function.
+- Catalog entries MUST use one stable local ID per live upstream dataset,
+  independent of endpoint paths and display names.
 - The account-scoped Marketplace list and metadata endpoints MUST supply
   discoverability and output fields, cached by caller principal.
-- A small versioned manifest MUST supply executable input schemas for curated
-  Scraper API collectors because Marketplace metadata does not universally
-  expose safe trigger schemas.
+- A small versioned manifest MUST only identify live datasets whose Scraper API
+  trigger schema is known, because Marketplace metadata does not expose those
+  input schemas. It MUST enrich the live catalog entry rather than create a
+  second collector namespace.
 - Duplicate IDs or invalid schemas MUST fail startup rather than fail during an
   agent call.
 

@@ -2,7 +2,6 @@ import { z } from "zod";
 import {
   CapabilityError,
   type DatasetDefinition,
-  type DatasetResult,
   type DatasetResultBase,
   type DatasetSummary,
 } from "../core/contracts";

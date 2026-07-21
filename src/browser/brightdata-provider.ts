@@ -1,7 +1,7 @@
 import pLimit from "p-limit";
 import { chromium, type Browser, type Page } from "playwright-core";
 import type { BrowserCredentialProvider } from "../connections/browser-credentials";
-import { CapabilityError, type RequestContext } from "../core/contracts";
+import { CapabilityError } from "../core/contracts";
 import { isPublicHttpUrl } from "../core/public-url";
 import type {
   BrowserAction,

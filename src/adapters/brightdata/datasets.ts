@@ -11,8 +11,7 @@ import type { DatasetRunner } from "../../core/datasets";
 import type { ResultSource, ResultStore } from "../../core/results";
 import {
   SYNC_SEARCH_DATASETS,
-  collectorDefinition,
-  collectors,
+  collectorFor,
   createBrightDataCatalog,
   deepLookupInputSchema,
   marketplaceInputSchema,
@@ -77,12 +76,12 @@ export function createBrightDataDatasetAdapter(
         if (input.datasetId === "deep-web-research") {
           return runDeepLookup(gateway, resultStore, input.arguments, context);
         }
-        if (input.datasetId.startsWith("collector:")) {
-          await catalog.describe(input.datasetId, context);
-          return runCollector(gateway, resultStore, input, context);
-        }
         if (input.datasetId.startsWith("marketplace:")) {
           const definition = await catalog.describe(input.datasetId, context);
+          const collector = collectorFor(input.datasetId.slice("marketplace:".length));
+          if (input.operation === "collect" && collector) {
+            return runCollector(gateway, resultStore, input, definition.title, collector, context);
+          }
           return runMarketplace(gateway, resultStore, input, definition.title, context);
         }
         throw unknownDataset(input.datasetId);
@@ -95,12 +94,11 @@ async function runCollector(
   gateway: BrightDataGateway,
   store: ResultStore,
   input: Parameters<DatasetRunner["run"]>[0],
+  title: string,
+  collector: NonNullable<ReturnType<typeof collectorFor>>,
   context: RequestContext,
 ) {
-  const collector = collectors.find(({ id }) => `collector:${id}` === input.datasetId);
-  if (!collector) throw unknownDataset(input.datasetId);
-  const operation = collector.kind === "urls" ? "collect" : "search";
-  if (input.operation !== operation) throw unsupported(input.datasetId, input.operation, operation);
+  if (input.operation !== "collect") throw unsupported(input.datasetId, input.operation, "collect");
   const parsed = collector.kind === "urls"
     ? z.object({
         urls: z.array(z.url()).min(1).max(20),
@@ -129,8 +127,8 @@ async function runCollector(
   const metadata = await finishSnapshotCancellable(gateway, snapshot.snapshot_id, context);
   return saveSnapshot(store, gateway, {
     id: input.datasetId,
-    title: collectorDefinition(collector).title,
-    operation,
+    title,
+    operation: "collect",
     snapshotId: snapshot.snapshot_id,
     metadata,
   }, context);

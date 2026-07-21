@@ -75,7 +75,10 @@
       "id": "dataset-table-app",
       "referenceCapability": "Dataset result tables",
       "disposition": "composed",
-      "routes": ["tool:run_dataset", "resource:ui://bright-mcp/dataset-table"],
+      "routes": [
+        "tool:run_dataset",
+        "resource:ui://bright-mcp/dataset-table-v1.html"
+      ],
       "verification": {
         "gate": "bun run build && bun run check:compat",
         "scenario": "Resolve the table app resource while preserving the canonical structured result and text fallback."

@@ -31,7 +31,7 @@ import type { BrowserUseCases } from "../browser/use-cases";
 import { registerBrowserTools } from "./browser-tools";
 import { jsonResourceReply, reply, requestContext, runTool } from "./support";
 
-export const DATASET_TABLE_URI = "ui://bright-mcp/dataset-table";
+export const DATASET_TABLE_URI = "ui://bright-mcp/dataset-table-v1.html";
 
 const annotations = {
   readOnlyHint: true,

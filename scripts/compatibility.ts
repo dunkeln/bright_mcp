@@ -39,6 +39,21 @@ async function checkStdio() {
       "The base profile must expose exactly its five routed tools.",
     );
     assertToolAnnotations(tools.tools);
+    const runDatasetMeta = tools.tools.find((tool) => tool.name === "run_dataset")
+      ?._meta as
+      | {
+          ui?: { resourceUri?: string };
+          "ui/resourceUri"?: string;
+          "openai/outputTemplate"?: string;
+        }
+      | undefined;
+    const datasetTableUri = "ui://bright-mcp/dataset-table-v1.html";
+    assert(
+      runDatasetMeta?.ui?.resourceUri === datasetTableUri &&
+        runDatasetMeta["ui/resourceUri"] === datasetTableUri &&
+        runDatasetMeta["openai/outputTemplate"] === datasetTableUri,
+      "run_dataset did not advertise the versioned app resource consistently.",
+    );
     await assertToolRejected(client, "search_web", { query: "" });
     await assertToolRejected(client, "scrape", { urls: ["file:///tmp/nope"] });
     await assertToolRejected(client, "find_datasets", { query: "", limit: 0 });
@@ -169,7 +184,7 @@ async function checkStdio() {
     );
 
     const widget = await client.readResource({
-      uri: "ui://bright-mcp/dataset-table",
+      uri: datasetTableUri,
     });
     assert(
       widget.contents[0]?.mimeType === "text/html;profile=mcp-app",

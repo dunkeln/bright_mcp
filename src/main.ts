@@ -1,13 +1,8 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
-import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
-import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
-import { LRUCache } from "lru-cache";
 import { createBrightDataDatasetAdapter } from "./adapters/brightdata/datasets";
 import { BrightDataGateway } from "./adapters/brightdata/gateway";
 import { createBrightDataWebAdapter } from "./adapters/brightdata/web";
 import { createOidcAuthorization } from "./auth/oidc";
-import { requiredScopesForRequest } from "./auth/scopes";
 import { createDemoDatasetAdapter } from "./adapters/demo-datasets";
 import { createDemoWebAdapter } from "./adapters/demo-web";
 import { createFakeBrowserProvider } from "./browser/fake-provider";
@@ -30,6 +25,7 @@ import { createHostedConnectionService } from "./connections/hosted-connection";
 import { createDatasetUseCases } from "./core/datasets";
 import { createWebUseCases } from "./core/web";
 import { createBrightMcpServer } from "./mcp/server";
+import { startHttpServer } from "./mcp/http-server";
 import { createSamplingExtractionProvider } from "./mcp/sampling-extraction";
 import { CancellableTaskStore } from "./mcp/task-store";
 
@@ -194,21 +190,7 @@ const createServer = () => {
   return server;
 };
 
-const httpSessions = new LRUCache<
-  string,
-  {
-    principalId: string;
-    server: ReturnType<typeof createServer>;
-    transport: WebStandardStreamableHTTPServerTransport;
-  }
->({
-  max: 1_000,
-  ttl: 60 * 60_000,
-  updateAgeOnGet: true,
-  ttlAutopurge: true,
-  dispose: ({ server }) => void server.close().catch(() => undefined),
-});
-
+let closeTransport: () => void = () => undefined;
 let shuttingDown = false;
 const shutdown = async () => {
   if (shuttingDown) return;
@@ -216,7 +198,7 @@ const shutdown = async () => {
   const browsers = [...activeBrowsers];
   activeBrowsers.clear();
   await Promise.allSettled(browsers.map((browser) => browser.shutdown()));
-  httpSessions.clear();
+  closeTransport();
   credentialVault?.close();
   process.exit(0);
 };
@@ -285,140 +267,17 @@ if (transportName === "stdio") {
   await server.connect(new StdioServerTransport());
 } else if (transportName === "http") {
   const port = readPort(process.env.PORT);
-  Bun.serve({
+  const httpServer = startHttpServer({
     port,
-    async fetch(request) {
-      const url = new URL(request.url);
-      const rejectedEdgeRequest = validateHostedEdge(
-        request,
-        publicMcpUrl,
-        allowedOrigins,
-      );
-      if (rejectedEdgeRequest) return rejectedEdgeRequest;
-      const connectionResponse = await hostedConnection?.handle(request);
-      if (connectionResponse) return connectionResponse;
-      if (
-        httpAuthorization &&
-        request.method === "GET" &&
-        url.pathname === httpAuthorization.metadataPath
-      ) {
-        return withCors(
-          Response.json(httpAuthorization.protectedResourceMetadata, {
-            headers: { "cache-control": "public, max-age=300" },
-          }),
-          request,
-          httpAuthorization !== undefined,
-          allowedOrigins,
-        );
-      }
-      if (request.method === "GET" && url.pathname === "/") {
-        return new Response("Bright MCP", { status: 200 });
-      }
-      if (request.method === "GET" && url.pathname === "/widget") {
-        return new Response(widgetHtml, {
-          headers: { "content-type": "text/html; charset=utf-8" },
-        });
-      }
-      if (request.method === "OPTIONS" && url.pathname === "/mcp") {
-        return withCors(
-          new Response(null, { status: 204 }),
-          request,
-          httpAuthorization !== undefined,
-          allowedOrigins,
-        );
-      }
-      if (url.pathname !== "/mcp") {
-        return new Response("Not found", { status: 404 });
-      }
-
-      let authInfo: AuthInfo | undefined;
-      if (httpAuthorization) {
-        const authenticated = await httpAuthorization.authenticate(request);
-        if (authenticated instanceof Response) {
-          return withCors(authenticated, request, true, allowedOrigins);
-        }
-        authInfo = authenticated;
-      }
-
-      let parsedBody: unknown;
-      if (request.method === "POST") {
-        try {
-          parsedBody = await readBoundedJson(request, 1_000_000);
-        } catch {
-          return withCors(
-            Response.json(
-              { error: "invalid_request", error_description: "The MCP request body is invalid or too large." },
-              { status: 400 },
-            ),
-            request,
-            httpAuthorization !== undefined,
-            allowedOrigins,
-          );
-        }
-      }
-      if (httpAuthorization && authInfo) {
-        const insufficient = httpAuthorization.requireScopes(
-          authInfo,
-          requiredScopesForRequest(parsedBody),
-        );
-        if (insufficient) {
-          return withCors(insufficient, request, true, allowedOrigins);
-        }
-      }
-
-      const sessionId = request.headers.get("mcp-session-id");
-      let session = sessionId ? httpSessions.get(sessionId) : undefined;
-      const requestPrincipal = authenticatedPrincipal(authInfo);
-      if (sessionId && (!session || session.principalId !== requestPrincipal)) {
-        return withCors(
-          Response.json(
-            { jsonrpc: "2.0", error: { code: -32_000, message: "Session not found." }, id: null },
-            { status: 404 },
-          ),
-          request,
-          httpAuthorization !== undefined,
-          allowedOrigins,
-        );
-      }
-      if (!session) {
-        if (!isInitializeRequest(parsedBody)) {
-          return withCors(
-            Response.json(
-              { jsonrpc: "2.0", error: { code: -32_000, message: "Initialize an MCP session first." }, id: null },
-              { status: 400 },
-            ),
-            request,
-            httpAuthorization !== undefined,
-            allowedOrigins,
-          );
-        }
-        const server = createServer();
-        const transport = new WebStandardStreamableHTTPServerTransport({
-          sessionIdGenerator: () => crypto.randomUUID(),
-          enableJsonResponse: true,
-          onsessioninitialized(id) {
-            httpSessions.set(id, { principalId: requestPrincipal, server, transport });
-          },
-          onsessionclosed(id) {
-            httpSessions.delete(id);
-          },
-        });
-        session = { principalId: requestPrincipal, server, transport };
-        await server.connect(transport);
-      }
-      const response = await session.transport.handleRequest(request, {
-        authInfo,
-        parsedBody,
-      });
-      return withCors(
-        response,
-        request,
-        httpAuthorization !== undefined,
-        allowedOrigins,
-      );
-    },
+    publicUrl: publicMcpUrl,
+    allowedOrigins,
+    authorization: httpAuthorization,
+    connection: hostedConnection,
+    widgetHtml,
+    localPrincipalId: principalId,
+    createServer,
   });
-  console.error(`Bright MCP listening on http://localhost:${port}/mcp`);
+  closeTransport = httpServer.close;
 } else {
   throw new Error('MCP_TRANSPORT must be either "http" or "stdio".');
 }
@@ -446,82 +305,10 @@ function requiredSetting(name: string, value: string | undefined) {
   return configured;
 }
 
-function authenticatedPrincipal(authInfo: AuthInfo | undefined) {
-  const authenticated = authInfo?.extra?.principalId;
-  return typeof authenticated === "string" ? authenticated : principalId;
-}
-
 function readMaxTokenAge(value: string | undefined) {
   const seconds = Number(value ?? 3_600);
   if (!Number.isInteger(seconds) || seconds < 60 || seconds > 3_600) {
     throw new Error("MCP_MAX_TOKEN_AGE_SECONDS must be between 60 and 3600.");
   }
   return seconds;
-}
-
-function validateHostedEdge(
-  request: Request,
-  publicUrl: URL | undefined,
-  origins: Set<string>,
-) {
-  if (!publicUrl) return undefined;
-  if (request.headers.get("host") !== publicUrl.host) {
-    return new Response("Misdirected request", { status: 421 });
-  }
-  const origin = request.headers.get("origin");
-  if (origin && !origins.has(origin)) {
-    return new Response("Origin not allowed", { status: 403 });
-  }
-  return undefined;
-}
-
-function withCors(
-  response: Response,
-  request: Request,
-  protectedMode: boolean,
-  origins: Set<string>,
-) {
-  const headers = new Headers(response.headers);
-  const origin = request.headers.get("origin");
-  if (!protectedMode) {
-    headers.set("access-control-allow-origin", "*");
-  } else if (origin && origins.has(origin)) {
-    headers.set("access-control-allow-origin", origin);
-    headers.set("vary", "origin");
-  }
-  headers.set("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
-  headers.set(
-    "access-control-allow-headers",
-    "authorization, content-type, mcp-protocol-version, mcp-session-id",
-  );
-  headers.set("access-control-expose-headers", "mcp-session-id, www-authenticate");
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-  });
-}
-
-async function readBoundedJson(request: Request, maxBytes: number) {
-  const declaredLength = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
-    throw new Error("Request body too large.");
-  }
-  if (!request.body) throw new Error("Request body is required.");
-  const reader = request.body.getReader();
-  const decoder = new TextDecoder();
-  let bytes = 0;
-  let text = "";
-  while (true) {
-    const chunk = await reader.read();
-    if (chunk.done) break;
-    bytes += chunk.value.byteLength;
-    if (bytes > maxBytes) {
-      await reader.cancel();
-      throw new Error("Request body too large.");
-    }
-    text += decoder.decode(chunk.value, { stream: true });
-  }
-  text += decoder.decode();
-  return JSON.parse(text) as unknown;
 }

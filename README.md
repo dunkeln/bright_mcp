@@ -1,5 +1,6 @@
 <div align="center">
-  <h1>Bright MCP</h1>
+  <img src="./assets/icon.png" alt="Bright MCP" width="320" />
+  <br />
   <i>unofficial iteration on BrightData API served as MCP</i>
 </div>
 

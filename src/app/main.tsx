@@ -1,5 +1,6 @@
 import { Badge } from "@openai/apps-sdk-ui/components/Badge";
 import { Button } from "@openai/apps-sdk-ui/components/Button";
+import { Checkbox } from "@openai/apps-sdk-ui/components/Checkbox";
 import {
   ArrowDownSm,
   ArrowLeft,
@@ -257,7 +258,13 @@ function DatasetTable() {
         </p>
       ))}
 
-      <section className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_224px]">
+      <section
+        className={`grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 ${
+          view === "table"
+            ? "sm:grid-cols-[minmax(0,1fr)_auto_224px]"
+            : ""
+        }`}
+      >
         <nav
           className="flex min-w-0 items-center gap-2 overflow-x-auto"
           role="tablist"
@@ -294,16 +301,18 @@ function DatasetTable() {
         >
           <BarChartIcon className="size-4" aria-hidden="true" />
         </Button>
-        <Input
-          className="col-span-2 w-full sm:col-span-1"
-          type="search"
-          aria-label="Filter rows on this page"
-          placeholder="Search visible values"
-          startAdornment={<Search className="size-4" aria-hidden="true" />}
-          size="sm"
-          value={filter}
-          onChange={(event) => setFilter(event.currentTarget.value)}
-        />
+        {view === "table" && (
+          <Input
+            className="col-span-2 w-full sm:col-span-1"
+            type="search"
+            aria-label="Filter rows on this page"
+            placeholder="Search visible values"
+            startAdornment={<Search className="size-4" aria-hidden="true" />}
+            size="sm"
+            value={filter}
+            onChange={(event) => setFilter(event.currentTarget.value)}
+          />
+        )}
       </section>
 
       {view === "overview" ? (
@@ -442,12 +451,15 @@ function DatasetTable() {
               return (
                 <tr key={rowRef} className="border-b border-subtle last:border-0">
                   <td className="px-3 py-2 align-top">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={checked}
-                      aria-label={`${checked ? "Deselect" : "Select"} row ${rowRef}`}
-                      onChange={(event) =>
-                        toggleSelection(rowRef, row, event.currentTarget.checked)
+                      label={
+                        <span className="sr-only">
+                          {checked ? "Deselect" : "Select"} row {rowRef}
+                        </span>
+                      }
+                      onCheckedChange={(nextChecked) =>
+                        toggleSelection(rowRef, row, nextChecked)
                       }
                     />
                   </td>

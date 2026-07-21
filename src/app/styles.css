@@ -22,7 +22,7 @@ body,
 body {
   margin: 0;
   background: transparent;
-  color: var(--text-primary, #1f1f1f);
+  color: var(--color-text-primary, #1f1f1f);
   font-family: var(--font-sans, ui-sans-serif, system-ui, sans-serif);
 }
 

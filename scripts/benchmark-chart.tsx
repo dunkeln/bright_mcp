@@ -1,7 +1,6 @@
 import { Bar } from "../src/components/dither-kit/bar";
 import { BarChart } from "../src/components/dither-kit/bar-chart";
 import { BlockLegend } from "../src/components/dither-kit/block-legend";
-import { Grid } from "../src/components/dither-kit/grid";
 import { XAxis } from "../src/components/dither-kit/x-axis";
 import { YAxis } from "../src/components/dither-kit/y-axis";
 import { useEffect } from "react";
@@ -53,7 +52,6 @@ function BenchmarkChart() {
           interactive={false}
           margins={{ top: 8, right: 16, bottom: 36, left: 52 }}
         >
-          <Grid />
           <XAxis dataKey="label" maxTicks={8} />
           <YAxis tickCount={5} tickFormatter={(value) => `${Math.round(value)}%`} />
           <Bar dataKey="brightData" variant="dotted" />

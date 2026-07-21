@@ -60,17 +60,11 @@ export const devDatasetResult = {
     "preview-row-5",
   ],
   page: {
-    truncated: true,
-    totalRows: 128,
+    truncated: false,
+    totalRows: 5,
   },
   artifact: {
     uri: "bright://results/preview-products-1",
     mediaType: "application/json",
   },
-  warnings: [
-    {
-      code: "preview_fixture",
-      message: "Local preview data — no Bright Data request was made.",
-    },
-  ],
 } satisfies DatasetResult;

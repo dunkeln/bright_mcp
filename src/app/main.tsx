@@ -14,6 +14,9 @@ type Sort = { key: string; direction: "ascending" | "descending" } | null;
 type Selection = { rowRef: string; row: JsonObject };
 
 function DatasetTable() {
+  const isBrowserPreview = Boolean(
+    (window as Window & { brightMcpPreview?: boolean }).brightMcpPreview,
+  );
   const [initial] = useState(readInitialResult);
   const [pages, setPages] = useState<DatasetResult[]>(
     initial.result ? [initial.result] : [],
@@ -267,12 +270,14 @@ function DatasetTable() {
       </div>
 
       <footer className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-secondary" aria-live="polite">
-          {pageError ??
-            contextError ??
-            (isConnected ? "Connected to host" : "Display remains available offline")}
-        </p>
-        <div className="flex gap-2">
+        {!isBrowserPreview && (
+          <p className="text-xs text-secondary" aria-live="polite">
+            {pageError ??
+              contextError ??
+              (isConnected ? "Connected to host" : "Display remains available offline")}
+          </p>
+        )}
+        <div className="ml-auto flex gap-2">
           {contextError && (
             <Button color="secondary" variant="ghost" size="sm" onClick={shareSelection}>
               Retry selection context

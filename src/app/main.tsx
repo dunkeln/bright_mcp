@@ -348,7 +348,7 @@ function DatasetWorkbenchApp() {
             </Menu.Item>
             <Menu.Item onSelect={() => setView("provenance")}>
               <InfoCircle className="size-4" aria-hidden="true" />
-              Provenance
+              Info
             </Menu.Item>
             <Menu.Separator />
             <Menu.Item

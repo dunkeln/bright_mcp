@@ -34,7 +34,7 @@ export function DatasetWorkbench({
   const heading = {
     details: "Row details",
     links: "Sources and links",
-    provenance: "Result provenance",
+    provenance: "Info",
     quality: "Data quality",
   }[panel];
   return (
@@ -158,11 +158,11 @@ function Links({ rows, onOpenLink }: { rows: JsonObject[]; onOpenLink: (url: str
   const links = linksFromRows(rows);
   if (!links.length) return <p className="text-sm text-secondary">No HTTP links were found in loaded rows.</p>;
   return (
-    <ul className="divide-y divide-subtle rounded-lg border border-subtle">
+    <ul className="space-y-1">
       {links.map((link, index) => (
-        <li key={`${link.url}:${index}`} className="flex items-center justify-between gap-3 p-2.5">
-          <div className="min-w-0"><p className="truncate text-sm">{link.url}</p><p className="text-xs text-secondary">{link.field} · row {link.row}</p></div>
-          <Button variant="ghost" color="secondary" size="sm" uniform aria-label={`Open ${link.url}`} onClick={() => onOpenLink(link.url)}><ExternalLink className="size-4" aria-hidden="true" /></Button>
+        <li key={`${link.url}:${index}`} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 hover:bg-surface-secondary">
+          <div className="min-w-0"><p className="truncate text-sm">{link.url}</p><p className="text-[11px] text-secondary">{link.field} · row {link.row}</p></div>
+          <Button variant="ghost" color="secondary" size="xs" uniform aria-label={`Open ${link.url}`} onClick={() => onOpenLink(link.url)}><ExternalLink className="size-3.5" aria-hidden="true" /></Button>
         </li>
       ))}
     </ul>

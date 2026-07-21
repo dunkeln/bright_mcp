@@ -2,6 +2,7 @@ import pLimit from "p-limit";
 import { chromium, type Browser, type Page } from "playwright-core";
 import type { BrowserCredentialProvider } from "../connections/browser-credentials";
 import { CapabilityError, type RequestContext } from "../core/contracts";
+import { isPublicHttpUrl } from "../core/public-url";
 import type {
   BrowserAction,
   BrowserNetworkEntry,
@@ -14,6 +15,9 @@ type RemoteSession = {
   page: Page;
   network: BrowserNetworkEntry[];
 };
+
+const MAX_REDIRECTS = 10;
+const MAX_PROVIDER_OBSERVATION_CHARS = 100_000;
 
 export function createBrightDataBrowserProvider(
   credentials: BrowserCredentialProvider,
@@ -41,6 +45,19 @@ export function createBrightDataBrowserProvider(
             },
           );
           const page = await browser.newPage({ acceptDownloads: false });
+          await page.route("**/*", async (route) => {
+            const request = route.request();
+            if (
+              request.isNavigationRequest() &&
+              request.frame() === page.mainFrame() &&
+              (!isPublicHttpUrl(request.url()) ||
+                redirectDepth(request) > MAX_REDIRECTS)
+            ) {
+              await route.abort("blockedbyclient");
+              return;
+            }
+            await route.continue();
+          });
           page.on("dialog", (dialog) => void dialog.dismiss());
           page.on("download", (download) => void download.cancel());
           const network: BrowserNetworkEntry[] = [];
@@ -137,7 +154,11 @@ export function createBrightDataBrowserProvider(
             context.signal,
             () => closeSession(sessions, providerSessionId),
           );
-          return { kind, content: content.slice(0, 100_000) };
+          return {
+            kind,
+            content: content.slice(0, MAX_PROVIDER_OBSERVATION_CHARS),
+            truncated: content.length > MAX_PROVIDER_OBSERVATION_CHARS || undefined,
+          };
         } catch (error) {
           throw normalizeBrowserError(error);
         }
@@ -276,10 +297,28 @@ export function normalizeBrowserError(error: unknown) {
       "Replace the Browser API username and password.",
     );
   }
+  if (/ERR_BLOCKED_BY_CLIENT/i.test(message)) {
+    return new CapabilityError(
+      "browser_navigation_blocked",
+      "The remote browser blocked a non-public destination or excessive redirect chain.",
+      false,
+      "Navigate to a public HTTP(S) URL without embedded credentials.",
+    );
+  }
   return new CapabilityError(
     "browser_upstream_unavailable",
     "The Bright Data remote browser operation failed.",
     true,
     "Retry once or start a new browser session.",
   );
+}
+
+function redirectDepth(request: import("playwright-core").Request) {
+  let depth = 0;
+  let redirected = request.redirectedFrom();
+  while (redirected) {
+    depth += 1;
+    redirected = redirected.redirectedFrom();
+  }
+  return depth;
 }

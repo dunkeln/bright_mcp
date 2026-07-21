@@ -52,6 +52,23 @@ assert(
   observed.kind === "text" && observed.content === "Fixture page",
   "Owned browser observation lost its canonical shape.",
 );
+const large = await browser.observe(
+  { sessionId: first.sessionId, kind: "html", timeoutMs: 1_000 },
+  alpha,
+);
+assert(
+  large.kind === "html" && large.truncated && large.resource,
+  "A large browser observation did not retain its bounded resource.",
+);
+if (large.kind === "html" && large.resource) {
+  const artifactId = large.resource.uri.split("/").at(-1);
+  assert(artifactId, "Large observation resource omitted its opaque ID.");
+  const artifact = browser.readArtifact(artifactId, alpha.principalId);
+  assert(
+    artifact.mediaType === "text/html" && artifact.data.byteLength === 60_000,
+    "The large observation resource lost its bounded content or media type.",
+  );
+}
 await browser.interact(
   {
     sessionId: first.sessionId,
@@ -156,6 +173,11 @@ assert(
     safeError.code === "browser_upstream_unavailable",
   "Browser error normalization exposed the CDP endpoint or credential.",
 );
+assert(
+  normalizeBrowserError(new Error("net::ERR_BLOCKED_BY_CLIENT")).code ===
+    "browser_navigation_blocked",
+  "Blocked redirect navigation did not retain an actionable error code.",
+);
 
 await browser.shutdown();
 console.log("Browser ownership, lifecycle, and redaction compatibility passed.");
@@ -185,6 +207,7 @@ function createProbeProvider() {
         return { kind, data: new Uint8Array([137, 80, 78, 71]) };
       }
       if (kind === "network") return { kind, entries: [] };
+      if (kind === "html") return { kind, content: "x".repeat(60_000) };
       return { kind, content: "Fixture page" } as ProviderObservation;
     },
     async interact(providerSessionId, action) {

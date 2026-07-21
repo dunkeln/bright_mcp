@@ -74,7 +74,7 @@ const observationOutput = z.object({
   resource: z
     .object({
       uri: z.string(),
-      mediaType: z.literal("image/png"),
+      mediaType: z.enum(["image/png", "text/plain", "text/html"]),
       expiresAt: z.string(),
     })
     .optional(),
@@ -151,15 +151,24 @@ export function registerBrowserTools(
           input,
           requestContext(principalId, extra.signal, extra.authInfo),
         );
-        if (structuredContent.kind === "screenshot") {
+        if (structuredContent.resource) {
           return {
             structuredContent,
             content: [
-              { type: "text" as const, text: "Captured a bounded browser screenshot." },
+              {
+                type: "text" as const,
+                text:
+                  structuredContent.kind === "screenshot"
+                    ? "Captured a bounded browser screenshot."
+                    : `Captured a bounded ${structuredContent.kind} preview; the larger observation is available as a resource.`,
+              },
               {
                 type: "resource_link" as const,
                 uri: structuredContent.resource.uri,
-                name: "Browser screenshot",
+                name:
+                  structuredContent.kind === "screenshot"
+                    ? "Browser screenshot"
+                    : `Browser ${structuredContent.kind} observation`,
                 mimeType: structuredContent.resource.mediaType,
               },
             ],
@@ -187,7 +196,7 @@ export function registerBrowserTools(
       }),
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: false,
         openWorldHint: true,
       },
@@ -211,7 +220,7 @@ export function registerBrowserTools(
       outputSchema: z.object({ sessionId: z.string(), closed: z.boolean() }),
       annotations: {
         readOnlyHint: false,
-        destructiveHint: false,
+        destructiveHint: true,
         idempotentHint: true,
         openWorldHint: false,
       },
@@ -234,17 +243,23 @@ export function registerBrowserTools(
     new ResourceTemplate("brightbrowser://observations/{artifactId}", {
       list: undefined,
     }),
-    { mimeType: "image/png", description: "Expiring browser screenshot" },
+    { description: "Expiring bounded browser observation" },
     async (uri, { artifactId }, extra) => {
       const context = requestContext(principalId, extra.signal, extra.authInfo);
       const artifact = browser.readArtifact(String(artifactId), context.principalId);
       return {
         contents: [
-          {
-            uri: uri.href,
-            mimeType: artifact.mediaType,
-            blob: artifact.data.toBase64(),
-          },
+          artifact.mediaType === "image/png"
+            ? {
+                uri: uri.href,
+                mimeType: artifact.mediaType,
+                blob: artifact.data.toBase64(),
+              }
+            : {
+                uri: uri.href,
+                mimeType: artifact.mediaType,
+                text: new TextDecoder().decode(artifact.data),
+              },
         ],
       };
     },

@@ -20,9 +20,18 @@ export type BrowserNetworkEntry = {
 };
 
 export type ProviderObservation =
-  | { kind: "accessibility" | "text" | "html"; content: string }
+  | {
+      kind: "accessibility" | "text" | "html";
+      content: string;
+      truncated?: boolean;
+    }
   | { kind: "network"; entries: BrowserNetworkEntry[] }
   | { kind: "screenshot"; data: Uint8Array };
+
+export type BrowserArtifactMediaType =
+  | "image/png"
+  | "text/plain"
+  | "text/html";
 
 export type BrowserProvider = {
   createAndNavigate(
@@ -66,13 +75,17 @@ export type BrowserSessionStore = {
 };
 
 export type BrowserArtifactStore = {
-  save(data: Uint8Array, principalId: string): {
+  save(
+    data: Uint8Array,
+    principalId: string,
+    mediaType: BrowserArtifactMediaType,
+  ): {
     uri: string;
-    mediaType: "image/png";
+    mediaType: BrowserArtifactMediaType;
     expiresAt: string;
   };
   read(artifactId: string, principalId: string): {
     data: Uint8Array;
-    mediaType: "image/png";
+    mediaType: BrowserArtifactMediaType;
   };
 };

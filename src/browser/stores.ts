@@ -2,6 +2,7 @@ import { LRUCache } from "lru-cache";
 import { CapabilityError } from "../core/contracts";
 import type {
   BrowserArtifactStore,
+  BrowserArtifactMediaType,
   BrowserProvider,
   BrowserSession,
   BrowserSessionStore,
@@ -77,15 +78,23 @@ export class LocalBrowserSessionStore implements BrowserSessionStore {
 export class LocalBrowserArtifactStore implements BrowserArtifactStore {
   private readonly artifacts = new LRUCache<
     string,
-    { data: Uint8Array; principalId: string; mediaType: "image/png" }
+    {
+      data: Uint8Array;
+      principalId: string;
+      mediaType: BrowserArtifactMediaType;
+    }
   >({ max: 20, ttl: ARTIFACT_TTL_MS, ttlAutopurge: true });
 
-  save(data: Uint8Array, principalId: string) {
+  save(
+    data: Uint8Array,
+    principalId: string,
+    mediaType: BrowserArtifactMediaType,
+  ) {
     const id = `observation_${crypto.randomUUID()}`;
-    this.artifacts.set(id, { data, principalId, mediaType: "image/png" });
+    this.artifacts.set(id, { data, principalId, mediaType });
     return {
       uri: `brightbrowser://observations/${id}`,
-      mediaType: "image/png" as const,
+      mediaType,
       expiresAt: new Date(Date.now() + ARTIFACT_TTL_MS).toISOString(),
     };
   }

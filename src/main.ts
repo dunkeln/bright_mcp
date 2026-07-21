@@ -12,11 +12,13 @@ import { createDemoDatasetAdapter } from "./adapters/demo-datasets";
 import { createDemoWebAdapter } from "./adapters/demo-web";
 import { createFakeBrowserProvider } from "./browser/fake-provider";
 import { createBrightDataBrowserProvider } from "./browser/brightdata-provider";
+import type { BrowserProvider } from "./browser/contracts";
 import {
   LocalBrowserArtifactStore,
   LocalBrowserSessionStore,
 } from "./browser/stores";
 import { createBrowserUseCases } from "./browser/use-cases";
+import type { BrowserUseCases } from "./browser/use-cases";
 import { LocalResultStore } from "./adapters/result-store";
 import {
   macOsKeychainCredential,
@@ -152,9 +154,9 @@ if (
     'MCP_BROWSER_PROFILE must be "disabled", "demo", or "brightdata".',
   );
 }
-const browser = browserProfile === "disabled"
+const browserProvider = browserProfile === "disabled"
   ? undefined
-  : createBrowser(browserProfile);
+  : createBrowserProvider(browserProfile);
 const widgetFile = Bun.file(
   new URL("../dist/dataset-table.html", import.meta.url),
 );
@@ -164,8 +166,10 @@ if (!(await widgetFile.exists())) {
 }
 
 const widgetHtml = await widgetFile.text();
-const createServer = () =>
-  createBrightMcpServer({
+const activeBrowsers = new Set<BrowserUseCases>();
+const createServer = () => {
+  const browser = browserProvider ? createBrowser(browserProvider) : undefined;
+  const server = createBrightMcpServer({
     datasets,
     createWeb: (server) =>
       createWebUseCases({
@@ -179,6 +183,16 @@ const createServer = () =>
     principalId,
     connection: hostedConnection,
   });
+  if (browser) {
+    activeBrowsers.add(browser);
+    const onclose = server.server.onclose;
+    server.server.onclose = () => {
+      onclose?.();
+      if (activeBrowsers.delete(browser)) void browser.shutdown();
+    };
+  }
+  return server;
+};
 
 const httpSessions = new LRUCache<
   string,
@@ -199,8 +213,10 @@ let shuttingDown = false;
 const shutdown = async () => {
   if (shuttingDown) return;
   shuttingDown = true;
+  const browsers = [...activeBrowsers];
+  activeBrowsers.clear();
+  await Promise.allSettled(browsers.map((browser) => browser.shutdown()));
   httpSessions.clear();
-  await browser?.shutdown();
   credentialVault?.close();
   process.exit(0);
 };
@@ -230,15 +246,20 @@ async function validateBrightDataCredential(
   }
 }
 
-function createBrowser(profile: "demo" | "brightdata") {
+function createBrowserProvider(
+  profile: "demo" | "brightdata",
+): BrowserProvider {
   if (httpAuthorization && profile === "brightdata") {
     throw new Error(
       "Hosted OIDC mode cannot use deployment-global Browser API credentials.",
     );
   }
-  const provider = profile === "demo"
+  return profile === "demo"
     ? createFakeBrowserProvider()
     : brightDataBrowserProvider();
+}
+
+function createBrowser(provider: BrowserProvider) {
   return createBrowserUseCases({
     provider,
     sessions: new LocalBrowserSessionStore(provider),

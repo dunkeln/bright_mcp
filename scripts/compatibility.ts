@@ -38,6 +38,7 @@ async function checkStdio() {
         "search_web,scrape,find_datasets,describe_dataset,run_dataset",
       "The base profile must expose exactly its five routed tools.",
     );
+    assertToolAnnotations(tools.tools);
     await assertToolRejected(client, "search_web", { query: "" });
     await assertToolRejected(client, "scrape", { urls: ["file:///tmp/nope"] });
     await assertToolRejected(client, "find_datasets", { query: "", limit: 0 });
@@ -246,6 +247,14 @@ async function checkBrowserProfile() {
         "search_web,scrape,find_datasets,describe_dataset,run_dataset,browser_navigate,browser_observe,browser_interact,browser_close",
       "The browser profile must expose exactly nine tools.",
     );
+    assertToolAnnotations(tools.tools);
+    for (const name of ["browser_interact", "browser_close"]) {
+      assert(
+        tools.tools.find((tool) => tool.name === name)?.annotations
+          ?.destructiveHint === true,
+        `${name} did not disclose its destructive state changes.`,
+      );
+    }
     await assertToolRejected(client, "browser_navigate", {
       destination: { kind: "url", url: "http://127.0.0.1/private" },
     });
@@ -401,13 +410,18 @@ async function checkHttp() {
   const port = 18_787;
   const process = Bun.spawn([bun, "run", "src/main.ts"], {
     cwd: projectRoot,
-    env: environment({ MCP_TRANSPORT: "http", PORT: String(port) }),
+    env: environment({
+      MCP_TRANSPORT: "http",
+      MCP_BROWSER_PROFILE: "demo",
+      PORT: String(port),
+    }),
     stdout: "ignore",
     stderr: "pipe",
   });
   try {
     await waitForServer(`http://127.0.0.1:${port}/`);
     const client = new Client({ name: "bright-http-check", version: "0.1.0" });
+    let browserSessionId = "";
     await client.connect(
       new StreamableHTTPClientTransport(
         new URL(`http://127.0.0.1:${port}/mcp`),
@@ -415,9 +429,35 @@ async function checkHttp() {
     );
     try {
       const tools = await client.listTools();
-      assert(tools.tools.length === 5, "Bun HTTP did not expose the base tools.");
+      assert(tools.tools.length === 9, "Bun HTTP did not expose the browser profile.");
+      const navigation = await client.callTool({
+        name: "browser_navigate",
+        arguments: { destination: { kind: "url", url: "https://example.com/" } },
+      });
+      browserSessionId =
+        (navigation.structuredContent as { sessionId?: string }).sessionId ?? "";
+      assert(browserSessionId, "Bun HTTP browser navigation omitted its session.");
     } finally {
       await client.close();
+    }
+
+    const replacement = new Client({
+      name: "bright-http-reconnect-check",
+      version: "0.1.0",
+    });
+    await replacement.connect(
+      new StreamableHTTPClientTransport(
+        new URL(`http://127.0.0.1:${port}/mcp`),
+      ),
+    );
+    try {
+      const stale = await replacement.callTool({
+        name: "browser_observe",
+        arguments: { sessionId: browserSessionId, kind: "text" },
+      });
+      assert(stale.isError, "A browser session survived its HTTP transport.");
+    } finally {
+      await replacement.close();
     }
   } finally {
     process.kill();
@@ -472,4 +512,22 @@ async function assertToolRejected(
     return;
   }
   throw new Error(`${name} accepted invalid input.`);
+}
+
+function assertToolAnnotations(
+  tools: Array<{ name: string; annotations?: Record<string, unknown> }>,
+) {
+  for (const tool of tools) {
+    for (const name of [
+      "readOnlyHint",
+      "destructiveHint",
+      "idempotentHint",
+      "openWorldHint",
+    ]) {
+      assert(
+        typeof tool.annotations?.[name] === "boolean",
+        `${tool.name} omitted the ${name} annotation.`,
+      );
+    }
+  }
 }

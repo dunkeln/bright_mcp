@@ -98,6 +98,7 @@ export function createBrowserUseCases(dependencies: {
           resource: dependencies.artifacts.save(
             observation.data,
             context.principalId,
+            "image/png",
           ),
         };
       }
@@ -108,11 +109,22 @@ export function createBrowserUseCases(dependencies: {
           entries: observation.entries.slice(-50),
         };
       }
+      const truncated =
+        observation.truncated ||
+        observation.content.length > MAX_OBSERVATION_CHARS ||
+        undefined;
       return {
         sessionId: session.id,
         kind: observation.kind,
         content: observation.content.slice(0, MAX_OBSERVATION_CHARS),
-        truncated: observation.content.length > MAX_OBSERVATION_CHARS || undefined,
+        truncated,
+        resource: truncated
+          ? dependencies.artifacts.save(
+              new TextEncoder().encode(observation.content),
+              context.principalId,
+              observation.kind === "html" ? "text/html" : "text/plain",
+            )
+          : undefined,
       };
     },
 

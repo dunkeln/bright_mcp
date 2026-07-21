@@ -26,3 +26,4 @@ pnpm-debug.log*
 
 # codex memories
 .codex/memories
+.vercel

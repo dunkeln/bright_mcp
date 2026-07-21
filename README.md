@@ -36,7 +36,10 @@ hosted authorization.
 ## Benchmarks
 
 <!-- benchmark:start -->
-![Grouped bar chart comparing MCP tool-use completion](./assets/benchmark.png)
+![Dumbbell chart comparing MCP completion by workflow](./assets/benchmark-completion.png)
+![Scatter plot comparing completion and token cost](./assets/benchmark-efficiency.png)
+![Cumulative latency distribution across all benchmark runs](./assets/benchmark-latency.png)
+![Dumbbell chart comparing average tool calls by workflow](./assets/benchmark-complexity.png)
 
 Bright MCP: 60% pass · 7626 tokens · 6.4s p50. BrightData MCP: 65% · 16120 tokens · 7.3s p50.
 [Method and tables](./evals/README.md#latest-tool-use-benchmark) · `openrouter/anthropic/claude-haiku-4.5` · 10 runs/case · 2026-07-21.

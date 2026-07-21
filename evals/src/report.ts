@@ -25,7 +25,10 @@ const complete = allSummaries.every(
 const publishable = complete && report.runsPerCase >= 10;
 const rootBlock = publishable
   ? [
-      "![Grouped bar chart comparing MCP tool-use completion](./assets/benchmark.png)",
+      "![Dumbbell chart comparing MCP completion by workflow](./assets/benchmark-completion.png)",
+      "![Scatter plot comparing completion and token cost](./assets/benchmark-efficiency.png)",
+      "![Cumulative latency distribution across all benchmark runs](./assets/benchmark-latency.png)",
+      "![Dumbbell chart comparing average tool calls by workflow](./assets/benchmark-complexity.png)",
       "",
       `Bright MCP: ${percent(overall.bright.passRate)} pass · ${Math.round(overall.bright.averageTokens)} tokens · ${seconds(overall.bright.medianLatency)} p50. BrightData MCP: ${percent(overall.upstream.passRate)} · ${Math.round(overall.upstream.averageTokens)} tokens · ${seconds(overall.upstream.medianLatency)} p50.`,
       `[Method and tables](./evals/README.md#latest-tool-use-benchmark) · \`${report.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}.`,

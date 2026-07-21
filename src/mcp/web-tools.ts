@@ -95,7 +95,7 @@ export function registerWebTools(
     {
       title: "Search web",
       description:
-        "Search one to five research angles in one ordered call. fast uses live SERP; ranked and deep use Bright Data Discover and can include page content, avoiding a separate scrape. First fast use may create the caller-funded bright_mcp_serp zone. Do not repeat unchanged queries that returned results.",
+        "Discover current public-web information when the relevant pages are not yet known. Submit one to five distinct queries together when they investigate the same objective. Use fast to locate current sources, ranked to prioritize relevant evidence, and deep for broader source discovery. With ranked or deep, set includeContent=true when the answer requires page-level evidence; this can complete research without a separate scrape. Use returned cursors only to continue an incomplete result set. Do not use this tool for already-known URLs, structured dataset records, or unchanged queries that already returned useful results. After successful discovery, answer from included content or scrape only the selected sources whose full text is still needed.",
       inputSchema: {
         queries: z.array(z.object({
           query: z.string().trim().min(1).max(500),
@@ -143,7 +143,7 @@ export function registerWebTools(
     {
       title: "Scrape URLs",
       description:
-        "Retrieve readable content from one to five known public HTTP(S) URLs in one call. First use may create the caller-funded bright_mcp_unlocker zone. Results preserve input order and isolate per-URL failures.",
+        "Acquire readable content from one to five known public URLs. Use when the user supplied the URLs or search_web identified specific pages that must be opened. Choose markdown for reading and synthesis, or html when document structure or markup matters. Provide an extraction projection only when the required fields and their types are already known. Results preserve URL order and report failures independently, so continue with successful pages instead of repeating the whole batch. Do not use this tool to discover sources or retrieve maintained structured datasets.",
       inputSchema: {
         urls: z
           .array(z.url().refine(isPublicHttpUrl, "URL must be a public HTTP(S) URL."))

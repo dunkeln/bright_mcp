@@ -61,7 +61,7 @@ const definitionSchema = z.object({
 const runDatasetConfig = {
   title: "Run dataset",
   description:
-    "Execute a dataset candidate using the operation and example from find_datasets, or the exact schema from describe_dataset when discovery omits an operation. Paid operations require explicit acknowledgement and return a bounded preview plus a result resource.",
+    "Execute a structured-data capability selected through find_datasets and, when necessary, describe_dataset. Preserve the returned dataset identifier and operation exactly; construct arguments only from the candidate example or described schema. Use this tool for structured collection, filtered record retrieval, or research that produces a table—not for general web search or page reading. Paid operations require the schema's explicit cost acknowledgement. A successful call returns a bounded result preview and a resource for additional rows or continuation; consume that result instead of repeating the same run.",
   inputSchema: {
     datasetId: z.string().trim().min(1).max(120),
     operation: datasetOperationSchema,
@@ -106,7 +106,7 @@ export function registerDatasetTools(
     {
       title: "Find datasets",
       description:
-        "Search the caller's live Marketplace catalog, curated collectors, and deep research once. A candidate with operation and example can be passed directly to run_dataset; otherwise call describe_dataset for valid fields and the exact schema.",
+        "Discover executable structured-data capabilities for an objective involving records, entities, products, organizations, profiles, listings, or research tables. Search by the desired data and constraints—not by a guessed dataset identifier. Results may represent maintained Marketplace data, purpose-built collectors, or deep research. Call once and inspect each candidate's operation, required inputs, and example. If a candidate includes an operation and example, pass them directly to run_dataset; call describe_dataset only when those execution details are absent. Do not use this tool for ordinary web pages or isolated factual lookups.",
       inputSchema: {
         query: z.string().trim().min(1).max(500),
         limit: z.number().int().min(1).max(10).default(5),
@@ -138,7 +138,7 @@ export function registerDatasetTools(
     {
       title: "Describe dataset",
       description:
-        "Get valid fields and the exact executable schema when find_datasets did not return a direct operation and example. Then call run_dataset once.",
+        "Inspect the executable contract of one dataset candidate returned by find_datasets. Use only when discovery did not provide enough information to run the candidate safely. The result defines supported operations, exact argument schemas, limits, fields, and examples. Select one returned operation, construct arguments that conform to its schema, and then call run_dataset. This tool does not search for datasets, retrieve records, or execute work; do not call it repeatedly for an unchanged candidate.",
       inputSchema: { datasetId: z.string().trim().min(1).max(120) },
       outputSchema: definitionSchema,
       annotations,

@@ -9,7 +9,7 @@ import { rgb } from "./palette"
 export type TooltipVariant = "default" | "frosted-glass"
 
 const VARIANT: Record<TooltipVariant, string> = {
-  default: "bg-popover",
+  default: "bg-surface",
   "frosted-glass": "bg-popover/70 backdrop-blur-sm",
 }
 

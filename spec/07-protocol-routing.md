@@ -14,14 +14,15 @@ The server MUST expose these application-controlled resource families:
 
 - `brightdata://datasets/{datasetId}`: versioned dataset definition and input
   schema corresponding to `describe_dataset`.
-- `brightdata://results/{resultId}`: completed canonical result artifact.
+- `brightdata://results/{resultId}`: completed canonical result artifact backed
+  by bounded local rows or lazy upstream snapshot parts.
 - Opaque page URIs returned inside result resources: bounded continuation pages.
 - `ui://bright-mcp/dataset-table`: static table app document.
 - Opaque browser session and observation resources when the browser profile is enabled.
 
-`describe_dataset` remains a tool because model access to server resources is
-not portable across every host. Resource and tool representations MUST derive
-from the same catalog entry. Result resources MUST enforce principal ownership,
+`describe_dataset` remains a tool for dynamic fields and because model access to
+server resources is not portable across every host. Resource and tool
+representations MUST derive from the same catalog entry. Result resources MUST enforce principal ownership,
 size limits, media type, expiry, and predictable not-found/expired errors.
 
 ## Tasks

@@ -100,6 +100,8 @@ export type DatasetSummary = {
   title: string;
   summary: string;
   requiredInputs: string[];
+  operation?: DatasetOperation;
+  example?: JsonObject;
 };
 
 export type DatasetDefinition = {
@@ -126,6 +128,7 @@ export class CapabilityError extends Error {
     message: string,
     readonly retryable = false,
     readonly nextAction?: string,
+    readonly requestId?: string,
   ) {
     super(message);
     this.name = "CapabilityError";

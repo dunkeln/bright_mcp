@@ -41,7 +41,7 @@ export function createBrightMcpServer(dependencies: {
           }
         : {}),
       instructions:
-        "Use search_web once to find current URLs, then scrape the relevant pages. For managed datasets, call find_datasets once, then describe_dataset with the returned ID, then run_dataset with that operation schema.",
+        "Batch related web queries in one search_web call; ranked or deep search can include page content. For structured data, call find_datasets once, run direct candidates immediately, and use describe_dataset only when discovery omits an operation and example.",
     },
   );
   registerWebTools(

@@ -22,6 +22,16 @@
       }
     },
     {
+      "id": "ranked-web-research",
+      "referenceCapability": "Intent-ranked discovery with optional page content",
+      "disposition": "composed",
+      "routes": ["tool:search_web#ranked", "tool:search_web#deep"],
+      "verification": {
+        "gate": "bun run check:adapters",
+        "scenario": "Trigger and poll Discover through an explicit research depth, then retain ranked URLs and optional page content without a separate scrape call."
+      }
+    },
+    {
       "id": "structured-extraction",
       "referenceCapability": "Schema-directed extraction",
       "disposition": "composed",
@@ -52,6 +62,26 @@
       }
     },
     {
+      "id": "account-dataset-catalog",
+      "referenceCapability": "Caller-scoped Marketplace catalog and field metadata",
+      "disposition": "internalized",
+      "routes": ["tool:find_datasets", "tool:describe_dataset", "adapter:account-catalog"],
+      "verification": {
+        "gate": "bun run check:adapters",
+        "scenario": "Search the caller's live dataset list, fetch active field metadata, and route supported datasets synchronously while routing the wider catalog through filtered snapshots."
+      }
+    },
+    {
+      "id": "deep-lookup-research",
+      "referenceCapability": "Natural-language objective to sourced structured table",
+      "disposition": "composed",
+      "routes": ["tool:find_datasets", "tool:run_dataset#search"],
+      "verification": {
+        "gate": "bun run check:adapters",
+        "scenario": "Return a Deep Lookup preview by default, reject a full run below its computed cost cap before triggering, then complete an acknowledged full run."
+      }
+    },
+    {
       "id": "asynchronous-execution",
       "referenceCapability": "Trigger, poll, status, and cancellation",
       "disposition": "internalized",
@@ -68,7 +98,7 @@
       "routes": ["resource:brightdata://results/{resultId}", "resource:brightdata://pages/{pageToken}"],
       "verification": {
         "gate": "bun run check:compat",
-        "scenario": "Read a result and continuation page, then prove another authenticated principal cannot read the artifact."
+        "scenario": "Read a result and continuation page lazily from bounded local rows or an upstream snapshot part, then prove another authenticated principal cannot read the artifact."
       }
     },
     {

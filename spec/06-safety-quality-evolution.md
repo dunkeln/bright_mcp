@@ -21,6 +21,8 @@
   connection URLs.
 - Denial of service: bound URLs per call, schema depth, polling deadline,
   concurrency, row count, serialized size, and app context updates.
+- Paid execution: require explicit acknowledgement for Marketplace and collector
+  calls; require a checked maximum-cost cap before triggering full Deep Lookup.
 - Elevation of privilege: v1 has no local file or shell tool; browser actions use
   a fixed typed allowlist, principal-bound sessions, and startup-fixed capabilities.
 

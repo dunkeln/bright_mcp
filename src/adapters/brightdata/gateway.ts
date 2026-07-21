@@ -31,7 +31,7 @@ export class BrightDataGateway {
   async requestJson(
     request: GatewayRequest,
     context: RequestContext,
-  ): Promise<{ status: number; data: unknown }> {
+  ): Promise<{ status: number; data: unknown; requestId?: string }> {
     return this.request(request, context, (text) => {
       try {
         return text.length ? JSON.parse(text) : null;
@@ -49,7 +49,7 @@ export class BrightDataGateway {
   async requestText(
     request: GatewayRequest,
     context: RequestContext,
-  ): Promise<{ status: number; data: string }> {
+  ): Promise<{ status: number; data: string; requestId?: string }> {
     return this.request(request, context, (text) => text);
   }
 
@@ -57,7 +57,7 @@ export class BrightDataGateway {
     request: GatewayRequest,
     context: RequestContext,
     parse: (text: string) => T,
-  ): Promise<{ status: number; data: T }> {
+  ): Promise<{ status: number; data: T; requestId?: string }> {
     const startedAt = performance.now();
     const url = new URL(
       request.path,
@@ -93,14 +93,22 @@ export class BrightDataGateway {
         });
 
         if (!response.ok) {
+          const upstreamRequestId = response.headers.get("x-request-id") ?? undefined;
           await response.body?.cancel();
           if (RETRYABLE_STATUS.has(response.status) && attempt < 3) {
-            await this.retryDelay(attempt, context.signal);
+            await this.retryDelay(
+              attempt,
+              context.signal,
+              response.headers.get("retry-after"),
+            );
             continue;
           }
-          throw statusError(response.status);
+          throw statusError(response.status, upstreamRequestId ?? context.requestId);
         }
-        const text = await readBoundedText(response, MAX_RESPONSE_BYTES);
+        const text = await readBoundedText(
+          response,
+          request.maxResponseBytes ?? MAX_RESPONSE_BYTES,
+        );
 
         const data = parse(text);
 
@@ -109,10 +117,15 @@ export class BrightDataGateway {
           requestId: context.requestId,
           attempt,
           status: response.status,
+          upstreamRequestId: response.headers.get("x-request-id") ?? undefined,
           durationMs: Math.round(performance.now() - startedAt),
           terminalState: "success",
         });
-        return { status: response.status, data };
+        return {
+          status: response.status,
+          data,
+          requestId: response.headers.get("x-request-id") ?? undefined,
+        };
       } catch (error) {
         const capabilityError = translateNetworkError(error, context.signal);
         const shouldRetry = capabilityError.retryable && attempt < 3;
@@ -139,8 +152,16 @@ export class BrightDataGateway {
     );
   }
 
-  private async retryDelay(attempt: number, signal?: AbortSignal) {
-    await Bun.sleep(200 * attempt);
+  private async retryDelay(
+    attempt: number,
+    signal?: AbortSignal,
+    retryAfter?: string | null,
+  ) {
+    const seconds = Number(retryAfter);
+    const retryMs = Number.isFinite(seconds) && seconds >= 0
+      ? seconds * 1_000
+      : Math.max(0, Date.parse(retryAfter ?? "") - Date.now());
+    await Bun.sleep(retryMs || 200 * attempt + Math.random() * 100);
     if (signal?.aborted) {
       throw new CapabilityError(
         "cancelled",
@@ -151,12 +172,36 @@ export class BrightDataGateway {
   }
 }
 
+export async function pollBrightData<T>(options: {
+  context: RequestContext;
+  deadlineMs: number;
+  intervalMs: number;
+  load(): Promise<T>;
+  state(value: T): "pending" | "ready" | "failed";
+  failed(value: T): CapabilityError;
+  timeout: CapabilityError;
+}) {
+  const deadline = Date.now() + options.deadlineMs;
+  while (Date.now() < deadline) {
+    if (options.context.signal?.aborted) {
+      throw new CapabilityError("cancelled", "The Bright Data operation was cancelled.");
+    }
+    await Bun.sleep(options.intervalMs);
+    const value = await options.load();
+    const state = options.state(value);
+    if (state === "ready") return value;
+    if (state === "failed") throw options.failed(value);
+  }
+  throw options.timeout;
+}
+
 type GatewayRequest = {
   method: "GET" | "POST";
   path: string;
   query?: Record<string, string>;
   body?: unknown;
   timeoutMs?: number;
+  maxResponseBytes?: number;
 };
 
 async function readBoundedText(response: Response, maxBytes: number) {
@@ -193,13 +238,14 @@ function responseTooLarge() {
   );
 }
 
-function statusError(status: number): CapabilityError {
+function statusError(status: number, requestId?: string): CapabilityError {
   if (status === 400 || status === 422) {
     return new CapabilityError(
       "upstream_rejected_input",
       "Bright Data rejected the upstream request input.",
       false,
       "Verify the tool arguments and configured Bright Data product zone.",
+      requestId,
     );
   }
   if (status === 401) {
@@ -208,6 +254,7 @@ function statusError(status: number): CapabilityError {
       "Bright Data rejected the configured API key.",
       false,
       "Replace BRIGHTDATA_API_KEY with a valid API key.",
+      requestId,
     );
   }
   if (status === 402) {
@@ -216,6 +263,7 @@ function statusError(status: number): CapabilityError {
       "The Bright Data account cannot run this paid operation.",
       false,
       "Check the account balance and product access in Bright Data.",
+      requestId,
     );
   }
   if (status === 403) {
@@ -224,6 +272,7 @@ function statusError(status: number): CapabilityError {
       "The configured Bright Data API key lacks access to this product.",
       false,
       "Grant the API key product access or use another key.",
+      requestId,
     );
   }
   if (status === 404) {
@@ -232,6 +281,7 @@ function statusError(status: number): CapabilityError {
       "The configured Bright Data capability is unavailable.",
       false,
       "Verify the adapter mapping and product zone.",
+      requestId,
     );
   }
   if (status === 429) {
@@ -240,6 +290,7 @@ function statusError(status: number): CapabilityError {
       "Bright Data rate-limited the request after bounded retries.",
       true,
       "Wait briefly before retrying.",
+      requestId,
     );
   }
   return new CapabilityError(
@@ -247,6 +298,7 @@ function statusError(status: number): CapabilityError {
     `Bright Data returned HTTP ${status}.`,
     RETRYABLE_STATUS.has(status),
     RETRYABLE_STATUS.has(status) ? "Retry after a brief delay." : undefined,
+    requestId,
   );
 }
 

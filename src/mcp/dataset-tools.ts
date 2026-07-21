@@ -40,6 +40,8 @@ const summarySchema = z.object({
   title: z.string(),
   summary: z.string(),
   requiredInputs: z.array(z.string()),
+  operation: datasetOperationSchema.optional(),
+  example: z.record(z.string(), jsonValueSchema).optional(),
 });
 
 const definitionSchema = z.object({
@@ -59,7 +61,7 @@ const definitionSchema = z.object({
 const runDatasetConfig = {
   title: "Run dataset",
   description:
-    "Execute an operation returned by describe_dataset using its exact input schema. Returns a bounded preview and a completed result resource.",
+    "Execute a dataset candidate using the operation and example from find_datasets, or the exact schema from describe_dataset when discovery omits an operation. Paid operations require explicit acknowledgement and return a bounded preview plus a result resource.",
   inputSchema: {
     datasetId: z.string().trim().min(1).max(120),
     operation: datasetOperationSchema,
@@ -68,7 +70,7 @@ const runDatasetConfig = {
   outputSchema: datasetResultSchema,
   annotations: {
     readOnlyHint: false,
-    destructiveHint: false,
+    destructiveHint: true,
     idempotentHint: false,
     openWorldHint: true,
   },
@@ -104,7 +106,7 @@ export function registerDatasetTools(
     {
       title: "Find datasets",
       description:
-        "Search the managed-dataset catalog once for a web-data task. If a candidate is returned, call describe_dataset with its ID; do not repeat the same search.",
+        "Search the caller's live Marketplace catalog, curated collectors, and deep research once. A candidate with operation and example can be passed directly to run_dataset; otherwise call describe_dataset for valid fields and the exact schema.",
       inputSchema: {
         query: z.string().trim().min(1).max(500),
         limit: z.number().int().min(1).max(10).default(5),
@@ -112,15 +114,20 @@ export function registerDatasetTools(
       outputSchema: { datasets: z.array(summarySchema) },
       annotations,
     },
-    async ({ query, limit }) =>
+    async ({ query, limit }, extra) =>
       runTool(async () => {
+        const context = requestContext(
+          dependencies.principalId,
+          extra.signal,
+          extra.authInfo,
+        );
         const structuredContent = {
-          datasets: await dependencies.datasets.findDatasets(query, limit),
+          datasets: await dependencies.datasets.findDatasets(query, limit, context),
         };
         return reply(
           structuredContent,
           structuredContent.datasets.length
-            ? `Dataset candidates:\n${JSON.stringify(structuredContent)}\nNext: call describe_dataset with the chosen ID.`
+            ? `Dataset candidates:\n${JSON.stringify(structuredContent)}\nNext: run candidates that include an operation and example; describe only candidates that omit them.`
             : "No matching dataset capability was found. Try a broader task description.",
         );
       }),
@@ -131,15 +138,20 @@ export function registerDatasetTools(
     {
       title: "Describe dataset",
       description:
-        "Get executable operations and input schemas for an ID returned by find_datasets. Then call run_dataset with one returned operation and schema-valid arguments.",
+        "Get valid fields and the exact executable schema when find_datasets did not return a direct operation and example. Then call run_dataset once.",
       inputSchema: { datasetId: z.string().trim().min(1).max(120) },
       outputSchema: definitionSchema,
       annotations,
     },
-    async ({ datasetId }) =>
+    async ({ datasetId }, extra) =>
       runTool(async () => {
+        const context = requestContext(
+          dependencies.principalId,
+          extra.signal,
+          extra.authInfo,
+        );
         const structuredContent =
-          await dependencies.datasets.describeDataset(datasetId);
+          await dependencies.datasets.describeDataset(datasetId, context);
         return reply(
           structuredContent,
           `Dataset definition:\n${JSON.stringify(structuredContent)}\nNext: call run_dataset with this ID, one returned operation, and matching arguments.`,
@@ -238,10 +250,17 @@ export function registerDatasetTools(
     "dataset-definition",
     new ResourceTemplate("brightdata://datasets/{datasetId}", { list: undefined }),
     { mimeType: "application/json", description: "Dataset capability definition" },
-    async (uri, { datasetId }) =>
+    async (uri, { datasetId }, extra) =>
       jsonResourceReply(
         uri,
-        await dependencies.datasets.describeDataset(String(datasetId)),
+        await dependencies.datasets.describeDataset(
+          String(datasetId),
+          requestContext(
+            dependencies.principalId,
+            extra.signal,
+            extra.authInfo,
+          ),
+        ),
       ),
   );
 
@@ -252,13 +271,13 @@ export function registerDatasetTools(
     async (uri, { resultId }, extra) =>
       jsonResourceReply(
         uri,
-        dependencies.results.readResult(
+        await dependencies.results.readResult(
           String(resultId),
           requestContext(
             dependencies.principalId,
             extra.signal,
             extra.authInfo,
-          ).principalId,
+          ),
         ),
       ),
   );
@@ -270,13 +289,13 @@ export function registerDatasetTools(
     async (uri, { pageToken }, extra) =>
       jsonResourceReply(
         uri,
-        dependencies.results.readPage(
+        await dependencies.results.readPage(
           String(pageToken),
           requestContext(
             dependencies.principalId,
             extra.signal,
             extra.authInfo,
-          ).principalId,
+          ),
         ),
       ),
   );

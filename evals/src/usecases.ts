@@ -32,7 +32,9 @@ for (const useCase of useCases) {
       client = await connect(server);
       const result = await client.callTool({
         name: searchTool(server),
-        arguments: { query: useCase.prompt },
+        arguments: server === "bright"
+          ? { queries: [{ query: useCase.prompt }] }
+          : { query: useCase.prompt },
       });
       const bytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
       const ok =

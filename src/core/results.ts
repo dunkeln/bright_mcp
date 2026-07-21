@@ -7,9 +7,19 @@ import type {
 export type ResultStore = {
   save(
     result: DatasetResultBase,
-    rows: DatasetResult["rows"],
+    source: DatasetResult["rows"] | ResultSource,
     context: RequestContext,
-  ): DatasetResult;
-  readResult(resultId: string, principalId: string): DatasetResult;
-  readPage(pageToken: string, principalId: string): DatasetResult;
+  ): Promise<DatasetResult>;
+  readResult(
+    resultId: string,
+    context: RequestContext,
+  ): Promise<DatasetResult>;
+  readPage(pageToken: string, context: RequestContext): Promise<DatasetResult>;
+};
+
+export type ResultSource = {
+  partSize: number;
+  totalRows?: number;
+  expiresAt?: string;
+  loadPart(part: number, context: RequestContext): Promise<DatasetResult["rows"]>;
 };

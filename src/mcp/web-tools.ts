@@ -19,6 +19,7 @@ const searchResultSchema = z.object({
   title: z.string(),
   url: z.url(),
   summary: z.string(),
+  content: z.string().optional(),
 });
 
 const itemFailureSchema = z.object({
@@ -97,19 +98,25 @@ export function registerWebTools(
     {
       title: "Search web",
       description:
-        "Find current public pages with Google, Bing, or DuckDuckGo. Use returned URLs directly; scrape relevant pages when their contents are needed. Do not repeat an unchanged query that returned results.",
+        "Search one to five research angles in one ordered call. fast uses live SERP; ranked and deep use Bright Data Discover and can include page content, avoiding a separate scrape. First fast use may create the caller-funded bright_mcp_serp zone. Do not repeat unchanged queries that returned results.",
       inputSchema: {
-        query: z.string().trim().min(1).max(500),
-        engine: z.enum(["google", "bing", "duckduckgo"]).default("google"),
-        locale: z
-          .string()
-          .regex(/^[a-zA-Z]{2,3}(?:-[a-zA-Z]{2})?$/)
-          .default("en-US"),
-        cursor: z.string().max(80).optional(),
+        queries: z.array(z.object({
+          query: z.string().trim().min(1).max(500),
+          engine: z.enum(["google", "bing", "duckduckgo"]).default("google"),
+          locale: z.string().regex(/^[a-zA-Z]{2,3}(?:-[a-zA-Z]{2})?$/).default("en-US"),
+          cursor: z.string().max(80).optional(),
+        })).min(1).max(5),
+        depth: z.enum(["fast", "ranked", "deep"]).default("fast"),
+        includeContent: z.boolean().default(false),
+        intent: z.string().trim().min(1).max(3_000).optional(),
       },
       outputSchema: {
-        results: z.array(searchResultSchema),
-        nextCursor: z.string().optional(),
+        searches: z.array(z.object({
+          query: z.string(),
+          results: z.array(searchResultSchema),
+          nextCursor: z.string().optional(),
+          error: itemFailureSchema.optional(),
+        })),
       },
       annotations: {
         ...annotations,
@@ -122,9 +129,13 @@ export function registerWebTools(
       const context = requestContext(principalId, extra.signal, extra.authInfo);
       return runTool(async () => {
         const structuredContent = await web.searchWeb(input, context);
+        const resultCount = structuredContent.searches.reduce(
+          (total, search) => total + search.results.length,
+          0,
+        );
         return reply(
           structuredContent,
-          `Found ${structuredContent.results.length} web results.`,
+          `Found ${resultCount} results across ${structuredContent.searches.length} searches.`,
         );
       });
     },
@@ -135,7 +146,7 @@ export function registerWebTools(
     {
       title: "Scrape URLs",
       description:
-        "Retrieve readable content from one to five known public HTTP(S) URLs in one call. Results preserve input order and isolate per-URL failures.",
+        "Retrieve readable content from one to five known public HTTP(S) URLs in one call. First use may create the caller-funded bright_mcp_unlocker zone. Results preserve input order and isolate per-URL failures.",
       inputSchema: {
         urls: z
           .array(z.url().refine(isPublicHttpUrl, "URL must be a public HTTP(S) URL."))

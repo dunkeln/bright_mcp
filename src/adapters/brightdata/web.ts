@@ -5,9 +5,10 @@ import type {
   ItemFailure,
   ScrapePort,
   SearchPort,
-  SearchRequest,
+  SearchQuery,
+  SingleSearchResponse,
 } from "../../core/web";
-import { BrightDataGateway } from "./gateway";
+import { BrightDataGateway, pollBrightData } from "./gateway";
 
 const SEARCH_PAGE_SIZE = 10;
 const MAX_SEARCH_OFFSET = 90;
@@ -25,10 +26,32 @@ const searchEnvelopeSchema = z.object({
   organic: z.array(organicResultSchema).optional(),
   results: z.array(organicResultSchema).optional(),
 });
+const discoverTriggerSchema = z.object({ task_id: z.string().min(1) });
+const discoverPollSchema = z.object({
+  status: z.enum(["processing", "done", "error", "failed"]),
+  results: z.array(z.object({
+    title: z.string(),
+    link: z.url(),
+    description: z.string().optional(),
+    content: z.string().optional(),
+  })).optional(),
+  error: z.string().optional(),
+  message: z.string().optional(),
+});
 const activeZonesSchema = z.array(z.object({
-  name: z.string().min(1),
-  type: z.string(),
+  name: z.string().min(1).optional(),
+  zone: z.string().min(1).optional(),
+  type: z.string().optional(),
+  zone_type: z.string().optional(),
   plan: z.object({ serp: z.boolean().optional() }).optional(),
+}).transform((zone, context) => {
+  const name = zone.name ?? zone.zone;
+  const type = zone.type ?? zone.zone_type;
+  if (!name || !type) {
+    context.addIssue({ code: "custom", message: "Zone name and type are required." });
+    return z.NEVER;
+  }
+  return { name, type, plan: zone.plan };
 }));
 
 export function createBrightDataWebAdapter(
@@ -42,48 +65,32 @@ export function createBrightDataWebAdapter(
   return {
     search: {
       async search(input, context) {
-        const zone = await resolveZone(
-          gateway,
-          activeZones,
-          zones.serp,
-          "serp",
-          context,
-        );
-        const offset = parseCursor(input.cursor);
-        const response = await gateway.requestJson(
-          {
-            method: "POST",
-            path: "/request",
-            body: {
-              zone,
-              url: searchUrl(input, offset),
-              format: "raw",
-              data_format: "parsed_light",
-            },
-            timeoutMs: 20_000,
-          },
-          context,
-        );
-        const parsed = searchEnvelopeSchema.safeParse(response.data);
-        if (!parsed.success || (!parsed.data.organic && !parsed.data.results)) {
-          throw malformedSearch();
+        if (input.depth === "fast" && input.includeContent) {
+          throw new CapabilityError(
+            "invalid_search_options",
+            "Fast SERP search cannot include page content.",
+            false,
+            "Use ranked or deep depth, or set includeContent to false and call scrape.",
+          );
         }
-        const candidates = parsed.data.organic ?? parsed.data.results ?? [];
-        const results = candidates
-          .filter((item) => !item.type || item.type === "organic")
-          .flatMap((item) => {
-            const url = item.link ?? item.url;
-            return url
-              ? [{ title: item.title, url, summary: item.description ?? item.snippet ?? "" }]
-              : [];
-          })
-          .slice(0, SEARCH_PAGE_SIZE);
+        const serpZone = input.depth === "fast"
+          ? await resolveZone(gateway, activeZones, zones.serp, "serp", context)
+          : undefined;
         return {
-          results,
-          nextCursor:
-            results.length === SEARCH_PAGE_SIZE && offset < MAX_SEARCH_OFFSET
-              ? `search_${offset + SEARCH_PAGE_SIZE}`
-              : undefined,
+          searches: await Promise.all(input.queries.map(async (query) => {
+            try {
+              const result = input.depth === "fast"
+                ? await searchSerp(gateway, activeZones, serpZone, query, context)
+                : await searchDiscover(gateway, query, input, context);
+              return { query: query.query, ...result };
+            } catch (error) {
+              const failure = error instanceof CapabilityError
+                ? error
+                : new CapabilityError("upstream_unavailable", "Bright Data search failed.", true);
+              if (failure.code === "brightdata_connection_required") throw failure;
+              return { query: query.query, results: [], error: failureRecord(failure) };
+            }
+          })),
         };
       },
     },
@@ -146,6 +153,122 @@ export function createBrightDataWebAdapter(
   };
 }
 
+async function searchSerp(
+  gateway: BrightDataGateway,
+  cache: LRUCache<string, z.infer<typeof activeZonesSchema>>,
+  configuredZone: string | undefined,
+  input: SearchQuery,
+  context: RequestContext,
+): Promise<SingleSearchResponse> {
+  const zone = await resolveZone(gateway, cache, configuredZone, "serp", context);
+  const offset = parseCursor(input.cursor);
+  const response = await gateway.requestJson(
+    {
+      method: "POST",
+      path: "/request",
+      body: {
+        zone,
+        url: searchUrl(input, offset),
+        format: "raw",
+        data_format: "parsed_light",
+      },
+      timeoutMs: 20_000,
+    },
+    context,
+  );
+  const parsed = searchEnvelopeSchema.safeParse(response.data);
+  if (!parsed.success || (!parsed.data.organic && !parsed.data.results)) {
+    throw malformedSearch();
+  }
+  const results = (parsed.data.organic ?? parsed.data.results ?? [])
+    .filter((item) => !item.type || item.type === "organic")
+    .flatMap((item) => {
+      const url = item.link ?? item.url;
+      return url
+        ? [{ title: item.title, url, summary: item.description ?? item.snippet ?? "" }]
+        : [];
+    })
+    .slice(0, SEARCH_PAGE_SIZE);
+  return {
+    results,
+    nextCursor: results.length === SEARCH_PAGE_SIZE && offset < MAX_SEARCH_OFFSET
+      ? `search_${offset + SEARCH_PAGE_SIZE}`
+      : undefined,
+  };
+}
+
+async function searchDiscover(
+  gateway: BrightDataGateway,
+  query: SearchQuery,
+  options: { depth: "fast" | "ranked" | "deep"; includeContent: boolean; intent?: string },
+  context: RequestContext,
+) {
+  if (query.cursor) {
+    throw new CapabilityError(
+      "invalid_search_cursor",
+      "Discover research does not accept SERP cursors.",
+      false,
+      "Remove the cursor or use fast search depth.",
+    );
+  }
+  const trigger = discoverTriggerSchema.safeParse((await gateway.requestJson({
+    method: "POST",
+    path: "/discover",
+    body: {
+      query: query.query,
+      intent: options.intent ?? query.query,
+      mode: options.depth === "deep" ? "deep" : "standard",
+      include_content: options.includeContent,
+      format: "json",
+      language: query.locale.split("-")[0]?.toLowerCase(),
+      country: query.locale.split("-")[1]?.toUpperCase() ?? "US",
+      num_results: SEARCH_PAGE_SIZE,
+      remove_duplicates: true,
+    },
+    timeoutMs: 20_000,
+  }, context)).data);
+  if (!trigger.success) throw malformedSearch();
+
+  const completed = await pollBrightData({
+    context,
+    deadlineMs: 55_000,
+    intervalMs: 2_000,
+    async load() {
+      const poll = discoverPollSchema.safeParse((await gateway.requestJson({
+        method: "GET",
+        path: "/discover",
+        query: { task_id: trigger.data.task_id },
+        timeoutMs: 20_000,
+      }, context)).data);
+      if (!poll.success) throw malformedSearch();
+      return poll.data;
+    },
+    state: (value) => value.status === "done"
+      ? "ready"
+      : value.status === "error" || value.status === "failed" ? "failed" : "pending",
+    failed: () => new CapabilityError(
+      "upstream_job_failed",
+      "Bright Data Discover could not complete the research request.",
+      false,
+      "Refine the query or retry with fast depth.",
+    ),
+    timeout: new CapabilityError(
+      "upstream_timeout",
+      "Bright Data Discover did not finish within the synchronous deadline.",
+      true,
+      "Retry with ranked depth or fewer queries.",
+    ),
+  });
+  return {
+    results: (completed.results ?? []).map((item) => ({
+      title: item.title,
+      url: item.link,
+      summary: item.description ?? "",
+      content: item.content,
+    })),
+  };
+}
+
 async function resolveZone(
   gateway: BrightDataGateway,
   cache: LRUCache<string, z.infer<typeof activeZonesSchema>>,
@@ -167,16 +290,43 @@ async function resolveZone(
   }
   const zone = zones.find((candidate) =>
     kind === "serp"
-      ? candidate.plan?.serp === true || /unblocker|unlocker/i.test(candidate.type)
+      ? candidate.plan?.serp === true || /^serp$/i.test(candidate.type)
       : /unblocker|unlocker/i.test(candidate.type) && candidate.plan?.serp !== true,
   )?.name;
   if (zone) return zone;
-  throw new CapabilityError(
-    "brightdata_product_required",
-    `The Bright Data account has no active ${kind === "serp" ? "SERP or Web Unlocker" : "Web Unlocker"} zone.`,
-    false,
-    "Enable the required product in Bright Data, then retry.",
-  );
+  const name = kind === "serp" ? "bright_mcp_serp" : "bright_mcp_unlocker";
+  await gateway.requestJson({
+    method: "POST",
+    path: "/zone",
+    body: {
+      zone: { name, type: "unblocker" },
+      plan: {
+        type: "unblocker",
+        serp: kind === "serp",
+        domain_whitelist: "",
+        ips_type: "shared",
+        bandwidth: "bandwidth",
+        ip_alloc_preset: "shared_block",
+        ips: 0,
+        country: "",
+        country_city: "",
+        mobile: false,
+        city: false,
+        asn: false,
+        vip: false,
+        vips_type: "shared",
+        vips: 0,
+        vip_country: "",
+        vip_country_city: "",
+        pool_ip_type: "",
+        ub_premium: false,
+        solve_captcha_disable: true,
+      },
+    },
+    timeoutMs: 20_000,
+  }, context);
+  cache.delete(context.principalId);
+  return name;
 }
 
 function malformedZones() {
@@ -209,7 +359,7 @@ function parseCursor(cursor: string | undefined) {
   return offset;
 }
 
-function searchUrl(input: SearchRequest, offset: number) {
+function searchUrl(input: SearchQuery, offset: number) {
   const [language = "en", country = "US"] = input.locale.split("-");
   if (input.engine === "bing") {
     const url = new URL("https://www.bing.com/search");

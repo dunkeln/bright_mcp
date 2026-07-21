@@ -28,7 +28,7 @@ by default.
 ## Product zones
 
 The adapter MUST discover active zones from the caller's account. When a needed
-SERP or Web Unlocker zone is absent, it MAY create the deterministic
+SERP or Web Unlocker zone is absent, it MUST attempt to create the deterministic
 `bright_mcp_serp` or `bright_mcp_unlocker` zone through Bright Data's account
 API. The tool description and annotations MUST disclose that first-use account
 mutation. Permission or billing failures MUST remain actionable upstream errors;

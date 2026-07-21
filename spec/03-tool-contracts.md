@@ -6,11 +6,15 @@ behavior accurately.
 
 ## `search_web`
 
-Purpose: find current web resources relevant to a query.
+Purpose: find current web resources for one or more related research angles.
 
-- Input: non-empty `query`; optional engine, locale, and pagination cursor.
-- Output: canonical search results containing title, URL, summary, and optional
-  continuation cursor.
+- Input: one to five ordered non-empty queries; optional engine, locale,
+  pagination cursor, explicit `fast | ranked | deep` depth, intent, and content.
+- Output: one ordered result group per query containing title, URL, summary,
+  optional content, continuation cursor, or isolated error.
+- `fast` MUST use SERP. `ranked` and `deep` MUST use Discover and MUST fail
+  actionably when the caller lacks Discover access; routing MUST NOT silently
+  switch products with different cost or latency semantics.
 - Engine-specific response envelopes MUST NOT escape the adapter.
 
 ## `scrape`
@@ -33,15 +37,16 @@ Purpose: retrieve readable content from one or more known URLs.
 Purpose: find Bright Data datasets relevant to an agent's stated task.
 
 - Input: non-empty natural-language `query`; optional result limit of 1–10.
-- Output: ranked capability summaries with stable ID, title, summary, and
-  required input names.
+- Output: ranked capability summaries with stable ID, title, summary, required
+  input names, and optional directly executable operation and example.
 - Output MUST contain only candidates accepted by `describe_dataset`.
 
 ## `describe_dataset`
 
 Purpose: obtain the executable contract for one dataset.
 
-- Input: stable dataset ID returned by `find_datasets`.
+- Input: stable dataset ID returned by `find_datasets` when its summary does not
+  already provide an executable operation and example.
 - Output: stable ID, title, description, supported operations, an input JSON
   Schema for each operation, and documented limits or examples when available.
 - V1 operation kinds are `collect` and `search`; a dataset MAY support either or
@@ -52,14 +57,17 @@ Purpose: obtain the executable contract for one dataset.
 
 Purpose: execute one described dataset capability.
 
-- Input: dataset ID, one operation returned by `describe_dataset`, and arguments
-  validated against that operation's described schema.
+- Input: dataset ID, one operation returned by discovery or description, and
+  arguments validated against the same catalog contract.
 - Output: the canonical dataset result below.
 - Triggering and polling are internal; the agent sees one logical operation.
 - Execution SHOULD be task-backed when the client negotiates task support and
   MUST preserve the same logical result when it does not.
 - A completed call MUST include a bounded preview and a resource link to the
   completed result artifact.
+- Paid operations MUST require an explicit acknowledgement; Deep Lookup full
+  runs MUST also require a caller-supplied maximum-cost cap checked before the
+  paid trigger.
 - Tool metadata MUST reference the table app resource.
 
 ## Canonical dataset result

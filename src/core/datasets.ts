@@ -8,8 +8,15 @@ import type {
 } from "./contracts";
 
 export type DatasetCatalog = {
-  find(query: string, limit: number): Promise<DatasetSummary[]>;
-  describe(datasetId: string): Promise<DatasetDefinition>;
+  find(
+    query: string,
+    limit: number,
+    context: RequestContext,
+  ): Promise<DatasetSummary[]>;
+  describe(
+    datasetId: string,
+    context: RequestContext,
+  ): Promise<DatasetDefinition>;
 };
 
 export type DatasetRunner = {
@@ -28,10 +35,10 @@ export function createDatasetUseCases(dependencies: {
   runner: DatasetRunner;
 }) {
   return {
-    findDatasets: (query: string, limit = 5) =>
-      dependencies.catalog.find(query, limit),
-    describeDataset: (datasetId: string) =>
-      dependencies.catalog.describe(datasetId),
+    findDatasets: (query: string, limit: number, context: RequestContext) =>
+      dependencies.catalog.find(query, limit, context),
+    describeDataset: (datasetId: string, context: RequestContext) =>
+      dependencies.catalog.describe(datasetId, context),
     runDataset: (
       input: {
         datasetId: string;

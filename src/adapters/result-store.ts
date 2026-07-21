@@ -6,17 +6,18 @@ import {
   type RequestContext,
 } from "../core/contracts";
 import { profileDataset } from "../core/profiles";
-import type { ResultStore } from "../core/results";
+import type { ResultSource, ResultStore } from "../core/results";
 
-const PREVIEW_ROWS = 8;
 const PAGE_ROWS = 8;
+const PROFILE_ROWS = 1_000;
 const RESULT_TTL_MS = 15 * 60 * 1000;
 
 type StoredResult = {
   owner: string;
-  expiresAt: string;
   base: Omit<DatasetResult, "rows" | "rowRefs" | "page" | "artifact">;
-  rows: DatasetResult["rows"];
+  source: ResultSource;
+  expiresAt: string;
+  parts: Map<number, DatasetResult["rows"]>;
 };
 
 type StoredPage = { owner: string; resultId: string; offset: number };
@@ -27,78 +28,72 @@ export class LocalResultStore implements ResultStore {
     ttl: RESULT_TTL_MS,
   });
   private readonly pages = new LRUCache<string, StoredPage>({
-    max: 500,
+    max: 2_000,
     ttl: RESULT_TTL_MS,
   });
 
-  save(
+  async save(
     base: DatasetResultBase,
-    rows: DatasetResult["rows"],
+    input: DatasetResult["rows"] | ResultSource,
     context: RequestContext,
-  ): DatasetResult {
-    const expiresAt = new Date(Date.now() + RESULT_TTL_MS).toISOString();
-    const profiledBase: StoredResult["base"] = {
-      ...base,
-      profiles: profileDataset(base.columns, rows),
-    };
-    this.results.set(base.resultId, {
+  ): Promise<DatasetResult> {
+    const source = Array.isArray(input) ? arraySource(input) : input;
+    const firstPart = await source.loadPart(1, context);
+    const expiresAt = source.expiresAt ?? new Date(Date.now() + RESULT_TTL_MS).toISOString();
+    const stored: StoredResult = {
       owner: context.principalId,
       expiresAt,
-      base: profiledBase,
-      rows,
-    });
-    return this.page(base.resultId, 0, PREVIEW_ROWS);
+      source,
+      parts: new Map([[1, firstPart]]),
+      base: {
+        ...base,
+        profiles: profileDataset(base.columns, firstPart.slice(0, PROFILE_ROWS)),
+      },
+    };
+    this.results.set(base.resultId, stored);
+    return this.render(stored, 0, context);
   }
 
-  readResult(resultId: string, principalId: string): DatasetResult {
-    const stored = this.ownedResult(resultId, principalId);
-    return this.render(stored, 0, stored.rows.length);
+  async readResult(resultId: string, context: RequestContext): Promise<DatasetResult> {
+    return this.render(this.ownedResult(resultId, context.principalId), 0, context);
   }
 
-  readPage(pageToken: string, principalId: string): DatasetResult {
+  async readPage(pageToken: string, context: RequestContext): Promise<DatasetResult> {
     const page = this.pages.get(pageToken);
-    if (!page || page.owner !== principalId) {
-      throw new CapabilityError(
-        "result_not_found",
-        "This result page was not found or has expired.",
-        false,
-        "Run the dataset again to create a fresh result.",
-      );
-    }
-    this.ownedResult(page.resultId, principalId);
-    return this.page(page.resultId, page.offset, PAGE_ROWS);
+    if (!page || page.owner !== context.principalId) throw resultNotFound();
+    return this.render(
+      this.ownedResult(page.resultId, context.principalId),
+      page.offset,
+      context,
+    );
   }
 
-  private page(resultId: string, offset: number, count: number): DatasetResult {
-    const stored = this.results.get(resultId);
-    if (!stored) {
-      throw new CapabilityError("result_not_found", "This result has expired.");
-    }
-    return this.render(stored, offset, count);
-  }
-
-  private render(
+  private async render(
     stored: StoredResult,
     offset: number,
-    count: number,
-  ): DatasetResult {
-    const rows = stored.rows.slice(offset, offset + count);
+    context: RequestContext,
+  ): Promise<DatasetResult> {
+    const part = Math.floor(offset / stored.source.partSize) + 1;
+    const partOffset = offset % stored.source.partSize;
+    let rows = stored.parts.get(part);
+    if (!rows) {
+      rows = await stored.source.loadPart(part, context);
+      stored.parts.set(part, rows);
+    }
+    rows = rows.slice(partOffset, partOffset + PAGE_ROWS);
     const nextOffset = offset + rows.length;
-    const nextResourceUri =
-      nextOffset < stored.rows.length
-        ? this.createPage(stored, nextOffset)
-        : undefined;
+    const hasNext = stored.source.totalRows === undefined
+      ? rows.length === PAGE_ROWS
+      : nextOffset < stored.source.totalRows;
 
     return {
       ...stored.base,
       rows,
-      rowRefs: rows.map((_, index) =>
-        this.rowRef(stored.base.resultId, offset + index),
-      ),
+      rowRefs: rows.map((_, index) => this.rowRef(stored.base.resultId, offset + index)),
       page: {
-        nextResourceUri,
-        truncated: nextOffset < stored.rows.length,
-        totalRows: stored.rows.length,
+        nextResourceUri: hasNext ? this.createPage(stored, nextOffset) : undefined,
+        truncated: hasNext,
+        totalRows: stored.source.totalRows,
       },
       artifact: {
         uri: `brightdata://results/${stored.base.resultId}`,
@@ -108,7 +103,7 @@ export class LocalResultStore implements ResultStore {
     };
   }
 
-  private createPage(stored: StoredResult, offset: number): string {
+  private createPage(stored: StoredResult, offset: number) {
     const token = crypto.randomUUID().replaceAll("-", "");
     this.pages.set(token, {
       owner: stored.owner,
@@ -118,21 +113,32 @@ export class LocalResultStore implements ResultStore {
     return `brightdata://pages/${token}`;
   }
 
-  private rowRef(resultId: string, ordinal: number): string {
-    const value = Bun.hash.wyhash(`${resultId}\0${ordinal}`, 0n);
-    return `r_${value.toString(36)}`;
+  private rowRef(resultId: string, ordinal: number) {
+    return `r_${Bun.hash.wyhash(`${resultId}\0${ordinal}`, 0n).toString(36)}`;
   }
 
-  private ownedResult(resultId: string, principalId: string): StoredResult {
+  private ownedResult(resultId: string, principalId: string) {
     const result = this.results.get(resultId);
-    if (!result || result.owner !== principalId) {
-      throw new CapabilityError(
-        "result_not_found",
-        "This result was not found or has expired.",
-        false,
-        "Run the dataset again to create a fresh result.",
-      );
-    }
+    if (!result || result.owner !== principalId) throw resultNotFound();
     return result;
   }
+}
+
+function arraySource(rows: DatasetResult["rows"]): ResultSource {
+  return {
+    partSize: Math.max(rows.length, 1),
+    totalRows: rows.length,
+    async loadPart(part) {
+      return part === 1 ? rows : [];
+    },
+  };
+}
+
+function resultNotFound() {
+  return new CapabilityError(
+    "result_not_found",
+    "This result was not found or has expired.",
+    false,
+    "Run the dataset again to create a fresh result.",
+  );
 }

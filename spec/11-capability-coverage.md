@@ -22,10 +22,12 @@ capability, not endpoint inventory.
 | Reference capability | V1 disposition |
 |---|---|
 | Search, batch search, engines, pagination | `search_web` |
+| Intent-ranked and content-inclusive research | `search_web: ranked | deep` |
 | Markdown/HTML scrape and batch scrape | `scrape` |
 | Schema-directed extraction | `scrape.extraction` via `ExtractionProvider` |
 | Web Data collectors | dataset discovery, description, `run_dataset: collect` |
 | Dataset fields and filtered record search | description, `run_dataset: search` |
+| Deep Lookup question-to-table research | virtual dataset through discovery and `run_dataset: search` |
 | Trigger, poll, status, cancellation | adapter plus optional MCP task |
 | Result paging and complete artifacts | MCP resources |
 | Dataset result tables | optional table MCP app |

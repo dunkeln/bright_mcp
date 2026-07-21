@@ -64,6 +64,12 @@ only by the composition root and never enter tool inputs or results.
 Structured extraction uses MCP host sampling. Hosts without sampling receive an
 actionable per-page extraction error while retaining scraped content.
 
+`search_web` uses caller-funded SERP for `fast` depth and restricted Discover
+access for explicit `ranked` or `deep` depth. Dataset collection, Marketplace
+search/filter, and full Deep Lookup runs are paid on the caller's account and
+require acknowledgement in their typed inputs; Deep Lookup also requires a
+pre-trigger maximum-cost cap. Preview remains its default.
+
 ## Browser profile
 
 The live browser profile uses Bright Data Browser API credentials, not the

@@ -20,11 +20,13 @@ export function createDemoWebAdapter(): {
   return {
     search: {
       async search(input) {
-        const query = input.query.toLowerCase();
         return {
-          results: pages.filter((page) =>
-            `${page.title} ${page.summary}`.toLowerCase().includes(query),
-          ),
+          searches: input.queries.map(({ query }) => ({
+            query,
+            results: pages.filter((page) =>
+              `${page.title} ${page.summary}`.toLowerCase().includes(query.toLowerCase()),
+            ),
+          })),
         };
       },
     },

@@ -33,11 +33,15 @@ The words MUST, MUST NOT, SHOULD, and MAY are normative.
 - Shared behavior such as authentication, retries, polling, and error mapping
   MUST be implemented once at the adapter boundary.
 
-## Progressive disclosure
+## Adaptive disclosure
 
-- Dataset selection MUST follow discovery, description, then execution.
-- Discovery results MUST be concise enough to guide the next call.
+- Dataset selection MUST begin with discovery.
+- Discovery results MUST be concise enough to guide the next call and SHOULD
+  include a directly executable operation and example when the input is
+  unambiguous.
 - Description MUST expose the exact executable input contract.
+- Description MUST remain available for dynamic fields or ambiguous input, but
+  MUST NOT be compulsory ceremony for a self-contained discovery result.
 - Execution MUST validate against that contract before calling upstream.
 
 ## Falsifiable constraints

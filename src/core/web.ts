@@ -1,14 +1,35 @@
 import { z } from "zod";
 import { CapabilityError, type JsonObject, type RequestContext } from "./contracts";
 
-export type SearchRequest = {
+export type SearchQuery = {
   query: string;
   engine: "google" | "bing" | "duckduckgo";
   locale: string;
   cursor?: string;
 };
 
+export type SearchRequest = {
+  queries: SearchQuery[];
+  depth: "fast" | "ranked" | "deep";
+  includeContent: boolean;
+  intent?: string;
+};
+
 export type SearchResponse = {
+  searches: Array<{
+    query: string;
+    results: Array<{
+      title: string;
+      url: string;
+      summary: string;
+      content?: string;
+    }>;
+    nextCursor?: string;
+    error?: ItemFailure;
+  }>;
+};
+
+export type SingleSearchResponse = {
   results: Array<{ title: string; url: string; summary: string }>;
   nextCursor?: string;
 };

@@ -55,6 +55,7 @@ export async function runTool<T>(
             message: failure.message,
             retryable: failure.retryable,
             nextAction: failure.nextAction,
+            requestId: failure.requestId,
           }),
         },
       ],

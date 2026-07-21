@@ -39,9 +39,11 @@ resource URI, app payload, or log record.
   paths and upstream display names.
 - Each entry MUST define upstream identity, agent description, input schema,
   defaults, limits, and normalization function.
-- V1 MAY use a versioned bundled catalog behind the catalog port.
-- Replacing the catalog source with an upstream discovery API MUST NOT change
-  tool contracts.
+- The account-scoped Marketplace list and metadata endpoints MUST supply
+  discoverability and output fields, cached by caller principal.
+- A small versioned manifest MUST supply executable input schemas for curated
+  Scraper API collectors because Marketplace metadata does not universally
+  expose safe trigger schemas.
 - Duplicate IDs or invalid schemas MUST fail startup rather than fail during an
   agent call.
 
@@ -63,6 +65,13 @@ polling, authentication, retry, or error logic.
 Search operations MAY call an upstream record-search API rather than trigger a
 collection. That upstream distinction remains adapter-owned; both operations
 return the same canonical dataset result and continuation resource semantics.
+
+Supported small Marketplace lookups SHOULD use synchronous Search. Other
+Marketplace filters MUST use the asynchronous Filter snapshot path and MUST NOT
+silently inherit unsupported sort or cursor semantics.
+
+Deep Lookup MUST appear as a virtual dataset. Preview is the default; a full run
+requires explicit cost acknowledgement and a maximum-cost cap.
 
 ## Error translation
 

@@ -35,8 +35,9 @@ for (const server of ["bright", "upstream"] as const) {
       properties?: Record<string, unknown>;
       required?: string[];
     } | undefined;
-    record(checks, "search query is schema-required", schema?.required?.includes("query") === true);
-    record(checks, "search query is schema-declared", "query" in (schema?.properties ?? {}));
+    const queryProperty = server === "bright" ? "queries" : "query";
+    record(checks, "search query is schema-required", schema?.required?.includes(queryProperty) === true);
+    record(checks, "search query is schema-declared", queryProperty in (schema?.properties ?? {}));
     record(
       checks,
       "missing search query is rejected",

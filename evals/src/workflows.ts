@@ -62,9 +62,10 @@ export const workflowCases = [
     prompt:
       'Research three highly rated ramen restaurants in Tokyo using at least two sources, and open the relevant pages before answering. Return a JSON array only; each item must have "restaurant", "rating", "area", and "sourceUrl".',
     toolPath: {
-      bright: [["search_web"], ["scrape"]],
+      bright: [["search_web"]],
       upstream: [["search_engine"], ["scrape_as_markdown", "scrape_batch"]],
     } satisfies ToolPath,
+    requiresOpenedSources: true,
     requiredKeys: ["restaurant", "rating", "area", "sourceUrl"],
     minimumUrls: 2,
   },
@@ -75,9 +76,10 @@ export const workflowCases = [
     prompt:
       'Research this week\'s major movie releases and today\'s leading topic on X using at least three sources, and open the relevant pages before answering. Return a JSON array only; each item must have "topic", "finding", "asOf", and "sourceUrl".',
     toolPath: {
-      bright: [["search_web"], ["scrape"]],
+      bright: [["search_web"]],
       upstream: [["search_engine"], ["scrape_as_markdown", "scrape_batch"]],
     } satisfies ToolPath,
+    requiresOpenedSources: true,
     requiredKeys: ["topic", "finding", "asOf", "sourceUrl"],
     minimumUrls: 3,
   },
@@ -89,7 +91,7 @@ export const workflowCases = [
       'Get structured Amazon product search data for wireless earbuds from Amazon.com. Do not explain which product to use; execute the available data capability. Return JSON only with keys "dataset", "rowCount", "fields", and "continuation".',
     upstreamProfile: "ecommerce",
     toolPath: {
-      bright: [["find_datasets"], ["describe_dataset"], ["run_dataset"]],
+      bright: [["find_datasets"], ["run_dataset"]],
       upstream: [["web_data_amazon_product_search"]],
     } satisfies ToolPath,
     requiredKeys: ["dataset", "rowCount", "fields", "continuation"],

@@ -68,12 +68,18 @@ try {
     const path = job.useCase.toolPath[job.server];
     const called = result.toolsCalled();
     const toolSelected = followsPath(called, path);
-    const argumentsValid = path.every((choices) =>
+    const pathArgumentsValid = path.every((choices) =>
       choices.some((tool) => {
         const arguments_ = result.getToolArguments(tool);
         return arguments_ && Object.keys(arguments_).length > 0;
       }),
     );
+    const openedSources = !(
+      job.server === "bright" &&
+      "requiresOpenedSources" in job.useCase &&
+      job.useCase.requiresOpenedSources
+    ) || called.includes("scrape") || contentInclusiveSearch(result.getToolArguments("search_web"));
+    const argumentsValid = pathArgumentsValid && openedSources;
     const responseComplete = result.text.trim().length > 0;
     const outcomeValid = validatesOutcome(result.text, job.useCase);
     results.push({
@@ -154,6 +160,11 @@ function validatesOutcome(
     !("mustRefuse" in useCase) ||
     /["']supported["']\s*:\s*false/i.test(text);
   return fieldsPresent && urls.size >= minimumUrls && refusalValid;
+}
+
+function contentInclusiveSearch(value: Record<string, unknown> | undefined) {
+  return value?.includeContent === true &&
+    (value.depth === "ranked" || value.depth === "deep");
 }
 
 function required(name: string) {

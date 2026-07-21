@@ -59,7 +59,7 @@ async function checkStdio() {
         runDatasetMeta["openai/outputTemplate"] === datasetTableUri,
       "run_dataset did not advertise the versioned app resource consistently.",
     );
-    await assertToolRejected(client, "search_web", { query: "" });
+    await assertToolRejected(client, "search_web", { queries: [] });
     await assertToolRejected(client, "scrape", { urls: ["file:///tmp/nope"] });
     await assertToolRejected(client, "find_datasets", { query: "", limit: 0 });
     await assertToolRejected(client, "describe_dataset", { datasetId: "" });
@@ -71,7 +71,7 @@ async function checkStdio() {
 
     const searched = await client.callTool({
       name: "search_web",
-      arguments: { query: "Bright Data" },
+      arguments: { queries: [{ query: "Bright Data" }] },
     });
     assert(!searched.isError, "search_web failed.");
 

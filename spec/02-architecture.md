@@ -50,6 +50,9 @@ MUST NOT become core domain models.
 - Owns upstream authorization-header construction from resolved credentials,
   URLs, timeouts, retries, polling, request shapes, response parsing, and error
   mapping.
+- Combines the caller-scoped Marketplace catalog, a small executable collector
+  manifest, Discover, Deep Lookup, synchronous record search, and asynchronous
+  snapshots behind the stable core ports.
 - Implements the ports required by core use cases.
 - Browser support is a separate adapter implementing `BrowserProvider`; it uses
   Bright Data's remote Scraping Browser and does not become a local browser host.

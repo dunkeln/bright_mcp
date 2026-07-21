@@ -23,7 +23,7 @@ declare global {
   }
 }
 
-const colors = { brightData: "#ff963c", bright: "#438cf5" } as const;
+const colors = { brightData: "#a371f7", bright: "#438cf5" } as const;
 const plot = { left: 210, right: 1080, top: 34, bottom: 430 };
 
 function BenchmarkCharts() {
@@ -40,7 +40,7 @@ function BenchmarkCharts() {
   return (
     <main className="w-[1200px] bg-[#0d1117] text-neutral-50">
       <Chart id="benchmark-completion" title="Where each MCP completes the job" subtitle="Tool-use pass rate by workflow" meta={meta(model, runsPerCase)}>
-        <Dumbbell tasks={tasks} value={(datum) => datum.passRate * 100} domain={100} format={(value) => `${Math.round(value)}%`} />
+        <PairedBars tasks={tasks} value={(datum) => datum.passRate * 100} domain={100} format={(value) => `${Math.round(value)}%`} />
       </Chart>
       <Chart id="benchmark-efficiency" title="Completion versus token cost" subtitle="Upper-left is better: more completed jobs with fewer tokens" meta={meta(model, runsPerCase)}>
         <Efficiency tasks={tasks} />
@@ -49,7 +49,7 @@ function BenchmarkCharts() {
         <Latency values={latency} />
       </Chart>
       <Chart id="benchmark-complexity" title="How much tool work each workflow takes" subtitle="Average MCP tool calls per run" meta={meta(model, runsPerCase)}>
-        <Dumbbell tasks={tasks} value={(datum) => datum.averageTools} domain={Math.max(...tasks.flatMap(({ bright, brightData }) => [bright.averageTools, brightData.averageTools]), 1)} format={(value) => value.toFixed(1)} />
+        <PairedBars tasks={tasks} value={(datum) => datum.averageTools} domain={Math.max(...tasks.flatMap(({ bright, brightData }) => [bright.averageTools, brightData.averageTools]), 1)} format={(value) => value.toFixed(1)} />
       </Chart>
     </main>
   );
@@ -75,12 +75,12 @@ function Legend() {
   return (
     <div className="mt-4 flex gap-5 text-xs text-neutral-300" aria-hidden="true">
       <span className="flex items-center gap-2"><i className="h-3 w-3 bg-[#438cf5]" />Bright MCP</span>
-      <span className="flex items-center gap-2"><i className="h-3 w-3 bg-[#ff963c]" />BrightData MCP</span>
+      <span className="flex items-center gap-2"><i className="h-3 w-3 bg-[#a371f7]" />BrightData MCP</span>
     </div>
   );
 }
 
-function Dumbbell({ tasks, value, domain, format }: { tasks: TaskDatum[]; value: (datum: ServerDatum) => number; domain: number; format: (value: number) => string }) {
+function PairedBars({ tasks, value, domain, format }: { tasks: TaskDatum[]; value: (datum: ServerDatum) => number; domain: number; format: (value: number) => string }) {
   const x = (number: number) => plot.left + (number / domain) * (plot.right - plot.left);
   return (
     <svg viewBox="0 0 1120 460" role="img" className="h-full w-full">
@@ -90,16 +90,12 @@ function Dumbbell({ tasks, value, domain, format }: { tasks: TaskDatum[]; value:
         const y = 56 + index * 48;
         const bright = value(task.bright);
         const brightData = value(task.brightData);
-        const same = Math.abs(bright - brightData) < domain * 0.015;
-        const brightY = y + (same ? 5 : 0);
-        const brightDataY = y - (same ? 5 : 0);
         return <g key={task.label}>
           <text x="0" y={y + 5} className="label">{task.label}</text>
-          <line x1={x(bright)} x2={x(brightData)} y1={brightY} y2={brightDataY} stroke="#6e7681" strokeWidth="2" />
-          <circle cx={x(brightData)} cy={brightDataY} r="8" fill="url(#orange-dither)" stroke={colors.brightData} />
-          <circle cx={x(bright)} cy={brightY} r="8" fill="url(#blue-dither)" stroke={colors.bright} />
-          <text x={x(brightData)} y={brightDataY - 13} textAnchor="middle" className="value">{format(brightData)}</text>
-          {!same && <text x={x(bright)} y={brightY + 23} textAnchor="middle" className="value">{format(bright)}</text>}
+          <rect x={plot.left} y={y - 12} width={Math.max(1, x(bright) - plot.left)} height="10" fill="url(#blue-dither)" />
+          <rect x={plot.left} y={y + 3} width={Math.max(1, x(brightData) - plot.left)} height="10" fill="url(#purple-dither)" />
+          <text x={Math.min(x(bright) + 8, 1090)} y={y - 3} className="value">{format(bright)}</text>
+          <text x={Math.min(x(brightData) + 8, 1090)} y={y + 13} className="value">{format(brightData)}</text>
         </g>;
       })}
     </svg>
@@ -122,7 +118,7 @@ function Efficiency({ tasks }: { tasks: TaskDatum[] }) {
           <text x={left} y={top + 34} className="label">{task.label}</text>
           <line x1={left + 150} x2={left + 520} y1={top + 88} y2={top + 88} stroke="#30363d" />
           <line x1={x(task.bright.averageTokens)} y1={y(task.bright.passRate * 100)} x2={x(task.brightData.averageTokens)} y2={y(task.brightData.passRate * 100)} stroke="#6e7681" />
-          <circle cx={x(task.brightData.averageTokens)} cy={y(task.brightData.passRate * 100) - 3} r="8" fill="url(#orange-dither)" stroke={colors.brightData} />
+          <circle cx={x(task.brightData.averageTokens)} cy={y(task.brightData.passRate * 100) - 3} r="8" fill="url(#purple-dither)" stroke={colors.brightData} />
           <circle cx={x(task.bright.averageTokens)} cy={y(task.bright.passRate * 100) + 3} r="8" fill="url(#blue-dither)" stroke={colors.bright} />
           <text x={x(task.brightData.averageTokens) + 11} y={y(task.brightData.passRate * 100) - 9} className="value">{Math.round(task.brightData.averageTokens / 1000)}k · {Math.round(task.brightData.passRate * 100)}%</text>
           <text x={x(task.bright.averageTokens) + 11} y={y(task.bright.passRate * 100) + 18} className="value">{Math.round(task.bright.averageTokens / 1000)}k · {Math.round(task.bright.passRate * 100)}%</text>
@@ -151,7 +147,7 @@ function Latency({ values }: { values: { brightData: number[]; bright: number[] 
 function Patterns() {
   return <defs>
     <pattern id="blue-dither" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="2" height="2" fill={colors.bright} /><rect x="2" y="2" width="2" height="2" fill={colors.bright} /></pattern>
-    <pattern id="orange-dither" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="2" height="2" fill={colors.brightData} /><rect x="2" y="2" width="2" height="2" fill={colors.brightData} /></pattern>
+    <pattern id="purple-dither" width="4" height="4" patternUnits="userSpaceOnUse"><rect width="2" height="2" fill={colors.brightData} /><rect x="2" y="2" width="2" height="2" fill={colors.brightData} /></pattern>
   </defs>;
 }
 

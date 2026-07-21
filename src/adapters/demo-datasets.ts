@@ -8,18 +8,40 @@ import {
 import type { DatasetCatalog, DatasetRunner } from "../core/datasets";
 import type { ResultStore } from "../core/results";
 
-const inputSchema = z.object({
+const searchInputSchema = z.object({
   query: z.string().trim().min(1).max(120),
   category: z.enum(["audio", "computing", "photo"]).optional(),
   limit: z.number().int().min(1).max(20).default(12),
+});
+
+const collectInputSchema = z.object({
+  productIds: z.array(z.string().trim().min(1).max(80)).min(1).max(20),
 });
 
 const definition: DatasetDefinition = {
   id: "ecommerce-products",
   title: "E-commerce products",
   description:
-    "Search a representative product catalog by words in the title or description.",
+    "Search a representative product catalog or collect known records by product ID.",
   operations: [
+    {
+      kind: "collect",
+      inputSchema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["productIds"],
+        properties: {
+          productIds: {
+            type: "array",
+            minItems: 1,
+            maxItems: 20,
+            items: { type: "string", minLength: 1, maxLength: 80 },
+          },
+        },
+      },
+      limits: ["Collects at most 20 known product records in the requested order."],
+      examples: [{ productIds: ["product-1", "product-5"] }],
+    },
     {
       kind: "search",
       inputSchema: {
@@ -93,33 +115,9 @@ export function createDemoDatasetAdapter(resultStore: ResultStore): {
         if (input.datasetId !== definition.id) {
           throw unknownDataset(input.datasetId);
         }
-        if (input.operation !== "search") {
-          throw new CapabilityError(
-            "operation_not_supported",
-            `Dataset ${definition.id} does not support ${input.operation}.`,
-            false,
-            "Call describe_dataset and use one of its operations.",
-          );
-        }
-
-        const parsed = inputSchema.safeParse(input.arguments);
-        if (!parsed.success) {
-          throw new CapabilityError(
-            "invalid_dataset_arguments",
-            z.prettifyError(parsed.error),
-            false,
-            "Call describe_dataset and match the returned input schema.",
-          );
-        }
-
-        const query = parsed.data.query.toLowerCase();
-        const matches = rows
-          .filter(
-            (row) =>
-              (!parsed.data.category || row.category === parsed.data.category) &&
-              `${row.title} ${row.category}`.toLowerCase().includes(query),
-          )
-          .slice(0, parsed.data.limit);
+        const matches = input.operation === "search"
+          ? searchRows(parseInput(searchInputSchema, input.arguments))
+          : collectRows(parseInput(collectInputSchema, input.arguments));
 
         const base: Omit<
           DatasetResult,
@@ -128,7 +126,7 @@ export function createDemoDatasetAdapter(resultStore: ResultStore): {
           schemaVersion: 1,
           resultId: `result_${crypto.randomUUID()}`,
           dataset: { id: definition.id, title: definition.title },
-          operation: "search",
+          operation: input.operation,
           columns: [
             { key: "productId", label: "Product ID", type: "string" },
             { key: "title", label: "Title", type: "string" },
@@ -142,6 +140,38 @@ export function createDemoDatasetAdapter(resultStore: ResultStore): {
       },
     },
   };
+}
+
+function searchRows(input: z.infer<typeof searchInputSchema>) {
+  const query = input.query.toLowerCase();
+  return rows
+    .filter(
+      (row) =>
+        (!input.category || row.category === input.category) &&
+        `${row.title} ${row.category}`.toLowerCase().includes(query),
+    )
+    .slice(0, input.limit);
+}
+
+function collectRows(input: z.infer<typeof collectInputSchema>) {
+  const byId = new Map(rows.map((row) => [row.productId, row]));
+  return input.productIds.flatMap((productId) => {
+    const row = byId.get(productId);
+    return row ? [row] : [];
+  });
+}
+
+function parseInput<T>(schema: z.ZodType<T>, input: unknown): T {
+  const parsed = schema.safeParse(input);
+  if (!parsed.success) {
+    throw new CapabilityError(
+      "invalid_dataset_arguments",
+      z.prettifyError(parsed.error),
+      false,
+      "Call describe_dataset and match the returned input schema.",
+    );
+  }
+  return parsed.data;
 }
 
 function unknownDataset(datasetId: string) {

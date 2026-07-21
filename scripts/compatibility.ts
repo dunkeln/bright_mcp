@@ -118,6 +118,27 @@ async function checkStdio() {
     assert(artifact.contents.length === 1, "The result artifact was not readable.");
     const page = await client.readResource({ uri: result.page.nextResourceUri });
     assert(page.contents.length === 1, "The result page was not readable.");
+
+    const collected = await client.callTool({
+      name: "run_dataset",
+      arguments: {
+        datasetId: "ecommerce-products",
+        operation: "collect",
+        arguments: { productIds: ["product-5", "product-1"] },
+      },
+    });
+    const collection = collected.structuredContent as {
+      operation?: string;
+      rows?: Array<{ productId?: string }>;
+    };
+    assert(
+      !collected.isError &&
+        collection.operation === "collect" &&
+        collection.rows?.map((row) => row.productId).join(",") ===
+          "product-5,product-1",
+      "run_dataset collect did not preserve the requested record order.",
+    );
+
     const widget = await client.readResource({
       uri: "ui://bright-mcp/dataset-table",
     });

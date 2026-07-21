@@ -7,6 +7,11 @@ import {
   CreateMessageRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { datasetResultSchema } from "../src/core/contracts";
+import {
+  assert,
+  testEnvironment as environment,
+  waitForServer,
+} from "./compatibility-support";
 
 const bun = process.execPath;
 const projectRoot = new URL("../", import.meta.url).pathname;
@@ -434,7 +439,11 @@ async function checkHttp() {
     stderr: "pipe",
   });
   try {
-    await waitForServer(`http://127.0.0.1:${port}/`);
+    await waitForServer(
+      `http://127.0.0.1:${port}/`,
+      process,
+      "The Bun HTTP server did not start.",
+    );
     const client = new Client({ name: "bright-http-check", version: "0.1.0" });
     let browserSessionId = "";
     await client.connect(
@@ -478,41 +487,6 @@ async function checkHttp() {
     process.kill();
     await process.exited;
   }
-}
-
-async function waitForServer(url: string) {
-  for (let attempt = 0; attempt < 40; attempt += 1) {
-    try {
-      if ((await fetch(url)).ok) return;
-    } catch {
-      // The child is still starting.
-    }
-    await Bun.sleep(50);
-  }
-  throw new Error("The Bun HTTP server did not start.");
-}
-
-function environment(overrides: Record<string, string>): Record<string, string> {
-  const inherited = Object.fromEntries(
-    Object.entries(process.env).filter(
-      (entry): entry is [string, string] => entry[1] !== undefined,
-    ),
-  );
-  return {
-    ...inherited,
-    BRIGHTDATA_API_KEY: "",
-    BRIGHTDATA_SERP_ZONE: "",
-    BRIGHTDATA_UNLOCKER_ZONE: "",
-    BRIGHTDATA_BROWSER_USERNAME: "",
-    BRIGHTDATA_BROWSER_PASSWORD: "",
-    MCP_BROWSER_PROFILE: "disabled",
-    BRIGHTDATA_PROFILE: "demo",
-    ...overrides,
-  };
-}
-
-function assert(value: unknown, message: string): asserts value {
-  if (!value) throw new Error(message);
 }
 
 async function assertToolRejected(

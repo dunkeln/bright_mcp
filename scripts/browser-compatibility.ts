@@ -13,6 +13,7 @@ import {
 } from "../src/browser/stores";
 import { createBrowserUseCases } from "../src/browser/use-cases";
 import { CapabilityError, type RequestContext } from "../src/core/contracts";
+import { assert } from "./compatibility-support";
 
 const probe = createProbeProvider();
 const browser = createBrowserUseCases({
@@ -260,8 +261,4 @@ async function expectCode(operation: Promise<unknown>, expected: string) {
     return;
   }
   throw new Error(`Expected ${expected}, but the operation succeeded.`);
-}
-
-function assert(value: unknown, message: string): asserts value {
-  if (!value) throw new Error(message);
 }

@@ -6,6 +6,7 @@ import {
 import { createBrightDataWebAdapter } from "../src/adapters/brightdata/web";
 import { LocalResultStore } from "../src/adapters/result-store";
 import { CapabilityError, type RequestContext } from "../src/core/contracts";
+import { assert } from "./compatibility-support";
 
 const secret = "fixture-secret-that-must-not-leak";
 const context: RequestContext = {
@@ -210,8 +211,4 @@ async function expectCode(operation: Promise<unknown>, expected: string) {
     return;
   }
   throw new Error(`Expected ${expected}, but the operation succeeded.`);
-}
-
-function assert(value: unknown, message: string): asserts value {
-  if (!value) throw new Error(message);
 }

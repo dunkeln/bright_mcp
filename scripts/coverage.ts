@@ -1,6 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { z } from "zod";
+import { assert, testEnvironment } from "./compatibility-support";
 
 const fixtureSchema = z.object({
   schemaVersion: z.literal(1),
@@ -42,7 +43,7 @@ const transport = new StdioClientTransport({
   command: process.execPath,
   args: ["run", "src/main.ts"],
   cwd: projectRoot,
-  env: cleanEnvironment({ MCP_TRANSPORT: "stdio", MCP_BROWSER_PROFILE: "demo" }),
+  env: testEnvironment({ MCP_TRANSPORT: "stdio", MCP_BROWSER_PROFILE: "demo" }),
   stderr: "pipe",
 });
 const client = new Client({ name: "bright-coverage-check", version: "0.1.0" });
@@ -77,25 +78,3 @@ try {
 }
 
 console.log(`Coverage fixture v${fixture.schemaVersion} passed for ${fixture.capabilities.length} capabilities.`);
-
-function cleanEnvironment(overrides: Record<string, string>) {
-  return {
-    ...Object.fromEntries(
-      Object.entries(process.env).filter(
-        (entry): entry is [string, string] => entry[1] !== undefined,
-      ),
-    ),
-    BRIGHTDATA_API_KEY: "",
-    BRIGHTDATA_SERP_ZONE: "",
-    BRIGHTDATA_UNLOCKER_ZONE: "",
-    BRIGHTDATA_BROWSER_USERNAME: "",
-    BRIGHTDATA_BROWSER_PASSWORD: "",
-    BRIGHTDATA_CREDENTIAL_SOURCE: "auto",
-    BRIGHTDATA_PROFILE: "demo",
-    ...overrides,
-  };
-}
-
-function assert(value: unknown, message: string): asserts value {
-  if (!value) throw new Error(message);
-}

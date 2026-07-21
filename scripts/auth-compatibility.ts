@@ -4,6 +4,13 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
+import {
+  assert,
+  createCertificate,
+  randomPort,
+  testEnvironment,
+  waitForServer,
+} from "./compatibility-support";
 
 const projectRoot = new URL("../", import.meta.url).pathname;
 const temporaryDirectory = await mkdtemp(join(tmpdir(), "bright-mcp-auth-"));
@@ -50,7 +57,7 @@ const issuerServer = Bun.serve({
 const child = Bun.spawn([process.execPath, "run", "src/main.ts"], {
   cwd: projectRoot,
   env: {
-    ...cleanEnvironment(),
+    ...testEnvironment(),
     MCP_TRANSPORT: "http",
     MCP_AUTH_MODE: "oidc",
     MCP_PUBLIC_URL: resource,
@@ -63,7 +70,11 @@ const child = Bun.spawn([process.execPath, "run", "src/main.ts"], {
 });
 
 try {
-  await waitForServer(`http://127.0.0.1:${mcpPort}/`);
+  await waitForServer(
+    `http://127.0.0.1:${mcpPort}/`,
+    child,
+    "Protected MCP did not start.",
+  );
   const metadata = await fetch(
     `http://127.0.0.1:${mcpPort}/.well-known/oauth-protected-resource/mcp`,
   );
@@ -184,73 +195,4 @@ async function connectClient(accessToken: string, name: string) {
     ),
   );
   return client;
-}
-
-async function createCertificate(key: string, certificate: string) {
-  const process = Bun.spawn(
-    [
-      "openssl",
-      "req",
-      "-x509",
-      "-newkey",
-      "rsa:2048",
-      "-keyout",
-      key,
-      "-out",
-      certificate,
-      "-days",
-      "1",
-      "-nodes",
-      "-subj",
-      "/CN=127.0.0.1",
-      "-addext",
-      "subjectAltName=IP:127.0.0.1",
-    ],
-    { stdout: "ignore", stderr: "ignore" },
-  );
-  if ((await process.exited) !== 0) {
-    throw new Error("OpenSSL could not create the temporary HTTPS certificate.");
-  }
-}
-
-async function waitForServer(url: string) {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    if (child.exitCode !== null) {
-      throw new Error(`Protected MCP exited during startup: ${await new Response(child.stderr).text()}`);
-    }
-    try {
-      if ((await fetch(url)).ok) return;
-    } catch {
-      // The child is still discovering the issuer or starting Bun HTTP.
-    }
-    await Bun.sleep(50);
-  }
-  throw new Error("Protected MCP did not start.");
-}
-
-function cleanEnvironment() {
-  return {
-    ...Object.fromEntries(
-      Object.entries(process.env).filter(
-        (entry): entry is [string, string] => entry[1] !== undefined,
-      ),
-    ),
-    BRIGHTDATA_API_KEY: "",
-    BRIGHTDATA_SERP_ZONE: "",
-    BRIGHTDATA_UNLOCKER_ZONE: "",
-    BRIGHTDATA_BROWSER_USERNAME: "",
-    BRIGHTDATA_BROWSER_PASSWORD: "",
-    MCP_BROWSER_PROFILE: "disabled",
-    BRIGHTDATA_PROFILE: "demo",
-  };
-}
-
-function randomPort(except?: number) {
-  let value = 20_000 + Math.floor(Math.random() * 20_000);
-  if (value === except) value += 1;
-  return value;
-}
-
-function assert(value: unknown, message: string): asserts value {
-  if (!value) throw new Error(message);
 }

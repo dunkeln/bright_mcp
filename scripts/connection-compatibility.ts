@@ -8,6 +8,13 @@ import {
   UrlElicitationRequiredError,
 } from "@modelcontextprotocol/sdk/types.js";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
+import {
+  assert,
+  createCertificate,
+  randomPort,
+  testEnvironment,
+  waitForServer,
+} from "./compatibility-support";
 
 const projectRoot = new URL("../", import.meta.url).pathname;
 const temporaryDirectory = await mkdtemp(join(tmpdir(), "bright-mcp-connection-"));
@@ -135,27 +142,31 @@ globalThis.fetch = fixtureFetch as typeof fetch;
   const child = Bun.spawn(
     [process.execPath, "run", "--preload", preloadPath, "src/main.ts"],
     {
-    cwd: projectRoot,
-    env: {
-      ...cleanEnvironment(),
-      MCP_TRANSPORT: "http",
-      MCP_AUTH_MODE: "oidc",
-      MCP_PUBLIC_URL: resource,
-      MCP_OIDC_ISSUER: issuer,
-      MCP_OIDC_CLIENT_ID: "connection-check",
-      MCP_VAULT_PATH: hostedVaultPath,
-      MCP_VAULT_KEY: vaultKey,
-      BRIGHTDATA_PROFILE: "live",
-      PORT: String(mcpPort),
-      NODE_TLS_REJECT_UNAUTHORIZED: "0",
-    },
+      cwd: projectRoot,
+      env: {
+        ...testEnvironment(),
+        MCP_TRANSPORT: "http",
+        MCP_AUTH_MODE: "oidc",
+        MCP_PUBLIC_URL: resource,
+        MCP_OIDC_ISSUER: issuer,
+        MCP_OIDC_CLIENT_ID: "connection-check",
+        MCP_VAULT_PATH: hostedVaultPath,
+        MCP_VAULT_KEY: vaultKey,
+        BRIGHTDATA_PROFILE: "live",
+        PORT: String(mcpPort),
+        NODE_TLS_REJECT_UNAUTHORIZED: "0",
+      },
       stdout: "ignore",
       stderr: "pipe",
     },
   );
 
   try {
-    await waitForServer(`http://127.0.0.1:${mcpPort}/`, child);
+    await waitForServer(
+      `http://127.0.0.1:${mcpPort}/`,
+      child,
+      "Protected MCP did not start.",
+    );
     const tokenA = await accessToken("principal-a");
     const transport = new StreamableHTTPClientTransport(
       new URL(`http://127.0.0.1:${mcpPort}/mcp`),
@@ -336,75 +347,9 @@ async function assertVaultDoesNotContain(path: string, secret: string) {
   }
 }
 
-async function createCertificate(key: string, certificate: string) {
-  const process = Bun.spawn(
-    [
-      "openssl",
-      "req",
-      "-x509",
-      "-newkey",
-      "rsa:2048",
-      "-keyout",
-      key,
-      "-out",
-      certificate,
-      "-days",
-      "1",
-      "-nodes",
-      "-subj",
-      "/CN=127.0.0.1",
-      "-addext",
-      "subjectAltName=IP:127.0.0.1",
-    ],
-    { stdout: "ignore", stderr: "ignore" },
-  );
-  assert((await process.exited) === 0, "OpenSSL could not create a temporary HTTPS certificate.");
-}
-
-async function waitForServer(url: string, child: Bun.Subprocess) {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    if (child.exitCode !== null) {
-      const stderr = child.stderr instanceof ReadableStream
-        ? await new Response(child.stderr).text()
-        : "stderr unavailable";
-      throw new Error(`Protected MCP exited during startup: ${stderr}`);
-    }
-    try {
-      if ((await fetch(url)).ok) return;
-    } catch {
-      // The child is still discovering the issuer or starting Bun HTTP.
-    }
-    await Bun.sleep(50);
-  }
-  throw new Error("Protected MCP did not start.");
-}
-
 function requiredHeader(response: Response, name: string) {
   const value = response.headers.get(name);
   assert(value, `Response omitted ${name}.`);
-  return value;
-}
-
-function cleanEnvironment() {
-  return {
-    ...Object.fromEntries(
-      Object.entries(process.env).filter(
-        (entry): entry is [string, string] => entry[1] !== undefined,
-      ),
-    ),
-    BRIGHTDATA_API_KEY: "",
-    BRIGHTDATA_CREDENTIAL_SOURCE: "auto",
-    BRIGHTDATA_SERP_ZONE: "",
-    BRIGHTDATA_UNLOCKER_ZONE: "",
-    BRIGHTDATA_BROWSER_USERNAME: "",
-    BRIGHTDATA_BROWSER_PASSWORD: "",
-    MCP_BROWSER_PROFILE: "disabled",
-  };
-}
-
-function randomPort(except?: number) {
-  let value = 20_000 + Math.floor(Math.random() * 20_000);
-  if (value === except) value += 1;
   return value;
 }
 
@@ -416,8 +361,4 @@ function asLocalUrl(value: string) {
   const url = new URL(value);
   url.protocol = "http:";
   return url;
-}
-
-function assert(value: unknown, message: string): asserts value {
-  if (!value) throw new Error(message);
 }

@@ -18,6 +18,19 @@ bun run start
 The HTTP MCP endpoint is `http://localhost:8787/mcp`; the health endpoint is
 `http://localhost:8787/`. Set `MCP_TRANSPORT=stdio` to use stdio instead.
 
+## Develop the MCP App
+
+Run the dataset table in a normal browser with schema-valid fixture data:
+
+```bash
+bun run dev:app
+```
+
+Open `http://localhost:3000`. Changes under `src/` rebuild the production-aligned
+bundle and reload the preview. Set `APP_PORT` to use another port. This preview
+does not start the MCP server, use credentials, or call Bright Data; verify the
+final host bridge through the MCP compatibility check and a real MCP Apps host.
+
 ## Bright Data credentials
 
 Credentials are optional. Without them, the default `auto` profile uses the

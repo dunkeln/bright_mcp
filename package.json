@@ -13,6 +13,7 @@
     "check:coverage": "bun run checks/coverage.ts",
     "connect:brightdata": "bun run scripts/brightdata-connection.ts connect",
     "dev": "bun --watch src/main.ts",
+    "dev:app": "bun run scripts/dev-app.ts",
     "disconnect:brightdata": "bun run scripts/brightdata-connection.ts disconnect",
     "start": "bun run src/main.ts",
     "typecheck": "tsc --noEmit"

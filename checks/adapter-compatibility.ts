@@ -176,14 +176,14 @@ async function checkDatasetPolling() {
       if (url.pathname === "/datasets/v3/trigger") {
         return json({ snapshot_id: "fixture-snapshot" }, 202);
       }
-      if (url.pathname === "/datasets/snapshots/fixture-snapshot") {
+      if (url.pathname === "/datasets/v3/progress/fixture-snapshot") {
         return json({
-          id: "fixture-snapshot",
+          snapshot_id: "fixture-snapshot",
           status: "ready",
           dataset_size: 1,
         });
       }
-      if (url.pathname === "/datasets/snapshots/fixture-snapshot/download") {
+      if (url.pathname === "/datasets/v3/snapshot/fixture-snapshot") {
         return json([
           {
             title: "Fixture product",
@@ -208,7 +208,7 @@ async function checkDatasetPolling() {
 
   assert(
     paths.join(",") ===
-      "/datasets/list,/datasets/gd_lwdb4vjm1ehb499uxs/metadata,/datasets/v3/trigger,/datasets/snapshots/fixture-snapshot,/datasets/snapshots/fixture-snapshot/download",
+      "/datasets/list,/datasets/gd_lwdb4vjm1ehb499uxs/metadata,/datasets/v3/trigger,/datasets/v3/progress/fixture-snapshot,/datasets/v3/snapshot/fixture-snapshot",
     "Dataset execution did not trigger, poll, and download in order.",
   );
   assert(
@@ -236,10 +236,10 @@ async function checkMarketplaceAndDeepLookup() {
         hits: [{ name: "Synchronous company" }], total_hits: 1,
       });
       if (path === "/datasets/filter") return json({ snapshot_id: "filtered-snapshot" });
-      if (path === "/datasets/snapshots/filtered-snapshot") return json({
-        id: "filtered-snapshot", status: "ready", dataset_size: 1, cost: 0.01,
+      if (path === "/datasets/v3/progress/filtered-snapshot") return json({
+        snapshot_id: "filtered-snapshot", status: "ready", dataset_size: 1, cost: 0.01,
       });
-      if (path === "/datasets/snapshots/filtered-snapshot/download") {
+      if (path === "/datasets/v3/snapshot/filtered-snapshot") {
         return json([{ name: "Filtered record" }]);
       }
       if (path === "/datasets/deep_lookup/v1/preview" && init?.method === "POST") {

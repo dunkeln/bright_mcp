@@ -25,8 +25,7 @@ const RESULT_TTL_MS = 15 * 60_000;
 const rowsSchema = z.array(z.record(z.string(), jsonValueSchema));
 const snapshotTriggerSchema = z.object({ snapshot_id: z.string().min(1) });
 const snapshotMetadataSchema = z.object({
-  id: z.string().min(1),
-  status: z.enum(["scheduled", "building", "ready", "failed"]),
+  status: z.enum(["starting", "running", "ready", "failed"]),
   dataset_size: z.number().int().nonnegative().optional(),
   cost: z.number().nonnegative().optional(),
   error: z.string().optional(),
@@ -287,7 +286,7 @@ async function saveSnapshot(
     async loadPart(part, readContext) {
       return parse(rowsSchema, (await gateway.requestJson({
         method: "GET",
-        path: `/datasets/snapshots/${encodeURIComponent(input.snapshotId)}/download`,
+        path: `/datasets/v3/snapshot/${encodeURIComponent(input.snapshotId)}`,
         query: { format: "json", batch_size: String(SNAPSHOT_PART_ROWS), part: String(part) },
         timeoutMs: 45_000,
         maxResponseBytes: 10_000_000,
@@ -323,7 +322,7 @@ async function finishSnapshot(
     async load() {
       return parse(snapshotMetadataSchema, (await gateway.requestJson({
         method: "GET",
-        path: `/datasets/snapshots/${encodeURIComponent(snapshotId)}`,
+        path: `/datasets/v3/progress/${encodeURIComponent(snapshotId)}`,
         timeoutMs: 15_000,
       }, context)).data);
     },

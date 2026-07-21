@@ -358,7 +358,7 @@ export function createHostedConnectionService(options: {
 
 function validationMessage(reason: string) {
   if (reason === "rejected_or_expired") {
-    return "Bright Data rejected the token or it has expired. Create or copy a current API token and start again.";
+    return "Bright Data couldn't accept this token. Check that it's current and copied correctly, then try again.";
   }
   if (reason === "permission") {
     return "The token lacks permission for the Bright Data account status check.";

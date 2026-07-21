@@ -64,6 +64,7 @@ try {
       maxSteps: 5,
       mcpClientManager: manager,
     });
+    const startedAt = performance.now();
     const result = await runner.run(job.useCase.prompt, { timeoutMs: 120_000 });
     const path = job.useCase.toolPath[job.server];
     const called = result.toolsCalled();
@@ -97,9 +98,7 @@ try {
       inputTokens: result.inputTokens(),
       outputTokens: result.outputTokens(),
       tokenCount: result.totalTokens(),
-      latencyMs: result.e2eLatencyMs(),
-      llmLatencyMs: result.llmLatencyMs(),
-      mcpLatencyMs: result.mcpLatencyMs(),
+      latencyMs: Math.round(performance.now() - startedAt),
       ...(result.hasError() ? { error: safeError(result.getError()) } : {}),
     });
     await persist();
@@ -130,8 +129,6 @@ type AgentResult = {
   outputTokens: number;
   tokenCount: number;
   latencyMs: number;
-  llmLatencyMs: number;
-  mcpLatencyMs: number;
   error?: string;
 };
 

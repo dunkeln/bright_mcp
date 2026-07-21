@@ -44,7 +44,9 @@ non-empty, bounded MCP results and records latency and result size.
 The repeated agent suite covers two workflows each for Acquire, Extract,
 Research, and Operate. It accepts different valid tool paths for each MCP, then
 checks requested output fields, provenance, honest capability boundaries,
-latency, calls, and token use. Live factual values are not independently graded.
+latency, calls, and token use. Latency is wall-clock time from the prompt to the
+final response, including both model and MCP work. Live factual values are not
+independently graded.
 
 ## Latest tool-use benchmark
 

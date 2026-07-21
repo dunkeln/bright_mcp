@@ -75,8 +75,6 @@ type Result = {
   outputTokens: number;
   tokenCount: number;
   latencyMs: number;
-  llmLatencyMs: number;
-  mcpLatencyMs: number;
 };
 type Report = {
   schemaVersion: number;

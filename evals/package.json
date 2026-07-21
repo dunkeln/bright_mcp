@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "agent": "bun run src/agent.ts",
+    "judge": "bun run src/judge.ts",
     "check": "bun run src/check.ts",
     "usecases": "bun run src/usecases.ts",
-    "eval": "bun run check && bun run usecases && bun run agent",
+    "eval": "bun run check && bun run usecases && bun run agent && bun run judge",
     "report:check": "bun run src/report.ts --check && bun ../scripts/render-benchmark-chart.ts --check",
     "report:write": "bun ../scripts/render-benchmark-chart.ts --write && bun run src/report.ts --write",
     "typecheck": "tsc --noEmit"

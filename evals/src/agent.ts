@@ -99,6 +99,9 @@ try {
       outputTokens: result.outputTokens(),
       tokenCount: result.totalTokens(),
       latencyMs: Math.round(performance.now() - startedAt),
+      response: result.text,
+      toolCalls: result.getToolCalls(),
+      toolEvidence: result.getToolMessages(),
       ...(result.hasError() ? { error: safeError(result.getError()) } : {}),
     });
     await persist();
@@ -129,6 +132,9 @@ type AgentResult = {
   outputTokens: number;
   tokenCount: number;
   latencyMs: number;
+  response: string;
+  toolCalls: unknown[];
+  toolEvidence: unknown[];
   error?: string;
 };
 
@@ -188,11 +194,12 @@ function shuffle<T>(values: T[]) {
 async function readPrevious(): Promise<AgentResult[]> {
   if (!(await artifact.exists())) return [];
   const report = await artifact.json() as {
+    schemaVersion?: number;
     model?: string;
     runsPerCase?: number;
     results?: AgentResult[];
   };
-  return report.model === model && report.runsPerCase === runs && Array.isArray(report.results)
+  return report.schemaVersion === 2 && report.model === model && report.runsPerCase === runs && Array.isArray(report.results)
     ? report.results
     : [];
 }
@@ -203,7 +210,7 @@ function resultKey(result: Pick<AgentResult, "caseId" | "server" | "run">) {
 
 async function persist() {
   await writeReport("agent", {
-    schemaVersion: 1,
+    schemaVersion: 2,
     generatedAt: new Date().toISOString(),
     mode: "mcpjam-openrouter-tool-use",
     model,

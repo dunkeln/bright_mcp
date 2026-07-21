@@ -38,8 +38,10 @@ export function safeError(error: unknown) {
 }
 
 export async function writeReport(name: string, report: unknown) {
+  const token = process.env.BRIGHTDATA_API_KEY;
+  const json = JSON.stringify(report, null, 2);
   await Bun.write(
     new URL(`../.artifacts/${name}.json`, import.meta.url),
-    `${JSON.stringify(report, null, 2)}\n`,
+    `${token ? json.replaceAll(token, "[redacted]") : json}\n`,
   );
 }

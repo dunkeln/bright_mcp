@@ -28,8 +28,9 @@ bun run check
 bun run usecases
 ```
 
-Reports are written to the ignored `evals/.artifacts/` directory. They contain
-metrics and sanitized failures, never result bodies, endpoint URLs, or tokens.
+Reports are written to the ignored `evals/.artifacts/` directory. Agent reports
+retain responses and tool evidence for blind judging; they never contain API
+tokens and must not be published.
 
 ## What is deterministic
 
@@ -46,7 +47,10 @@ Research, and Operate. It accepts different valid tool paths for each MCP, then
 checks requested output fields, provenance, honest capability boundaries,
 latency, calls, and token use. Latency is wall-clock time from the prompt to the
 final response, including both model and MCP work. Live factual values are not
-independently graded.
+independently graded. A stronger judge model compares matched, anonymously
+labeled artifacts for task fulfillment, evidence grounding, information
+density, source quality, and actionability. Deterministic passes remain separate
+from judge scores.
 
 ## Latest tool-use benchmark
 

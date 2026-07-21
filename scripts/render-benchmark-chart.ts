@@ -9,15 +9,22 @@ const mode = process.argv[2];
 if (!["--write", "--check", "--preview"].includes(mode ?? "")) throw new Error("Use --write, --check, or --preview.");
 
 const report = (await Bun.file(new URL("../evals/.artifacts/agent.json", import.meta.url)).json()) as Report;
+const judgeFile = Bun.file(new URL("../evals/.artifacts/judge.json", import.meta.url));
+if (!(await judgeFile.exists())) process.exit(0);
+const judge = await judgeFile.json() as JudgeReport;
 const tasks = workflowCases.map(({ id, shortLabel }) => ({
   label: shortLabel,
   brightData: summarize(report.results.filter((result) => result.caseId === id && result.server === "upstream")),
   bright: summarize(report.results.filter((result) => result.caseId === id && result.server === "bright")),
+  quality: {
+    brightData: quality(judge, id, "upstream"),
+    bright: quality(judge, id, "bright"),
+  },
 }));
-const complete = workflowCases.every(({ id }) => (["bright", "upstream"] as const).every((server) => report.results.filter((result) => result.caseId === id && result.server === server).length === report.runsPerCase));
+const complete = workflowCases.every(({ id }) => (["bright", "upstream"] as const).every((server) => report.results.filter((result) => result.caseId === id && result.server === server).length === report.runsPerCase)) && judge.judgments.length === workflowCases.length * report.runsPerCase;
 if (mode !== "--preview" && !complete) process.exit(0);
 
-const charts = ["completion", "radar", "efficiency", "latency", "complexity"] as const;
+const charts = ["completion", "preference", "radar", "quality-cost", "efficiency", "latency", "complexity"] as const;
 const temporaryDirectory = await mkdtemp(join(tmpdir(), "bright-benchmark-"));
 try {
   const assets = await buildAppAssets({
@@ -31,7 +38,20 @@ try {
   const data = {
     model: report.model,
     runsPerCase: report.runsPerCase,
+    judgeModel: judge.model,
+    preference: {
+      brightData: judge.judgments.filter(({ winner }) => winner === "upstream").length,
+      bright: judge.judgments.filter(({ winner }) => winner === "bright").length,
+      ties: judge.judgments.filter(({ winner }) => winner === "tie").length,
+    },
     tasks,
+    quality: {
+      dimensions: judge.rubric.map((key) => ({
+        label: dimensionLabel(key),
+        brightData: dimension(judge, key, "upstream"),
+        bright: dimension(judge, key, "bright"),
+      })),
+    },
     latency: {
       brightData: report.results.filter(({ server }) => server === "upstream").map(({ latencyMs }) => latencyMs),
       bright: report.results.filter(({ server }) => server === "bright").map(({ latencyMs }) => latencyMs),
@@ -61,6 +81,8 @@ try {
 
 type Result = { caseId: string; server: "bright" | "upstream"; passed: boolean; tokenCount: number; latencyMs: number; toolsCalled: string[] };
 type Report = { model: string; runsPerCase: number; results: Result[] };
+type Dimension = "taskFulfillment" | "evidenceGrounding" | "informationDensity" | "sourceQuality" | "actionability";
+type JudgeReport = { model: string; runsPerCase: number; rubric: Dimension[]; judgments: Array<{ pairId: string; scores: Record<"bright" | "upstream", Record<Dimension, number>>; winner: "bright" | "upstream" | "tie" }> };
 
 function summarize(results: Result[]) {
   return {
@@ -70,6 +92,9 @@ function summarize(results: Result[]) {
   };
 }
 function average(values: number[]) { return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0; }
+function quality(report: JudgeReport, caseId: string, server: "bright" | "upstream") { return average(report.judgments.filter(({ pairId }) => pairId.startsWith(`${caseId}:`)).flatMap(({ scores }) => Object.values(scores[server]))); }
+function dimension(report: JudgeReport, key: Dimension, server: "bright" | "upstream") { return average(report.judgments.map(({ scores }) => scores[server][key])); }
+function dimensionLabel(value: Dimension) { return value.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase()); }
 function safeJson(value: unknown) { return JSON.stringify(value).replaceAll("<", "\\u003c"); }
 function previewPath(directory: string | undefined, chart: string) {
   if (!directory) throw new Error("Preview output directory is required.");

@@ -7,6 +7,7 @@
     "build": "bun run scripts/build-app.ts",
     "check:auth": "bun run scripts/auth-compatibility.ts",
     "check:compat": "bun run scripts/compatibility.ts",
+    "check:coverage": "bun run scripts/coverage.ts",
     "connect:brightdata": "bun run scripts/brightdata-connection.ts connect",
     "dev": "bun --watch src/main.ts",
     "disconnect:brightdata": "bun run scripts/brightdata-connection.ts disconnect",

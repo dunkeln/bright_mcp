@@ -18,6 +18,7 @@ bun run build
 bun run typecheck
 bun run check:compat
 bun run check:auth
+bun run check:coverage
 bun run start
 ```
 

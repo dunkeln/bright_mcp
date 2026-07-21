@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 1,
+  "capabilities": [
+    {
+      "id": "web-search",
+      "referenceCapability": "Search, batch search, engines, and pagination",
+      "disposition": "composed",
+      "routes": ["tool:search_web"],
+      "verification": {
+        "gate": "bun run check:compat",
+        "scenario": "Invoke canonical search; the Bright adapter owns engine, locale, cursor, and upstream envelope mapping."
+      }
+    },
+    {
+      "id": "web-scrape",
+      "referenceCapability": "Markdown/HTML scrape and ordered batch scrape",
+      "disposition": "composed",
+      "routes": ["tool:scrape"],
+      "verification": {
+        "gate": "bun run check:compat",
+        "scenario": "Scrape two URLs and verify format-independent input ordering plus private-network rejection."
+      }
+    },
+    {
+      "id": "structured-extraction",
+      "referenceCapability": "Schema-directed extraction",
+      "disposition": "composed",
+      "routes": ["tool:scrape#extraction", "protocol:sampling"],
+      "verification": {
+        "gate": "bun run check:compat",
+        "scenario": "A sampling-capable host returns Zod-validated data and provenance; an unsupported host receives an actionable per-page fallback."
+      }
+    },
+    {
+      "id": "dataset-collection",
+      "referenceCapability": "Web Data collectors",
+      "disposition": "composed",
+      "routes": ["tool:find_datasets", "tool:describe_dataset", "tool:run_dataset#collect"],
+      "verification": {
+        "gate": "bun run check:compat",
+        "scenario": "Discover and describe the representative dataset, then collect known records in requested order."
+      }
+    },
+    {
+      "id": "dataset-record-search",
+      "referenceCapability": "Dataset fields and filtered record search",
+      "disposition": "composed",
+      "routes": ["tool:describe_dataset", "tool:run_dataset#search"],
+      "verification": {
+        "gate": "bun run check:compat",
+        "scenario": "Describe the typed search schema and execute a filtered canonical result."
+      }
+    },
+    {
+      "id": "asynchronous-execution",
+      "referenceCapability": "Trigger, poll, status, and cancellation",
+      "disposition": "internalized",
+      "routes": ["tool:run_dataset", "protocol:tasks", "adapter:bounded-polling"],
+      "verification": {
+        "gate": "bun run check:compat",
+        "scenario": "Run the same logical dataset call synchronously and through an optional MCP task; upstream job IDs remain private."
+      }
+    },
+    {
+      "id": "result-artifacts",
+      "referenceCapability": "Result paging and complete artifacts",
+      "disposition": "composed",
+      "routes": ["resource:brightdata://results/{resultId}", "resource:brightdata://pages/{pageToken}"],
+      "verification": {
+        "gate": "bun run check:compat && bun run check:auth",
+        "scenario": "Read a result and continuation page, then prove another authenticated principal cannot read the artifact."
+      }
+    },
+    {
+      "id": "dataset-table-app",
+      "referenceCapability": "Dataset result tables",
+      "disposition": "composed",
+      "routes": ["tool:run_dataset", "resource:ui://bright-mcp/dataset-table"],
+      "verification": {
+        "gate": "bun run build && bun run check:compat",
+        "scenario": "Resolve the table app resource while preserving the canonical structured result and text fallback."
+      }
+    },
+    {
+      "id": "remote-browser",
+      "referenceCapability": "Browser navigation, history, observation, and typed actions",
+      "disposition": "composed",
+      "routes": [
+        "tool:browser_navigate",
+        "tool:browser_observe",
+        "tool:browser_interact",
+        "tool:browser_close",
+        "resource:brightbrowser://observations/{artifactId}"
+      ],
+      "verification": {
+        "gate": "bun run check:compat",
+        "scenario": "Navigate, observe, interact, use history, read a screenshot resource, and close an owned demo session."
+      }
+    },
+    {
+      "id": "capability-profiles",
+      "referenceCapability": "Tool groups and Pro mode",
+      "disposition": "composed",
+      "routes": ["profile:base", "profile:browser"],
+      "verification": {
+        "gate": "bun run check:compat",
+        "scenario": "List exactly five tools in the base profile and exactly nine in the opt-in browser profile."
+      }
+    },
+    {
+      "id": "session-observability",
+      "referenceCapability": "Session statistics",
+      "disposition": "internalized",
+      "routes": ["observability:request-log", "adapter:bounded-session-store"],
+      "verification": {
+        "gate": "bun run check:compat",
+        "scenario": "Request IDs, attempts, durations, terminal states, and bounded session lifecycle stay operational rather than model-visible."
+      }
+    },
+    {
+      "id": "credential-and-zone-setup",
+      "referenceCapability": "Credential and zone setup",
+      "disposition": "composed",
+      "routes": ["connection:macos-keychain", "config:brightdata-zones", "boundary:principal-credential-provider"],
+      "verification": {
+        "gate": "bun run scripts/brightdata-connection.ts help && bun run check:auth",
+        "scenario": "Local setup uses a Keychain prompt and read-only validation; hosted mode rejects global credentials and preserves the principal-bound provider boundary."
+      }
+    },
+    {
+      "id": "strategy-prompts",
+      "referenceCapability": "Scraping-strategy and diagnostic prompts",
+      "disposition": "excluded",
+      "routes": [],
+      "verification": {
+        "gate": "bun run check:coverage",
+        "scenario": "Keep guidance outside the model-visible server surface."
+      },
+      "exclusionReason": "Guidance prompts are not Bright Data service capabilities and are optional in V1.",
+      "userConsequence": "The server does not offer prewritten strategy prompts; agents compose the typed tools directly."
+    }
+  ]
+}

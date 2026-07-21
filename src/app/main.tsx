@@ -377,7 +377,7 @@ function DatasetTable() {
                         <DotsVerticalMoreMenu className="size-4" aria-hidden="true" />
                       </Button>
                     </Menu.Trigger>
-                    <Menu.Content align="end" minWidth={210}>
+                    <Menu.Content align="end" minWidth="auto">
                       <Menu.Item
                         onSelect={() =>
                           setSort({ key: column.key, direction: "ascending" })
@@ -394,7 +394,6 @@ function DatasetTable() {
                         <ArrowDownSm className="size-4" aria-hidden="true" />
                         Sort descending
                       </Menu.Item>
-                      <Menu.Separator />
                       <Menu.Item
                         disabled={visibleColumns.length === 1}
                         onSelect={() => hideColumn(column.key)}

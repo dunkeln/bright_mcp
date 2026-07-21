@@ -17,6 +17,7 @@ bun install --frozen-lockfile
 bun run build
 bun run typecheck
 bun run check:compat
+bun run check:auth
 bun run start
 ```
 
@@ -40,6 +41,27 @@ surface at five tools. Set the profile to `brightdata` with
 launched or downloaded. Run the opt-in live compatibility gate with
 `BRIGHTDATA_BROWSER_CHECK=1 bun run check:compat`; it performs a paid remote
 navigation only when explicitly requested.
+
+## Hosted authorization
+
+Put the HTTP server behind TLS and set `MCP_AUTH_MODE=oidc`,
+`MCP_PUBLIC_URL=https://<host>/mcp`, and `MCP_OIDC_ISSUER` to an HTTPS issuer
+with OAuth/OIDC discovery, a JWKS endpoint, and PKCE S256 support. Access tokens
+must be signed JWTs with the configured issuer and resource audience, `sub`,
+`iat`, `exp`, and a lifetime no longer than `MCP_MAX_TOKEN_AGE_SECONDS` (one hour
+by default). Set `MCP_ALLOWED_ORIGINS` to a comma-separated browser-origin
+allowlist when needed.
+
+The protected resource advertises `mcp:access`; cost-bearing capabilities use
+incremental `bright:web`, `bright:datasets:run`, and `bright:browser` scopes.
+`bun run check:auth` starts a temporary issuer and verifies discovery, JWT and
+scope enforcement, and cross-principal result isolation.
+
+Hosted OIDC mode currently uses the demo Bright Data adapters. It deliberately
+rejects deployment-global Bright Data API and Browser API credentials: real
+hosted calls require a principal-bound encrypted credential vault and connection
+flow. Local/headless mode may continue to use the explicit environment settings
+above.
 
 
 | Dimension | BrightData MCP | Bright MCP |

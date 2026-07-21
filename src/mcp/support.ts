@@ -1,10 +1,20 @@
+import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { CapabilityError, type RequestContext } from "../core/contracts";
 
 export function requestContext(
   principalId: string,
   signal?: AbortSignal,
+  authInfo?: AuthInfo,
 ): RequestContext {
-  return { principalId, requestId: crypto.randomUUID(), signal };
+  const authenticatedPrincipal = authInfo?.extra?.principalId;
+  return {
+    principalId:
+      typeof authenticatedPrincipal === "string"
+        ? authenticatedPrincipal
+        : principalId,
+    requestId: crypto.randomUUID(),
+    signal,
+  };
 }
 
 export function reply<T extends Record<string, unknown>>(

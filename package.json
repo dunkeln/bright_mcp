@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "build": "bun run scripts/build-app.ts",
+    "check:auth": "bun run scripts/auth-compatibility.ts",
     "check:compat": "bun run scripts/compatibility.ts",
     "dev": "bun --watch src/main.ts",
     "start": "bun run src/main.ts",
@@ -21,6 +22,7 @@
     "@modelcontextprotocol/ext-apps": "1.7.4",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@openai/apps-sdk-ui": "0.2.2",
+    "jose": "6.2.3",
     "lru-cache": "11.5.2",
     "p-limit": "7.2.0",
     "playwright-core": "1.61.1",

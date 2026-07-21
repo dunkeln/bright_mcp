@@ -120,7 +120,7 @@ export function registerBrowserTools(
       runTool(async () => {
         const structuredContent = await browser.navigate(
           input,
-          requestContext(principalId, extra.signal),
+          requestContext(principalId, extra.signal, extra.authInfo),
         );
         return reply(structuredContent, `Browser is at ${structuredContent.url}.`);
       }),
@@ -149,7 +149,7 @@ export function registerBrowserTools(
       runTool(async () => {
         const structuredContent = await browser.observe(
           input,
-          requestContext(principalId, extra.signal),
+          requestContext(principalId, extra.signal, extra.authInfo),
         );
         if (structuredContent.kind === "screenshot") {
           return {
@@ -196,7 +196,7 @@ export function registerBrowserTools(
       runTool(async () => {
         const structuredContent = await browser.interact(
           input,
-          requestContext(principalId, extra.signal),
+          requestContext(principalId, extra.signal, extra.authInfo),
         );
         return reply(structuredContent, `Browser action completed at ${structuredContent.url}.`);
       }),
@@ -220,7 +220,7 @@ export function registerBrowserTools(
       runTool(async () => {
         const structuredContent = await browser.close(
           sessionId,
-          requestContext(principalId, extra.signal),
+          requestContext(principalId, extra.signal, extra.authInfo),
         );
         return reply(
           structuredContent,
@@ -235,8 +235,9 @@ export function registerBrowserTools(
       list: undefined,
     }),
     { mimeType: "image/png", description: "Expiring browser screenshot" },
-    async (uri, { artifactId }) => {
-      const artifact = browser.readArtifact(String(artifactId), principalId);
+    async (uri, { artifactId }, extra) => {
+      const context = requestContext(principalId, extra.signal, extra.authInfo);
+      const artifact = browser.readArtifact(String(artifactId), context.principalId);
       return {
         contents: [
           {

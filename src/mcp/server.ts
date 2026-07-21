@@ -3,6 +3,10 @@ import {
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type {
+  CreateTaskRequestHandlerExtra,
+  TaskRequestHandlerExtra,
+} from "@modelcontextprotocol/sdk/experimental/tasks/interfaces.js";
 import {
   CallToolResultSchema,
   type CallToolResult,
@@ -14,6 +18,7 @@ import {
   jsonValueSchema,
   type DatasetOperation,
   type JsonObject,
+  type RequestContext,
 } from "../core/contracts";
 import { isPublicHttpUrl } from "../core/public-url";
 import type { DatasetUseCases } from "../core/datasets";
@@ -126,23 +131,58 @@ const scrapeItemSchema = z.object({
   extractionError: itemFailureSchema.optional(),
 });
 
+const runDatasetConfig = {
+  title: "Run dataset",
+  description:
+    "Use this when you have described a dataset and want to execute one returned operation with schema-valid arguments. Returns a bounded preview and a completed result resource.",
+  inputSchema: {
+    datasetId: z.string().trim().min(1).max(120),
+    operation: datasetOperationSchema,
+    arguments: z.record(z.string(), jsonValueSchema),
+  },
+  outputSchema: datasetResultSchema,
+  annotations: {
+    readOnlyHint: false,
+    destructiveHint: false,
+    idempotentHint: false,
+    openWorldHint: true,
+  },
+  _meta: {
+    ui: { resourceUri: DATASET_TABLE_URI, visibility: ["model", "app"] },
+    "ui/resourceUri": DATASET_TABLE_URI,
+    "openai/outputTemplate": DATASET_TABLE_URI,
+    "openai/toolInvocation/invoking": "Running dataset…",
+    "openai/toolInvocation/invoked": "Dataset ready",
+  },
+} as const;
+
+type RunDatasetInput = {
+  datasetId: string;
+  operation: DatasetOperation;
+  arguments: JsonObject;
+};
+
 export function createBrightMcpServer(dependencies: {
   datasets: DatasetUseCases;
   web: WebUseCases;
   browser?: BrowserUseCases;
   results: ResultStore;
-  tasks: CancellableTaskStore;
+  tasks?: CancellableTaskStore;
   widgetHtml: string;
   principalId: string;
 }) {
   const server = new McpServer(
     { name: "bright-mcp", version: "0.1.0" },
     {
-      capabilities: {
-        tasks: { list: {}, cancel: {}, requests: { tools: { call: {} } } },
-      },
-      taskStore: dependencies.tasks,
-      defaultTaskPollInterval: 500,
+      ...(dependencies.tasks
+        ? {
+            capabilities: {
+              tasks: { list: {}, cancel: {}, requests: { tools: { call: {} } } },
+            },
+            taskStore: dependencies.tasks,
+            defaultTaskPollInterval: 500,
+          }
+        : {}),
       instructions:
         "Use search_web to find current URLs and scrape to retrieve known URLs. For managed datasets, use find_datasets, then describe_dataset, then run_dataset with the returned ID and operation schema.",
     },
@@ -173,7 +213,11 @@ export function createBrightMcpServer(dependencies: {
       runTool(async () => {
         const structuredContent = await dependencies.web.searchWeb(
           input,
-          requestContext(dependencies.principalId, extra.signal),
+          requestContext(
+            dependencies.principalId,
+            extra.signal,
+            extra.authInfo,
+          ),
         );
         return reply(
           structuredContent,
@@ -203,7 +247,11 @@ export function createBrightMcpServer(dependencies: {
       runTool(async () => {
         const structuredContent = await dependencies.web.scrape(
           input,
-          requestContext(dependencies.principalId, extra.signal),
+          requestContext(
+            dependencies.principalId,
+            extra.signal,
+            extra.authInfo,
+          ),
         );
         const failures = structuredContent.results.filter((item) => item.error).length;
         return reply(
@@ -261,85 +309,91 @@ export function createBrightMcpServer(dependencies: {
       }),
   );
 
-  server.experimental.tasks.registerToolTask(
-    "run_dataset",
-    {
-      title: "Run dataset",
-      description:
-        "Use this when you have described a dataset and want to execute one returned operation with schema-valid arguments. Returns a bounded preview and a completed result resource.",
-      inputSchema: {
-        datasetId: z.string().trim().min(1).max(120),
-        operation: datasetOperationSchema,
-        arguments: z.record(z.string(), jsonValueSchema),
-      },
-      outputSchema: datasetResultSchema,
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: true,
-      },
-      execution: { taskSupport: "optional" },
-      _meta: {
-        ui: { resourceUri: DATASET_TABLE_URI, visibility: ["model", "app"] },
-        "ui/resourceUri": DATASET_TABLE_URI,
-        "openai/outputTemplate": DATASET_TABLE_URI,
-        "openai/toolInvocation/invoking": "Running dataset…",
-        "openai/toolInvocation/invoked": "Dataset ready",
-      },
-    },
-    {
-      async createTask(input, extra) {
-        const task = await extra.taskStore.createTask({
-          ttl: taskTtl(extra.taskRequestedTtl),
-          pollInterval: 500,
-        });
-        const controller = new AbortController();
-        dependencies.tasks.bind(task.taskId, controller);
-        const abortFromRequest = () => controller.abort(extra.signal.reason);
-        extra.signal.addEventListener("abort", abortFromRequest, { once: true });
-
-        void executeRunDataset(input, dependencies, controller.signal)
-          .then(async (result) => {
-            await extra.taskStore.storeTaskResult(
-              task.taskId,
-              result.isError ? "failed" : "completed",
-              result,
-            );
-          })
-          .catch(async (error) => {
-            await extra.taskStore.storeTaskResult(task.taskId, "failed", {
-              isError: true,
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify({
-                    code: "internal_error",
-                    message: error instanceof Error ? error.message : "Task failed.",
-                    retryable: true,
-                    nextAction: "Retry once.",
-                  }),
-                },
-              ],
-            });
-          })
-          .finally(() => {
-            extra.signal.removeEventListener("abort", abortFromRequest);
-            dependencies.tasks.release(task.taskId);
+  if (dependencies.tasks) {
+    const tasks = dependencies.tasks;
+    server.experimental.tasks.registerToolTask(
+      "run_dataset",
+      { ...runDatasetConfig, execution: { taskSupport: "optional" } },
+      {
+        async createTask(
+          input: RunDatasetInput,
+          extra: CreateTaskRequestHandlerExtra,
+        ) {
+          const task = await extra.taskStore.createTask({
+            ttl: taskTtl(extra.taskRequestedTtl),
+            pollInterval: 500,
           });
+          const controller = new AbortController();
+          tasks.bind(task.taskId, controller);
+          const abortFromRequest = () => controller.abort(extra.signal.reason);
+          extra.signal.addEventListener("abort", abortFromRequest, { once: true });
+          const context = requestContext(
+            dependencies.principalId,
+            controller.signal,
+            extra.authInfo,
+          );
 
-        return { task };
+          void executeRunDataset(input, dependencies, context)
+            .then(async (result) => {
+              await extra.taskStore.storeTaskResult(
+                task.taskId,
+                result.isError ? "failed" : "completed",
+                result,
+              );
+            })
+            .catch(async (error) => {
+              await extra.taskStore.storeTaskResult(task.taskId, "failed", {
+                isError: true,
+                content: [
+                  {
+                    type: "text",
+                    text: JSON.stringify({
+                      code: "internal_error",
+                      message:
+                        error instanceof Error ? error.message : "Task failed.",
+                      retryable: true,
+                      nextAction: "Retry once.",
+                    }),
+                  },
+                ],
+              });
+            })
+            .finally(() => {
+              extra.signal.removeEventListener("abort", abortFromRequest);
+              tasks.release(task.taskId);
+            });
+
+          return { task };
+        },
+        async getTask(
+          _input: RunDatasetInput,
+          extra: TaskRequestHandlerExtra,
+        ) {
+          return extra.taskStore.getTask(extra.taskId);
+        },
+        async getTaskResult(
+          _input: RunDatasetInput,
+          extra: TaskRequestHandlerExtra,
+        ) {
+          return CallToolResultSchema.parse(
+            await extra.taskStore.getTaskResult(extra.taskId),
+          );
+        },
       },
-      async getTask(_input, extra) {
-        return extra.taskStore.getTask(extra.taskId);
-      },
-      async getTaskResult(_input, extra) {
-        return CallToolResultSchema.parse(
-          await extra.taskStore.getTaskResult(extra.taskId),
-        );
-      },
-    },
-  );
+    );
+  } else {
+    server.registerTool("run_dataset", runDatasetConfig, async (input, extra) =>
+      executeRunDataset(
+        input,
+        dependencies,
+        requestContext(
+          dependencies.principalId,
+          extra.signal,
+          extra.authInfo,
+        ),
+      ),
+    );
+  }
 
   server.registerResource(
     "dataset-definition",
@@ -356,12 +410,16 @@ export function createBrightMcpServer(dependencies: {
     "dataset-result",
     new ResourceTemplate("brightdata://results/{resultId}", { list: undefined }),
     { mimeType: "application/json", description: "Completed dataset result" },
-    async (uri, { resultId }) =>
+    async (uri, { resultId }, extra) =>
       jsonResourceReply(
         uri,
         dependencies.results.readResult(
           String(resultId),
-          dependencies.principalId,
+          requestContext(
+            dependencies.principalId,
+            extra.signal,
+            extra.authInfo,
+          ).principalId,
         ),
       ),
   );
@@ -370,12 +428,16 @@ export function createBrightMcpServer(dependencies: {
     "dataset-result-page",
     new ResourceTemplate("brightdata://pages/{pageToken}", { list: undefined }),
     { mimeType: "application/json", description: "Dataset result continuation page" },
-    async (uri, { pageToken }) =>
+    async (uri, { pageToken }, extra) =>
       jsonResourceReply(
         uri,
         dependencies.results.readPage(
           String(pageToken),
-          dependencies.principalId,
+          requestContext(
+            dependencies.principalId,
+            extra.signal,
+            extra.authInfo,
+          ).principalId,
         ),
       ),
   );
@@ -432,10 +494,9 @@ function executeRunDataset(
     datasets: DatasetUseCases;
     principalId: string;
   },
-  signal: AbortSignal,
+  context: RequestContext,
 ): Promise<CallToolResult> {
   return runTool(async () => {
-    const context = requestContext(dependencies.principalId, signal);
     const structuredContent = await dependencies.datasets.runDataset(
       input,
       context,

@@ -49,5 +49,19 @@ latency, calls, and token use. Live factual values are not independently graded.
 ## Latest tool-use benchmark
 
 <!-- benchmark:start -->
-No agent benchmark has been published yet.
+
+`openrouter/anthropic/claude-haiku-4.5` · 10 runs/case · 2026-07-21
+
+| Case | Pass Bright/BrightData | Tokens Bright/BrightData | p50 latency Bright/BrightData | Calls Bright/BrightData |
+|---|---:|---:|---:|---:|
+| Acquire · Current search | 0% / 30% | 6812 / 9645 | 5.5s / 13.3s | 2.20 / 2.60 |
+| Acquire · Known pages | 100% / 100% | 7086 / 6380 | 5.5s / 6.8s | 2.30 / 3.60 |
+| Extract · npm record | 100% / 100% | 8788 / 7471 | 6.4s / 7.1s | 3.00 / 2.40 |
+| Extract · PyPI record | 100% / 90% | 8892 / 6937 | 6.5s / 92.9s | 3.00 / 2.70 |
+| Research · Local research | 80% / 60% | 9486 / 26597 | 9.2s / 11.0s | 4.00 / 5.90 |
+| Research · Current events | 0% / 20% | 7467 / 57325 | 7.1s / 9.1s | 5.70 / 6.60 |
+| Operate · Product snapshot | 0% / 20% | 6189 / 12874 | 4.6s / 4.9s | 2.00 / 1.80 |
+| Operate · Recurring delivery | 100% / 100% | 6292 / 1730 | 5.5s / 2.2s | 2.00 / 0.00 |
+
+A pass requires a valid workflow tool path, populated arguments, the requested output fields and provenance, and no runner error. Factual values are not independently graded.
 <!-- benchmark:end -->

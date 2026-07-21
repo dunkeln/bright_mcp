@@ -36,7 +36,10 @@ hosted authorization.
 ## Benchmarks
 
 <!-- benchmark:start -->
-> Benchmark publication requires a complete 10-run comparison across both live MCPs.
+![Grouped bar chart comparing MCP tool-use completion](./assets/benchmark.png)
+
+Bright MCP: 60% pass · 7626 tokens · 6.4s p50. BrightData MCP: 65% · 16120 tokens · 7.3s p50.
+[Method and tables](./evals/README.md#latest-tool-use-benchmark) · `openrouter/anthropic/claude-haiku-4.5` · 10 runs/case · 2026-07-21.
 <!-- benchmark:end -->
 
 | Dimension | BrightData MCP | Bright MCP |

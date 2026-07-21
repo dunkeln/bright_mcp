@@ -1,5 +1,9 @@
 import { Badge } from "@openai/apps-sdk-ui/components/Badge";
 import { Button } from "@openai/apps-sdk-ui/components/Button";
+import {
+  ArrowLeft,
+  ArrowRight,
+} from "@openai/apps-sdk-ui/components/Icon";
 import { Input } from "@openai/apps-sdk-ui/components/Input";
 import { useApp, useHostStyles } from "@modelcontextprotocol/ext-apps/react";
 import { StrictMode, useEffect, useMemo, useState } from "react";
@@ -285,26 +289,36 @@ function DatasetTable() {
           )}
           <Button
             color="secondary"
-            variant="outline"
-            size="sm"
+            variant="soft"
+            size="md"
+            iconSize="sm"
+            uniform
+            pill={false}
             disabled={pageIndex === 0}
+            aria-label="Previous page"
+            title="Previous page"
             onClick={() => {
               setPageIndex((current) => Math.max(0, current - 1));
               setFilter("");
               setSort(null);
             }}
           >
-            Previous
+            <ArrowLeft className="rtl:rotate-180" aria-hidden="true" />
           </Button>
           <Button
             color="secondary"
-            variant="outline"
-            size="sm"
+            variant="soft"
+            size="md"
+            iconSize="sm"
+            uniform
+            pill={false}
             loading={loadingPage}
             disabled={!page.page.nextResourceUri || !app}
+            aria-label="Next page"
+            title="Next page"
             onClick={loadNextPage}
           >
-            Next
+            <ArrowRight className="rtl:rotate-180" aria-hidden="true" />
           </Button>
         </div>
       </footer>

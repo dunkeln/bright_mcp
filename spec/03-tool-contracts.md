@@ -8,13 +8,12 @@ behavior accurately.
 
 Purpose: find current web resources for one or more related research angles.
 
-- Input: one to five ordered non-empty queries; optional engine, locale,
-  pagination cursor, explicit `fast | ranked | deep` depth, and intent.
+- Input: one to five ordered non-empty queries with optional engine, locale,
+  and pagination cursor.
 - Output: one ordered result group per query containing title, URL, summary,
   continuation cursor, or isolated error.
-- `fast` MUST use SERP. `ranked` and `deep` MUST use Discover and MUST fail
-  actionably when the caller lacks Discover access; routing MUST NOT silently
-  switch products with different cost or latency semantics.
+- Search MUST use SERP and MUST NOT expose a mode that switches to another
+  Bright Data product with different access, cost, latency, or failure semantics.
 - Engine-specific response envelopes MUST NOT escape the adapter.
 - Page content MUST be acquired explicitly through `scrape`; search results
   remain compact so one discovery call cannot exhaust the model context.
@@ -56,8 +55,10 @@ Purpose: obtain the executable contract for one dataset.
 
 Purpose: execute one described dataset capability.
 
-- Input: dataset ID, one operation returned by discovery or description, and
-  arguments validated against the same catalog contract.
+- Input: dataset ID, one operation returned by discovery or description, and a
+  strict argument union for URL collection, keyword collection, filtered record
+  search, or deep research. The selected dataset applies its narrower discovered
+  schema before execution.
 - Output: the canonical dataset result below.
 - Triggering and polling are internal; the agent sees one logical operation.
 - Execution SHOULD be task-backed when the client negotiates task support and

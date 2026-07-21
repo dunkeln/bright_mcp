@@ -1,11 +1,10 @@
 import type {
   DatasetDefinition,
-  DatasetOperation,
   DatasetResult,
   DatasetSummary,
-  JsonObject,
   RequestContext,
 } from "./contracts";
+import type { DatasetRunInput } from "./dataset-inputs";
 
 export type DatasetCatalog = {
   find(
@@ -21,11 +20,7 @@ export type DatasetCatalog = {
 
 export type DatasetRunner = {
   run(
-    input: {
-      datasetId: string;
-      operation: DatasetOperation;
-      arguments: JsonObject;
-    },
+    input: DatasetRunInput,
     context: RequestContext,
   ): Promise<DatasetResult>;
 };

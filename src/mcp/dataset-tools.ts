@@ -17,10 +17,12 @@ import {
   datasetOperationSchema,
   datasetResultSchema,
   jsonValueSchema,
-  type DatasetOperation,
-  type JsonObject,
   type RequestContext,
 } from "../core/contracts";
+import {
+  datasetRunArgumentsSchema,
+  datasetRunInputSchema,
+} from "../core/dataset-inputs";
 import type { DatasetAdapter } from "../core/datasets";
 import type { ResultStore } from "../core/results";
 import { jsonResourceReply, reply, requestContext, runTool } from "./support";
@@ -61,11 +63,11 @@ const definitionSchema = z.object({
 const runDatasetConfig = {
   title: "Run dataset",
   description:
-    "Execute a structured-data capability selected through find_datasets and, when necessary, describe_dataset. Preserve the returned dataset identifier and operation exactly; construct arguments only from the candidate example or described schema. Use this tool for structured collection, filtered record retrieval, or research that produces a table—not for general web search or page reading. Paid operations require the schema's explicit cost acknowledgement. A successful call returns a bounded result preview and a resource for additional rows or continuation; consume that result instead of repeating the same run.",
+    "Execute a structured-data capability selected through find_datasets and, when necessary, describe_dataset. Preserve the returned dataset identifier and operation exactly; choose the matching typed argument shape and use only fields from the candidate example or described schema. Use this tool for URL or keyword collection, filtered record retrieval, or research that produces a table—not for general web search or page reading. Paid operations require explicit cost acknowledgement. A successful call returns a bounded preview and a resource for additional rows; consume it instead of repeating the run.",
   inputSchema: {
     datasetId: z.string().trim().min(1).max(120),
     operation: datasetOperationSchema,
-    arguments: z.record(z.string(), jsonValueSchema),
+    arguments: datasetRunArgumentsSchema,
   },
   outputSchema: datasetResultSchema,
   annotations: {
@@ -82,12 +84,6 @@ const runDatasetConfig = {
     "openai/toolInvocation/invoked": "Dataset workbench ready",
   },
 } as const;
-
-type RunDatasetInput = {
-  datasetId: string;
-  operation: DatasetOperation;
-  arguments: JsonObject;
-};
 
 type DatasetToolDependencies = {
   datasets: DatasetAdapter;
@@ -127,7 +123,7 @@ export function registerDatasetTools(
         return reply(
           structuredContent,
           structuredContent.datasets.length
-            ? `Dataset candidates:\n${JSON.stringify(structuredContent)}\nNext: run candidates that include an operation and example; describe only candidates that omit them.`
+            ? `Found ${structuredContent.datasets.length} dataset candidate${structuredContent.datasets.length === 1 ? "" : "s"}. Run candidates that include an operation and example; describe only candidates that omit them.`
             : "No matching dataset capability was found. Try a broader task description.",
         );
       }),
@@ -154,7 +150,7 @@ export function registerDatasetTools(
           await dependencies.datasets.catalog.describe(datasetId, context);
         return reply(
           structuredContent,
-          `Dataset definition:\n${JSON.stringify(structuredContent)}\nNext: call run_dataset with this ID, one returned operation, and matching arguments.`,
+          `Loaded ${structuredContent.title} with ${structuredContent.operations.length} supported operation${structuredContent.operations.length === 1 ? "" : "s"}. Call run_dataset with this ID, one returned operation, and matching typed arguments.`,
         );
       }),
   );
@@ -166,7 +162,7 @@ export function registerDatasetTools(
       { ...runDatasetConfig, execution: { taskSupport: "optional" } },
       {
         async createTask(
-          input: RunDatasetInput,
+          input: unknown,
           extra: CreateTaskRequestHandlerExtra,
         ) {
           const task = await extra.taskStore.createTask({
@@ -216,13 +212,13 @@ export function registerDatasetTools(
           return { task };
         },
         async getTask(
-          _input: RunDatasetInput,
+          _input: unknown,
           extra: TaskRequestHandlerExtra,
         ) {
           return extra.taskStore.getTask(extra.taskId);
         },
         async getTaskResult(
-          _input: RunDatasetInput,
+          _input: unknown,
           extra: TaskRequestHandlerExtra,
         ) {
           return CallToolResultSchema.parse(
@@ -319,7 +315,7 @@ export function registerDatasetTools(
 }
 
 function executeRunDataset(
-  input: RunDatasetInput,
+  input: unknown,
   dependencies: Pick<DatasetToolDependencies, "datasets" | "principalId">,
   context: RequestContext,
   onError?: (
@@ -327,8 +323,18 @@ function executeRunDataset(
   ) => CapabilityError | undefined | Promise<CapabilityError | undefined>,
 ): Promise<CallToolResult> {
   return runTool(async () => {
+    const parsedInput = datasetRunInputSchema.safeParse(input);
+    if (!parsedInput.success) {
+      const issue = parsedInput.error.issues[0];
+      throw new CapabilityError(
+        "invalid_dataset_arguments",
+        `Invalid run_dataset input${issue?.path.length ? ` at ${issue.path.join(".")}` : ""}: ${issue?.message ?? "unsupported argument shape"}.`,
+        false,
+        "Use the operation and matching typed argument shape returned by dataset discovery or description.",
+      );
+    }
     const structuredContent = await dependencies.datasets.runner.run(
-      input,
+      parsedInput.data,
       context,
     );
     return {

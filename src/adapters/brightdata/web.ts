@@ -8,7 +8,7 @@ import type {
   SearchQuery,
   SingleSearchResponse,
 } from "../../core/web";
-import { BrightDataGateway, pollBrightData } from "./gateway";
+import { BrightDataGateway } from "./gateway";
 
 const SEARCH_PAGE_SIZE = 10;
 const MAX_SEARCH_OFFSET = 90;
@@ -25,17 +25,6 @@ const organicResultSchema = z.object({
 const searchEnvelopeSchema = z.object({
   organic: z.array(organicResultSchema).optional(),
   results: z.array(organicResultSchema).optional(),
-});
-const discoverTriggerSchema = z.object({ task_id: z.string().min(1) });
-const discoverPollSchema = z.object({
-  status: z.enum(["processing", "done", "error", "failed"]),
-  results: z.array(z.object({
-    title: z.string(),
-    link: z.url(),
-    description: z.string().optional(),
-  })).optional(),
-  error: z.string().optional(),
-  message: z.string().optional(),
 });
 const activeZonesSchema = z.array(z.object({
   name: z.string().min(1).optional(),
@@ -64,15 +53,23 @@ export function createBrightDataWebAdapter(
   return {
     search: {
       async search(input, context) {
-        const serpZone = input.depth === "fast"
-          ? await resolveZone(gateway, activeZones, zones.serp, "serp", context)
-          : undefined;
+        const serpZone = await resolveZone(
+          gateway,
+          activeZones,
+          zones.serp,
+          "serp",
+          context,
+        );
         return {
           searches: await Promise.all(input.queries.map(async (query) => {
             try {
-              const result = input.depth === "fast"
-                ? await searchSerp(gateway, activeZones, serpZone, query, context)
-                : await searchDiscover(gateway, query, input, context);
+              const result = await searchSerp(
+                gateway,
+                activeZones,
+                serpZone,
+                query,
+                context,
+              );
               return { query: query.query, ...result };
             } catch (error) {
               const failure = error instanceof CapabilityError
@@ -181,76 +178,6 @@ async function searchSerp(
     nextCursor: results.length === SEARCH_PAGE_SIZE && offset < MAX_SEARCH_OFFSET
       ? `search_${offset + SEARCH_PAGE_SIZE}`
       : undefined,
-  };
-}
-
-async function searchDiscover(
-  gateway: BrightDataGateway,
-  query: SearchQuery,
-  options: { depth: "fast" | "ranked" | "deep"; intent?: string },
-  context: RequestContext,
-) {
-  if (query.cursor) {
-    throw new CapabilityError(
-      "invalid_search_cursor",
-      "Discover research does not accept SERP cursors.",
-      false,
-      "Remove the cursor or use fast search depth.",
-    );
-  }
-  const trigger = discoverTriggerSchema.safeParse((await gateway.requestJson({
-    method: "POST",
-    path: "/discover",
-    body: {
-      query: query.query,
-      intent: options.intent ?? query.query,
-      mode: options.depth === "deep" ? "deep" : "standard",
-      format: "json",
-      language: query.locale.split("-")[0]?.toLowerCase(),
-      country: query.locale.split("-")[1]?.toUpperCase() ?? "US",
-      num_results: SEARCH_PAGE_SIZE,
-      remove_duplicates: true,
-    },
-    timeoutMs: 20_000,
-  }, context)).data);
-  if (!trigger.success) throw malformedSearch();
-
-  const completed = await pollBrightData({
-    context,
-    deadlineMs: 55_000,
-    intervalMs: 2_000,
-    async load() {
-      const poll = discoverPollSchema.safeParse((await gateway.requestJson({
-        method: "GET",
-        path: "/discover",
-        query: { task_id: trigger.data.task_id },
-        timeoutMs: 20_000,
-      }, context)).data);
-      if (!poll.success) throw malformedSearch();
-      return poll.data;
-    },
-    state: (value) => value.status === "done"
-      ? "ready"
-      : value.status === "error" || value.status === "failed" ? "failed" : "pending",
-    failed: () => new CapabilityError(
-      "upstream_job_failed",
-      "Bright Data Discover could not complete the research request.",
-      false,
-      "Refine the query or retry with fast depth.",
-    ),
-    timeout: new CapabilityError(
-      "upstream_timeout",
-      "Bright Data Discover did not finish within the synchronous deadline.",
-      true,
-      "Retry with ranked depth or fewer queries.",
-    ),
-  });
-  return {
-    results: (completed.results ?? []).map((item) => ({
-      title: item.title,
-      url: item.link,
-      summary: item.description ?? "",
-    })),
   };
 }
 

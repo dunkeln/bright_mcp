@@ -22,7 +22,7 @@ capability, not endpoint inventory.
 | Reference capability | V1 disposition |
 |---|---|
 | Search, batch search, engines, pagination | `search_web` |
-| Intent-ranked research with selected page content | `search_web: ranked | deep` composed with `scrape` |
+| Multi-source public-web research | batched `search_web` composed with selected `scrape` calls |
 | Markdown scrape and batch scrape | `scrape` |
 | Raw HTML scrape | excluded; the base tool returns one agent-readable format |
 | Ad hoc field extraction | `scrape` composed with the calling agent |

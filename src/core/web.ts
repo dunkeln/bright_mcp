@@ -9,8 +9,6 @@ export type SearchQuery = {
 
 export type SearchRequest = {
   queries: SearchQuery[];
-  depth: "fast" | "ranked" | "deep";
-  intent?: string;
 };
 
 export type SearchResponse = {

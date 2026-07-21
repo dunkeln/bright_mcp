@@ -34,13 +34,13 @@
       "userConsequence": "The base scrape tool returns readable Markdown rather than exact page markup."
     },
     {
-      "id": "ranked-web-research",
-      "referenceCapability": "Intent-ranked discovery with optional page content",
+      "id": "multi-source-web-research",
+      "referenceCapability": "Multi-source public-web research",
       "disposition": "composed",
-      "routes": ["tool:search_web#ranked", "tool:search_web#deep", "tool:scrape"],
+      "routes": ["tool:search_web", "tool:scrape"],
       "verification": {
-        "gate": "bun run check:adapters",
-        "scenario": "Trigger and poll Discover through an explicit research depth, retain compact ranked URLs, then scrape only selected pages."
+        "gate": "bun run check:adapters && bun run check:compat",
+        "scenario": "Batch related compact searches, retain ordered results, then scrape only selected pages."
       }
     },
     {

@@ -6,17 +6,11 @@ import {
   type DatasetSummary,
 } from "../core/contracts";
 import type { DatasetCatalog, DatasetRunner } from "../core/datasets";
+import {
+  deepLookupInputSchema,
+  urlCollectionInputSchema,
+} from "../core/dataset-inputs";
 import type { ResultStore } from "../core/results";
-
-const searchInputSchema = z.object({
-  query: z.string().trim().min(1).max(120),
-  category: z.enum(["audio", "computing", "photo"]).optional(),
-  limit: z.number().int().min(1).max(20).default(12),
-}).strict();
-
-const collectInputSchema = z.object({
-  productIds: z.array(z.string().trim().min(1).max(80)).min(1).max(20),
-}).strict();
 
 const definition: DatasetDefinition = {
   id: "ecommerce-products",
@@ -26,15 +20,18 @@ const definition: DatasetDefinition = {
   operations: [
     {
       kind: "collect",
-      inputSchema: z.toJSONSchema(collectInputSchema, { target: "draft-7" }),
+      inputSchema: z.toJSONSchema(urlCollectionInputSchema, { target: "draft-7" }),
       limits: ["Collects at most 20 known product records in the requested order."],
-      examples: [{ productIds: ["product-1", "product-5"] }],
+      examples: [{
+        urls: ["https://example.com/product-1", "https://example.com/product-5"],
+        acknowledgeCost: true,
+      }],
     },
     {
       kind: "search",
-      inputSchema: z.toJSONSchema(searchInputSchema, { target: "draft-7" }),
+      inputSchema: z.toJSONSchema(deepLookupInputSchema, { target: "draft-7" }),
       limits: ["Returns at most 20 rows in this demo dataset."],
-      examples: [{ query: "wireless", category: "audio", limit: 8 }],
+      examples: [{ query: "wireless audio", limit: 8, preview: true }],
     },
   ],
 };
@@ -70,7 +67,9 @@ export function createDemoDatasetAdapter(resultStore: ResultStore): {
     id: definition.id,
     title: definition.title,
     summary: definition.description,
-    requiredInputs: ["productIds", "query"],
+    requiredInputs: ["query"],
+    operation: "search",
+    example: { query: "wireless audio", limit: 8, preview: true },
   };
 
   return {
@@ -95,8 +94,8 @@ export function createDemoDatasetAdapter(resultStore: ResultStore): {
           throw unknownDataset(input.datasetId);
         }
         const matches = input.operation === "search"
-          ? searchRows(parseInput(searchInputSchema, input.arguments))
-          : collectRows(parseInput(collectInputSchema, input.arguments));
+          ? searchRows(parseInput(deepLookupInputSchema, input.arguments))
+          : collectRows(parseInput(urlCollectionInputSchema, input.arguments));
 
         const base: DatasetResultBase = {
           schemaVersion: 1,
@@ -118,20 +117,20 @@ export function createDemoDatasetAdapter(resultStore: ResultStore): {
   };
 }
 
-function searchRows(input: z.infer<typeof searchInputSchema>) {
+function searchRows(input: z.infer<typeof deepLookupInputSchema>) {
   const query = input.query.toLowerCase();
   return rows
     .filter(
       (row) =>
-        (!input.category || row.category === input.category) &&
         `${row.title} ${row.category}`.toLowerCase().includes(query),
     )
     .slice(0, input.limit);
 }
 
-function collectRows(input: z.infer<typeof collectInputSchema>) {
+function collectRows(input: z.infer<typeof urlCollectionInputSchema>) {
   const byId = new Map(rows.map((row) => [row.productId, row]));
-  return input.productIds.flatMap((productId) => {
+  return input.urls.flatMap((url) => {
+    const productId = new URL(url).pathname.split("/").filter(Boolean).at(-1) ?? "";
     const row = byId.get(productId);
     return row ? [row] : [];
   });

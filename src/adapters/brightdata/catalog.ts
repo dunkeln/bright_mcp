@@ -7,6 +7,12 @@ import {
   type JsonObject,
   type RequestContext,
 } from "../../core/contracts";
+import {
+  deepLookupInputSchema,
+  keywordCollectionInputSchema,
+  marketplaceInputSchema,
+  urlCollectionInputSchema,
+} from "../../core/dataset-inputs";
 import type { DatasetCatalog } from "../../core/datasets";
 import { BrightDataGateway } from "./gateway";
 
@@ -20,53 +26,6 @@ export const SYNC_SEARCH_DATASETS = new Set([
   "gd_me5ppxjr2ge6icjuh0",
   "gd_l1vikfnt1wgvvqz95w",
 ]);
-
-const filterSchema: z.ZodType<JsonObject> = z.lazy(() =>
-  z.union([
-    z.object({
-      name: z.string().trim().min(1).max(160),
-      operator: z.enum([
-        "=", "!=", "<", "<=", ">", ">=", "in", "not_in", "includes",
-        "not_includes", "array_includes", "not_array_includes", "is_null",
-        "is_not_null",
-      ]),
-      value: z.union([
-        z.string(), z.number(), z.boolean(),
-        z.array(z.union([z.string(), z.number(), z.boolean()])).max(10_000),
-      ]).optional(),
-    }).strict(),
-    z.object({
-      operator: z.enum(["and", "or"]),
-      filters: z.array(filterSchema).min(1).max(20),
-    }).strict(),
-  ]),
-);
-
-export const marketplaceInputSchema = z.object({
-  filter: filterSchema,
-  limit: z.number().int().min(1).max(10_000).default(100),
-  sort: z.union([
-    z.enum(["default", "random"]),
-    z.array(z.record(z.string().min(1), z.enum(["asc", "desc"]))).min(1).max(5),
-  ]).optional(),
-  cursor: z.array(z.union([z.string(), z.number(), z.boolean()])).max(20).optional(),
-  acknowledgeCost: z.literal(true),
-}).strict();
-
-export const deepLookupInputSchema = z.object({
-  query: z.string().trim().min(1).max(2_000),
-  limit: z.number().int().min(1).max(100).default(10),
-  preview: z.boolean().default(true),
-  acknowledgeCost: z.literal(true).optional(),
-  maxCostUsd: z.number().positive().max(10_000).optional(),
-}).strict().superRefine((input, context) => {
-  if (!input.preview && (input.acknowledgeCost !== true || input.maxCostUsd === undefined)) {
-    context.addIssue({
-      code: "custom",
-      message: "Full research requires acknowledgeCost=true and maxCostUsd.",
-    });
-  }
-});
 
 const datasetListSchema = z.array(z.object({
   id: z.string().min(1),
@@ -106,16 +65,6 @@ export function collectorFor(upstreamId: string) {
   const kind = collectorInputKinds.get(upstreamId);
   return kind ? { upstreamId, kind } : undefined;
 }
-
-const urlCollectorInput = z.object({
-  urls: z.array(z.url()).min(1).max(20),
-  acknowledgeCost: z.literal(true),
-}).strict();
-const keywordCollectorInput = z.object({
-  query: z.string().trim().min(1).max(160),
-  pages: z.number().int().min(1).max(5).default(1),
-  acknowledgeCost: z.literal(true),
-}).strict();
 
 export function createBrightDataCatalog(gateway: BrightDataGateway): DatasetCatalog {
   const lists = new LRUCache<string, z.infer<typeof datasetListSchema>>({
@@ -187,7 +136,9 @@ export function createBrightDataCatalog(gateway: BrightDataGateway): DatasetCata
 }
 
 function collectorOperation(collector: NonNullable<ReturnType<typeof collectorFor>>) {
-  const schema = collector.kind === "urls" ? urlCollectorInput : keywordCollectorInput;
+  const schema = collector.kind === "urls"
+    ? urlCollectionInputSchema
+    : keywordCollectionInputSchema;
   return {
     kind: "collect" as const,
     inputSchema: z.toJSONSchema(schema, { target: "draft-7" }) as JsonObject,

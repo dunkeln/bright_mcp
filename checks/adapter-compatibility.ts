@@ -16,7 +16,7 @@ const context: RequestContext = {
 const records: Array<Record<string, unknown>> = [];
 
 await checkSearchShapes();
-await checkBatchAndDiscover();
+await checkBatchSearch();
 await checkSearchReusesUnlocker();
 await checkDatasetPolling();
 await checkMarketplaceAndDeepLookup();
@@ -83,7 +83,6 @@ async function checkSearchReusesUnlocker() {
   await adapter.search.search(
     {
       queries: [{ query: "Bright Data", engine: "google", locale: "en-US" }],
-      depth: "fast",
     },
     context,
   );
@@ -95,7 +94,7 @@ async function checkSearchReusesUnlocker() {
   );
 }
 
-async function checkBatchAndDiscover() {
+async function checkBatchSearch() {
   const adapter = createBrightDataWebAdapter(
     gateway(async (input, init) => {
       const url = new URL(String(input));
@@ -104,16 +103,7 @@ async function checkBatchAndDiscover() {
         const query = new URL(body.url).searchParams.get("q") ?? "";
         return json({ organic: [{ title: query, link: `https://example.com/${query}` }] });
       }
-      if (init?.method === "POST") return json({ task_id: "discover-task" });
-      return json({
-        status: "done",
-        results: [{
-          title: "Ranked result",
-          link: "https://example.com/ranked",
-          description: "Ranked summary",
-          content: "# Full content",
-        }],
-      });
+      return new Response(null, { status: 404 });
     }),
     { serp: "fixture-serp", unlocker: "fixture-unlocker" },
   );
@@ -122,19 +112,10 @@ async function checkBatchAndDiscover() {
       { query: "one", engine: "google", locale: "en-US" },
       { query: "two", engine: "google", locale: "en-US" },
     ],
-    depth: "fast",
   }, context);
   assert(
     batch.searches.map(({ query }) => query).join(",") === "one,two",
     "Batch search did not preserve query order.",
-  );
-  const ranked = await adapter.search.search({
-    queries: [{ query: "research", engine: "google", locale: "en-US" }],
-    depth: "ranked",
-  }, context);
-  assert(
-    !("content" in (ranked.searches[0]?.results[0] ?? {})),
-    "Search exposed full page content instead of a compact result.",
   );
 }
 
@@ -155,7 +136,6 @@ async function searchWith(
   return adapter.search.search(
     {
       queries: [{ query: "Bright Data", engine: "google", locale: "en-US" }],
-      depth: "fast",
     },
     context,
   );

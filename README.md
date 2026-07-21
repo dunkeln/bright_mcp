@@ -5,7 +5,7 @@
 </div>
 
 Agent-oriented Bright Data capabilities over MCP, built on Bun. The five-tool
-base profile batches web research, routes explicit ranked/deep discovery,
+base profile batches compact web search and Markdown reading,
 searches the caller's live dataset catalog, runs curated collectors and Deep
 Lookup, pages upstream snapshots as resources, and renders results in a
 transient React MCP workbench.
@@ -53,7 +53,7 @@ Bright MCP: 60% pass · 7626 tokens · 6.4s p50. BrightData MCP: 65% · 16120 to
 | Browser tools | 14 | 4 |
 | Dataset tools | One per dataset | 3 composable tools |
 | Dataset catalog | Tool inventory grows with products | Caller-scoped catalog behind discovery |
-| Research | Search then agent-managed scraping | Batched SERP or explicit content-inclusive Discover |
+| Research | Search then agent-managed scraping | Batched compact search and ordered Markdown reading |
 | Large results | Returned through tool calls | Lazy, principal-bound snapshot resources |
 | Runtime/toolchain | Node + npm + Vite | Bun-native |
 | Production dependencies | 7 plus UI dependencies | Roughly 6–8, profile-dependent |

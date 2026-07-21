@@ -51,7 +51,7 @@ MUST NOT become core domain models.
   URLs, timeouts, retries, polling, request shapes, response parsing, and error
   mapping.
 - Combines the caller-scoped Marketplace catalog, a small executable collector
-  manifest, Discover, Deep Lookup, synchronous record search, and asynchronous
+  manifest, Deep Lookup, synchronous record search, and asynchronous
   snapshots behind the stable core ports.
 - Implements the ports required by core use cases.
 - Browser support is a separate adapter implementing `BrowserProvider`; it uses

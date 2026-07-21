@@ -43,6 +43,21 @@ async function checkStdio() {
       "The base profile must expose exactly its five routed tools.",
     );
     assertToolAnnotations(tools.tools);
+    const searchProperties = tools.tools.find(({ name }) => name === "search_web")
+      ?.inputSchema.properties as Record<string, unknown> | undefined;
+    const runArguments = (
+      tools.tools.find(({ name }) => name === "run_dataset")
+        ?.inputSchema.properties?.arguments as { anyOf?: unknown[] } | undefined
+    );
+    assert(
+      searchProperties &&
+        Object.keys(searchProperties).join(",") === "queries",
+      "search_web exposed an execution-product mode instead of one search contract.",
+    );
+    assert(
+      runArguments?.anyOf?.length === 4,
+      "run_dataset did not advertise its four supported workflow argument shapes.",
+    );
     const runDatasetMeta = tools.tools.find((tool) => tool.name === "run_dataset")
       ?._meta as
       | {
@@ -160,7 +175,13 @@ async function checkStdio() {
       arguments: {
         datasetId: "ecommerce-products",
         operation: "collect",
-        arguments: { productIds: ["product-5", "product-1"] },
+        arguments: {
+          urls: [
+            "https://example.com/product-5",
+            "https://example.com/product-1",
+          ],
+          acknowledgeCost: true,
+        },
       },
     });
     const collection = collected.structuredContent as {

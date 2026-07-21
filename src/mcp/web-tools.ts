@@ -38,6 +38,15 @@ const scrapeInputSchema = z.object({
     .max(5),
 }).strict();
 
+const searchInputSchema = z.object({
+  queries: z.array(z.object({
+    query: z.string().trim().min(1).max(500),
+    engine: z.enum(["google", "bing", "duckduckgo"]).default("google"),
+    locale: z.string().regex(/^[a-zA-Z]{2,3}(?:-[a-zA-Z]{2})?$/).default("en-US"),
+    cursor: z.string().max(80).optional(),
+  }).strict()).min(1).max(5),
+}).strict();
+
 export function registerWebTools(
   server: McpServer,
   web: WebAdapter,
@@ -48,17 +57,8 @@ export function registerWebTools(
     {
       title: "Search web",
       description:
-        "Discover current public-web sources when the relevant pages are not yet known. Submit one to five distinct queries together when they investigate the same objective. Use fast to locate current sources, ranked to prioritize relevant evidence, and deep for broader source discovery. Results contain compact titles, URLs, and summaries; call scrape only for the selected pages whose full text is needed. Use returned cursors only to continue an incomplete result set. Do not use this tool for already-known URLs, structured dataset records, or unchanged queries that already returned useful results.",
-      inputSchema: {
-        queries: z.array(z.object({
-          query: z.string().trim().min(1).max(500),
-          engine: z.enum(["google", "bing", "duckduckgo"]).default("google"),
-          locale: z.string().regex(/^[a-zA-Z]{2,3}(?:-[a-zA-Z]{2})?$/).default("en-US"),
-          cursor: z.string().max(80).optional(),
-        })).min(1).max(5),
-        depth: z.enum(["fast", "ranked", "deep"]).default("fast"),
-        intent: z.string().trim().min(1).max(3_000).optional(),
-      },
+        "Find current public-web sources when the relevant pages are not yet known. Submit one to five related queries together. Results contain compact titles, URLs, and summaries; scrape only selected pages whose full text is needed. Use a returned cursor only to continue that query. Do not repeat unchanged queries that already returned useful results, and do not use this tool for known URLs or structured dataset records.",
+      inputSchema: searchInputSchema,
       outputSchema: {
         searches: z.array(z.object({
           query: z.string(),
@@ -112,9 +112,10 @@ export function registerWebTools(
           results: await web.scrape.scrape(input, context),
         };
         const failures = structuredContent.results.filter((item) => item.error).length;
+        const truncated = structuredContent.results.filter((item) => item.truncated).length;
         return reply(
           structuredContent,
-          `Scraped ${structuredContent.results.length - failures} of ${structuredContent.results.length} URLs.`,
+          `Scraped ${structuredContent.results.length - failures} of ${structuredContent.results.length} URLs.${truncated ? ` ${truncated} result${truncated === 1 ? " was" : "s were"} truncated at 100 KB; use a more specific page URL if omitted content is required.` : ""}`,
         );
       });
     },

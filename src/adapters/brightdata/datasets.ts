@@ -8,13 +8,17 @@ import {
   type RequestContext,
 } from "../../core/contracts";
 import type { DatasetRunner } from "../../core/datasets";
+import {
+  deepLookupInputSchema,
+  keywordCollectionInputSchema,
+  marketplaceInputSchema,
+  urlCollectionInputSchema,
+} from "../../core/dataset-inputs";
 import type { ResultSource, ResultStore } from "../../core/results";
 import {
   SYNC_SEARCH_DATASETS,
   collectorFor,
   createBrightDataCatalog,
-  deepLookupInputSchema,
-  marketplaceInputSchema,
   unknownDataset,
 } from "./catalog";
 import { BrightDataGateway, pollBrightData } from "./gateway";
@@ -99,15 +103,8 @@ async function runCollector(
 ) {
   if (input.operation !== "collect") throw unsupported(input.datasetId, input.operation, "collect");
   const parsed = collector.kind === "urls"
-    ? z.object({
-        urls: z.array(z.url()).min(1).max(20),
-        acknowledgeCost: z.literal(true),
-      }).strict().safeParse(input.arguments)
-    : z.object({
-        query: z.string().trim().min(1).max(160),
-        pages: z.number().int().min(1).max(5).default(1),
-        acknowledgeCost: z.literal(true),
-      }).strict().safeParse(input.arguments);
+    ? urlCollectionInputSchema.safeParse(input.arguments)
+    : keywordCollectionInputSchema.safeParse(input.arguments);
   if (!parsed.success) throw invalidArguments(parsed.error);
   const records = collector.kind === "urls"
     ? (parsed.data as { urls: string[] }).urls.map((url) => ({ url }))

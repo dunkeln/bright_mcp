@@ -6,6 +6,7 @@ import {
   CallToolResultSchema,
   CreateMessageRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { datasetResultSchema } from "../src/core/contracts";
 
 const bun = process.execPath;
 const projectRoot = new URL("../", import.meta.url).pathname;
@@ -37,6 +38,15 @@ async function checkStdio() {
         "search_web,scrape,find_datasets,describe_dataset,run_dataset",
       "The base profile must expose exactly its five routed tools.",
     );
+    await assertToolRejected(client, "search_web", { query: "" });
+    await assertToolRejected(client, "scrape", { urls: ["file:///tmp/nope"] });
+    await assertToolRejected(client, "find_datasets", { query: "", limit: 0 });
+    await assertToolRejected(client, "describe_dataset", { datasetId: "" });
+    await assertToolRejected(client, "run_dataset", {
+      datasetId: "ecommerce-products",
+      operation: "search",
+      arguments: { query: "e", unknown: true },
+    });
 
     const searched = await client.callTool({
       name: "search_web",
@@ -113,6 +123,24 @@ async function checkStdio() {
     };
     assert(result.artifact?.uri, "run_dataset omitted its artifact URI.");
     assert(result.page?.nextResourceUri, "run_dataset omitted its next page URI.");
+    assert(
+      datasetResultSchema.safeParse(run.structuredContent).success,
+      "run_dataset returned an invalid canonical result.",
+    );
+    const canonical = run.structuredContent as Record<string, unknown>;
+    assert(
+      !datasetResultSchema.safeParse({ ...canonical, rowRefs: [] }).success,
+      "The canonical result accepted misaligned row references.",
+    );
+    const columns = canonical.columns as unknown[];
+    assert(
+      columns[0] !== undefined &&
+        !datasetResultSchema.safeParse({
+          ...canonical,
+          columns: [columns[0], columns[0]],
+        }).success,
+      "The canonical result accepted duplicate column keys.",
+    );
 
     const artifact = await client.readResource({ uri: result.artifact.uri });
     assert(artifact.contents.length === 1, "The result artifact was not readable.");
@@ -218,6 +246,18 @@ async function checkBrowserProfile() {
         "search_web,scrape,find_datasets,describe_dataset,run_dataset,browser_navigate,browser_observe,browser_interact,browser_close",
       "The browser profile must expose exactly nine tools.",
     );
+    await assertToolRejected(client, "browser_navigate", {
+      destination: { kind: "url", url: "http://127.0.0.1/private" },
+    });
+    await assertToolRejected(client, "browser_observe", {
+      sessionId: "",
+      kind: "text",
+    });
+    await assertToolRejected(client, "browser_interact", {
+      sessionId: "missing",
+      action: { kind: "script", source: "alert(1)" },
+    });
+    await assertToolRejected(client, "browser_close", { sessionId: "" });
 
     const navigation = await client.callTool({
       name: "browser_navigate",
@@ -418,4 +458,18 @@ function environment(overrides: Record<string, string>): Record<string, string> 
 
 function assert(value: unknown, message: string): asserts value {
   if (!value) throw new Error(message);
+}
+
+async function assertToolRejected(
+  client: Client,
+  name: string,
+  args: Record<string, unknown>,
+) {
+  try {
+    const result = await client.callTool({ name, arguments: args });
+    if (result.isError) return;
+  } catch {
+    return;
+  }
+  throw new Error(`${name} accepted invalid input.`);
 }

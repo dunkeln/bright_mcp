@@ -12,11 +12,11 @@ const searchInputSchema = z.object({
   query: z.string().trim().min(1).max(120),
   category: z.enum(["audio", "computing", "photo"]).optional(),
   limit: z.number().int().min(1).max(20).default(12),
-});
+}).strict();
 
 const collectInputSchema = z.object({
   productIds: z.array(z.string().trim().min(1).max(80)).min(1).max(20),
-});
+}).strict();
 
 const definition: DatasetDefinition = {
   id: "ecommerce-products",
@@ -26,34 +26,13 @@ const definition: DatasetDefinition = {
   operations: [
     {
       kind: "collect",
-      inputSchema: {
-        type: "object",
-        additionalProperties: false,
-        required: ["productIds"],
-        properties: {
-          productIds: {
-            type: "array",
-            minItems: 1,
-            maxItems: 20,
-            items: { type: "string", minLength: 1, maxLength: 80 },
-          },
-        },
-      },
+      inputSchema: z.toJSONSchema(collectInputSchema, { target: "draft-7" }),
       limits: ["Collects at most 20 known product records in the requested order."],
       examples: [{ productIds: ["product-1", "product-5"] }],
     },
     {
       kind: "search",
-      inputSchema: {
-        type: "object",
-        additionalProperties: false,
-        required: ["query"],
-        properties: {
-          query: { type: "string", minLength: 1, maxLength: 120 },
-          category: { type: "string", enum: ["audio", "computing", "photo"] },
-          limit: { type: "integer", minimum: 1, maximum: 20, default: 12 },
-        },
-      },
+      inputSchema: z.toJSONSchema(searchInputSchema, { target: "draft-7" }),
       limits: ["Returns at most 20 rows in this demo dataset."],
       examples: [{ query: "wireless", category: "audio", limit: 8 }],
     },
@@ -91,7 +70,7 @@ export function createDemoDatasetAdapter(resultStore: ResultStore): {
     id: definition.id,
     title: definition.title,
     summary: definition.description,
-    requiredInputs: ["query"],
+    requiredInputs: ["productIds", "query"],
   };
 
   return {

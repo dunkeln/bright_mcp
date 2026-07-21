@@ -18,7 +18,7 @@ const POLL_DEADLINE_MS = 55_000;
 const inputSchema = z.object({
   query: z.string().trim().min(1).max(160),
   pages: z.number().int().min(1).max(3).default(1),
-});
+}).strict();
 
 const upstreamRowsSchema = z.array(z.record(z.string(), jsonValueSchema));
 const snapshotSchema = z.object({ snapshot_id: z.string().min(1) });
@@ -36,15 +36,7 @@ const definition: DatasetDefinition = {
   operations: [
     {
       kind: "search",
-      inputSchema: {
-        type: "object",
-        additionalProperties: false,
-        required: ["query"],
-        properties: {
-          query: { type: "string", minLength: 1, maxLength: 160 },
-          pages: { type: "integer", minimum: 1, maximum: 3, default: 1 },
-        },
-      },
+      inputSchema: z.toJSONSchema(inputSchema, { target: "draft-7" }),
       limits: [
         "Searches Amazon.com.",
         "Accepts one to three search-result pages.",

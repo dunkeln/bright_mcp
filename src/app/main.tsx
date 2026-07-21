@@ -321,9 +321,6 @@ function parseResult(
       message: `Unsupported or invalid dataset result schema (${version}).`,
     };
   }
-  if (parsed.data.rows.length !== parsed.data.rowRefs.length) {
-    return { ok: false, message: "Dataset rows and row references do not align." };
-  }
   return { ok: true, value: parsed.data };
 }
 

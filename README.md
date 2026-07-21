@@ -9,6 +9,20 @@ base profile includes canonical web search, ordered batch scraping, dataset
 discovery and execution, result resources, optional MCP tasks, and a React table
 MCP App.
 
+## Install
+
+Codex:
+
+```bash
+codex mcp add bright --url https://bright-mcp.onrender.com/mcp
+```
+
+Claude Code:
+
+```bash
+claude mcp add --transport http bright https://bright-mcp.onrender.com/mcp
+```
+
 See [SETUP.md](./SETUP.md) for local development, credentials, live checks, and
 hosted authorization.
 

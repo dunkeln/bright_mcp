@@ -9,18 +9,20 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import {
-  CapabilityError,
   datasetOperationSchema,
   datasetResultSchema,
   jsonValueSchema,
   type DatasetOperation,
   type JsonObject,
-  type RequestContext,
 } from "../core/contracts";
+import { isPublicHttpUrl } from "../core/public-url";
 import type { DatasetUseCases } from "../core/datasets";
 import type { ResultStore } from "../core/results";
 import type { FieldProjection, WebUseCases } from "../core/web";
 import type { CancellableTaskStore } from "./task-store";
+import type { BrowserUseCases } from "../browser/use-cases";
+import { registerBrowserTools } from "./browser-tools";
+import { jsonResourceReply, reply, requestContext, runTool } from "./support";
 
 export const DATASET_TABLE_URI = "ui://bright-mcp/dataset-table";
 
@@ -127,6 +129,7 @@ const scrapeItemSchema = z.object({
 export function createBrightMcpServer(dependencies: {
   datasets: DatasetUseCases;
   web: WebUseCases;
+  browser?: BrowserUseCases;
   results: ResultStore;
   tasks: CancellableTaskStore;
   widgetHtml: string;
@@ -343,7 +346,7 @@ export function createBrightMcpServer(dependencies: {
     new ResourceTemplate("brightdata://datasets/{datasetId}", { list: undefined }),
     { mimeType: "application/json", description: "Dataset capability definition" },
     async (uri, { datasetId }) =>
-      resourceReply(
+      jsonResourceReply(
         uri,
         await dependencies.datasets.describeDataset(String(datasetId)),
       ),
@@ -354,7 +357,7 @@ export function createBrightMcpServer(dependencies: {
     new ResourceTemplate("brightdata://results/{resultId}", { list: undefined }),
     { mimeType: "application/json", description: "Completed dataset result" },
     async (uri, { resultId }) =>
-      resourceReply(
+      jsonResourceReply(
         uri,
         dependencies.results.readResult(
           String(resultId),
@@ -368,7 +371,7 @@ export function createBrightMcpServer(dependencies: {
     new ResourceTemplate("brightdata://pages/{pageToken}", { list: undefined }),
     { mimeType: "application/json", description: "Dataset result continuation page" },
     async (uri, { pageToken }) =>
-      resourceReply(
+      jsonResourceReply(
         uri,
         dependencies.results.readPage(
           String(pageToken),
@@ -411,6 +414,10 @@ export function createBrightMcpServer(dependencies: {
       ],
     }),
   );
+
+  if (dependencies.browser) {
+    registerBrowserTools(server, dependencies.browser, dependencies.principalId);
+  }
 
   return server;
 }
@@ -455,93 +462,4 @@ function executeRunDataset(
 function taskTtl(requested: number | null | undefined) {
   if (requested === null || requested === undefined) return 15 * 60_000;
   return Math.min(Math.max(requested, 60_000), 15 * 60_000);
-}
-
-function isPublicHttpUrl(value: string) {
-  const url = new URL(value);
-  if (!(["http:", "https:"] as string[]).includes(url.protocol)) return false;
-  if (url.username || url.password) return false;
-  const hostname = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
-  if (hostname === "localhost" || hostname.endsWith(".localhost")) return false;
-  if (
-    hostname === "::" ||
-    hostname === "::1" ||
-    hostname.startsWith("::ffff:") ||
-    /^fe[89ab][0-9a-f]:/i.test(hostname) ||
-    /^[fd][0-9a-f]:/i.test(hostname) ||
-    hostname.startsWith("ff")
-  ) {
-    return false;
-  }
-  const octets = hostname.split(".").map(Number);
-  if (octets.length !== 4 || octets.some((part) => !Number.isInteger(part))) {
-    return true;
-  }
-  const [a, b] = octets as [number, number, number, number];
-  return !(
-    a === 0 ||
-    a === 10 ||
-    a === 127 ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    a >= 224
-  );
-}
-
-function requestContext(
-  principalId: string,
-  signal?: AbortSignal,
-): RequestContext {
-  return { principalId, requestId: crypto.randomUUID(), signal };
-}
-
-function reply<T extends Record<string, unknown>>(structuredContent: T, text: string) {
-  return {
-    structuredContent,
-    content: [{ type: "text" as const, text }],
-  };
-}
-
-async function runTool<T>(operation: () => Promise<T>) {
-  try {
-    return await operation();
-  } catch (error) {
-    const failure =
-      error instanceof CapabilityError
-        ? error
-        : new CapabilityError(
-            "internal_error",
-            "The capability failed unexpectedly.",
-            true,
-            "Retry once. If it fails again, inspect the server logs with the request ID.",
-          );
-    return {
-      isError: true as const,
-      content: [
-        {
-          type: "text" as const,
-          text: JSON.stringify({
-            code: failure.code,
-            message: failure.message,
-            retryable: failure.retryable,
-            nextAction: failure.nextAction,
-          }),
-        },
-      ],
-    };
-  }
-}
-
-function resourceReply(uri: URL, value: unknown) {
-  return {
-    contents: [
-      {
-        uri: uri.href,
-        mimeType: "application/json",
-        text: JSON.stringify(value),
-      },
-    ],
-  };
 }

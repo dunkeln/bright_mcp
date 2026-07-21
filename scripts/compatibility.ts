@@ -9,6 +9,10 @@ const projectRoot = new URL("../", import.meta.url).pathname;
 
 await checkStdio();
 await checkTaskExecution();
+await checkBrowserProfile();
+if (process.env.BRIGHTDATA_BROWSER_CHECK === "1") {
+  await checkRealBrowser();
+}
 await checkHttp();
 console.log("MCP tool, resource, stdio, and Bun HTTP compatibility passed.");
 
@@ -118,6 +122,120 @@ async function checkStdio() {
   }
 }
 
+async function checkBrowserProfile() {
+  const transport = new StdioClientTransport({
+    command: bun,
+    args: ["run", "src/main.ts"],
+    cwd: projectRoot,
+    env: environment({ MCP_TRANSPORT: "stdio", MCP_BROWSER_PROFILE: "demo" }),
+    stderr: "pipe",
+  });
+  const client = new Client({ name: "bright-browser-check", version: "0.1.0" });
+  await client.connect(transport);
+  try {
+    const tools = await client.listTools();
+    assert(
+      tools.tools.map((tool) => tool.name).join(",") ===
+        "search_web,scrape,find_datasets,describe_dataset,run_dataset,browser_navigate,browser_observe,browser_interact,browser_close",
+      "The browser profile must expose exactly nine tools.",
+    );
+
+    const navigation = await client.callTool({
+      name: "browser_navigate",
+      arguments: { destination: { kind: "url", url: "https://example.com/" } },
+    });
+    assert(!navigation.isError, "browser_navigate failed.");
+    const sessionId = (navigation.structuredContent as { sessionId?: string }).sessionId;
+    assert(sessionId, "browser_navigate omitted its opaque session ID.");
+
+    const observation = await client.callTool({
+      name: "browser_observe",
+      arguments: { sessionId, kind: "text" },
+    });
+    assert(!observation.isError, "browser_observe failed.");
+
+    const interaction = await client.callTool({
+      name: "browser_interact",
+      arguments: { sessionId, action: { kind: "scroll", deltaY: 200 } },
+    });
+    assert(!interaction.isError, "browser_interact failed.");
+
+    const back = await client.callTool({
+      name: "browser_navigate",
+      arguments: { sessionId, destination: { kind: "back" } },
+    });
+    assert(!back.isError, "browser history navigation failed.");
+
+    const screenshot = await client.callTool({
+      name: "browser_observe",
+      arguments: { sessionId, kind: "screenshot" },
+    });
+    assert(!screenshot.isError, "browser screenshot observation failed.");
+    const resourceUri = (
+      screenshot.structuredContent as { resource?: { uri?: string } }
+    ).resource?.uri;
+    assert(resourceUri, "browser screenshot omitted its resource URI.");
+    const artifact = await client.readResource({ uri: resourceUri });
+    assert(artifact.contents[0]?.mimeType === "image/png", "Screenshot resource failed.");
+
+    const closed = await client.callTool({
+      name: "browser_close",
+      arguments: { sessionId },
+    });
+    assert(!closed.isError, "browser_close failed.");
+    const closedAgain = await client.callTool({
+      name: "browser_close",
+      arguments: { sessionId },
+    });
+    assert(!closedAgain.isError, "browser_close was not idempotent.");
+  } finally {
+    await client.close();
+  }
+}
+
+async function checkRealBrowser() {
+  const username = process.env.BRIGHTDATA_BROWSER_USERNAME;
+  const password = process.env.BRIGHTDATA_BROWSER_PASSWORD;
+  assert(
+    username && password,
+    "The real browser check requires Bright Data Browser API credentials.",
+  );
+  const transport = new StdioClientTransport({
+    command: bun,
+    args: ["run", "src/main.ts"],
+    cwd: projectRoot,
+    env: environment({
+      MCP_TRANSPORT: "stdio",
+      MCP_BROWSER_PROFILE: "brightdata",
+      BRIGHTDATA_BROWSER_USERNAME: username,
+      BRIGHTDATA_BROWSER_PASSWORD: password,
+    }),
+    stderr: "pipe",
+  });
+  const client = new Client({ name: "bright-real-browser-check", version: "0.1.0" });
+  await client.connect(transport);
+  let sessionId: string | undefined;
+  try {
+    const navigation = await client.callTool({
+      name: "browser_navigate",
+      arguments: { destination: { kind: "url", url: "https://example.com/" } },
+    });
+    assert(!navigation.isError, "Real Bright Data browser navigation failed.");
+    sessionId = (navigation.structuredContent as { sessionId?: string }).sessionId;
+    assert(sessionId, "Real browser navigation omitted its session ID.");
+    const observation = await client.callTool({
+      name: "browser_observe",
+      arguments: { sessionId, kind: "text" },
+    });
+    assert(!observation.isError, "Real Bright Data browser observation failed.");
+  } finally {
+    if (sessionId) {
+      await client.callTool({ name: "browser_close", arguments: { sessionId } });
+    }
+    await client.close();
+  }
+}
+
 async function checkTaskExecution() {
   const transport = new StdioClientTransport({
     command: bun,
@@ -211,6 +329,9 @@ function environment(overrides: Record<string, string>): Record<string, string> 
     BRIGHTDATA_API_KEY: "",
     BRIGHTDATA_SERP_ZONE: "",
     BRIGHTDATA_UNLOCKER_ZONE: "",
+    BRIGHTDATA_BROWSER_USERNAME: "",
+    BRIGHTDATA_BROWSER_PASSWORD: "",
+    MCP_BROWSER_PROFILE: "disabled",
     ...overrides,
   };
 }

@@ -5,8 +5,16 @@ import { BrightDataGateway } from "./adapters/brightdata/gateway";
 import { createBrightDataWebAdapter } from "./adapters/brightdata/web";
 import { createDemoDatasetAdapter } from "./adapters/demo-datasets";
 import { createDemoWebAdapter } from "./adapters/demo-web";
+import { createFakeBrowserProvider } from "./browser/fake-provider";
+import { createBrightDataBrowserProvider } from "./browser/brightdata-provider";
+import {
+  LocalBrowserArtifactStore,
+  LocalBrowserSessionStore,
+} from "./browser/stores";
+import { createBrowserUseCases } from "./browser/use-cases";
 import { LocalResultStore } from "./adapters/result-store";
 import { staticCredential } from "./connections/credentials";
+import { staticBrowserCredential } from "./connections/browser-credentials";
 import { createDatasetUseCases } from "./core/datasets";
 import { createWebUseCases } from "./core/web";
 import { createBrightMcpServer } from "./mcp/server";
@@ -37,6 +45,28 @@ const webAdapter = gateway
   : createDemoWebAdapter();
 const datasets = createDatasetUseCases(datasetAdapter);
 const web = createWebUseCases(webAdapter);
+const browserProfile = process.env.MCP_BROWSER_PROFILE?.trim() || "disabled";
+if (
+  browserProfile !== "disabled" &&
+  browserProfile !== "demo" &&
+  browserProfile !== "brightdata"
+) {
+  throw new Error(
+    'MCP_BROWSER_PROFILE must be "disabled", "demo", or "brightdata".',
+  );
+}
+const browser = browserProfile === "disabled"
+  ? undefined
+  : createBrowser(browserProfile);
+let shuttingDown = false;
+const shutdown = async () => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  await browser?.shutdown();
+  process.exit(0);
+};
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 const widgetFile = Bun.file(
   new URL("../dist/dataset-table.html", import.meta.url),
 );
@@ -50,11 +80,36 @@ const createServer = () =>
   createBrightMcpServer({
     datasets,
     web,
+    browser,
     results: resultStore,
     tasks: taskStore,
     widgetHtml,
     principalId,
   });
+
+function createBrowser(profile: "demo" | "brightdata") {
+  const provider = profile === "demo"
+    ? createFakeBrowserProvider()
+    : brightDataBrowserProvider();
+  return createBrowserUseCases({
+    provider,
+    sessions: new LocalBrowserSessionStore(provider),
+    artifacts: new LocalBrowserArtifactStore(),
+  });
+}
+
+function brightDataBrowserProvider() {
+  const username = process.env.BRIGHTDATA_BROWSER_USERNAME?.trim();
+  const password = process.env.BRIGHTDATA_BROWSER_PASSWORD;
+  if (!username || !password) {
+    throw new Error(
+      "The brightdata browser profile requires BRIGHTDATA_BROWSER_USERNAME and BRIGHTDATA_BROWSER_PASSWORD.",
+    );
+  }
+  return createBrightDataBrowserProvider(
+    staticBrowserCredential(username, password),
+  );
+}
 
 if (transportName === "stdio") {
   const server = createServer();

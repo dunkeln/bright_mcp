@@ -32,6 +32,15 @@ MCP and app loop runnable. Structured extraction requires an injected provider
 and otherwise returns an actionable capability error. Credentials and zone names
 are read only by the composition root and never enter tool inputs or results.
 
+Set `MCP_BROWSER_PROFILE=demo` to enable the four-tool browser profile against a
+bounded fake provider. The default is `disabled`, keeping the model-visible base
+surface at five tools. Set the profile to `brightdata` with
+`BRIGHTDATA_BROWSER_USERNAME` and `BRIGHTDATA_BROWSER_PASSWORD` to connect
+`playwright-core` to Bright Data's remote Browser API; no local browser is
+launched or downloaded. Run the opt-in live compatibility gate with
+`BRIGHTDATA_BROWSER_CHECK=1 bun run check:compat`; it performs a paid remote
+navigation only when explicitly requested.
+
 
 | Dimension | BrightData MCP | Bright MCP |
 |---|---:|---:|

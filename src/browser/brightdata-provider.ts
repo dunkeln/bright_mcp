@@ -1,0 +1,285 @@
+import pLimit from "p-limit";
+import { chromium, type Browser, type Page } from "playwright-core";
+import type { BrowserCredentialProvider } from "../connections/browser-credentials";
+import { CapabilityError, type RequestContext } from "../core/contracts";
+import type {
+  BrowserAction,
+  BrowserNetworkEntry,
+  BrowserProvider,
+  ProviderObservation,
+} from "./contracts";
+
+type RemoteSession = {
+  browser: Browser;
+  page: Page;
+  network: BrowserNetworkEntry[];
+};
+
+export function createBrightDataBrowserProvider(
+  credentials: BrowserCredentialProvider,
+): BrowserProvider {
+  const sessions = new Map<string, RemoteSession>();
+  const runRemote = pLimit(4);
+
+  return {
+    async createAndNavigate(url, timeoutMs, context) {
+      return runRemote(async () => {
+        const credential = await credentials(context.principalId);
+        const endpoint = browserEndpoint(credential);
+        let browser: Browser | undefined;
+        try {
+          const connection = chromium.connectOverCDP(endpoint, {
+            timeout: Math.min(timeoutMs, 20_000),
+          });
+          browser = await abortable(
+            connection,
+            context.signal,
+            () => {
+              void connection
+                .then((connected) => connected.close())
+                .catch(() => undefined);
+            },
+          );
+          const page = await browser.newPage({ acceptDownloads: false });
+          page.on("dialog", (dialog) => void dialog.dismiss());
+          page.on("download", (download) => void download.cancel());
+          const network: BrowserNetworkEntry[] = [];
+          page.on("response", (response) => {
+            network.push({
+              method: response.request().method().slice(0, 20),
+              url: safeUrl(response.url()).slice(0, 2_048),
+              status: response.status(),
+              contentType: response.headers()["content-type"]?.slice(0, 200),
+            });
+            if (network.length > 50) network.shift();
+          });
+          await abortable(
+            page.goto(url, {
+              waitUntil: "domcontentloaded",
+              timeout: Math.min(timeoutMs, 120_000),
+            }),
+            context.signal,
+            () => browser?.close().catch(() => undefined),
+          );
+          const providerSessionId = crypto.randomUUID();
+          sessions.set(providerSessionId, { browser, page, network });
+          return {
+            providerSessionId,
+            url: safeUrl(page.url()),
+            title: await page.title(),
+          };
+        } catch (error) {
+          await browser?.close().catch(() => undefined);
+          throw browserError(error);
+        }
+      });
+    },
+
+    async navigateHistory(providerSessionId, direction, timeoutMs, context) {
+      return runRemote(async () => {
+        const session = requiredSession(sessions, providerSessionId);
+        try {
+          const response = await abortable(
+            direction === "back"
+              ? session.page.goBack({
+                  waitUntil: "domcontentloaded",
+                  timeout: Math.min(timeoutMs, 120_000),
+                })
+              : session.page.goForward({
+                  waitUntil: "domcontentloaded",
+                  timeout: Math.min(timeoutMs, 120_000),
+                }),
+            context.signal,
+            () => closeSession(sessions, providerSessionId),
+          );
+          if (!response) {
+            throw new CapabilityError(
+              "browser_history_unavailable",
+              `No ${direction} browser history is available.`,
+              false,
+            );
+          }
+          return {
+            url: safeUrl(session.page.url()),
+            title: await session.page.title(),
+          };
+        } catch (error) {
+          throw browserError(error);
+        }
+      });
+    },
+
+    async observe(providerSessionId, kind, timeoutMs, context) {
+      return runRemote(async (): Promise<ProviderObservation> => {
+        const session = requiredSession(sessions, providerSessionId);
+        try {
+          if (kind === "screenshot") {
+            const data = await abortable(
+              session.page.screenshot({
+                type: "png",
+                fullPage: false,
+                timeout: Math.min(timeoutMs, 15_000),
+              }),
+              context.signal,
+              () => closeSession(sessions, providerSessionId),
+            );
+            return { kind, data };
+          }
+          if (kind === "network") {
+            return { kind, entries: [...session.network] };
+          }
+          const content = await abortable(
+            kind === "accessibility"
+              ? session.page.locator("body").ariaSnapshot({ timeout: timeoutMs })
+              : kind === "text"
+                ? session.page.locator("body").innerText({ timeout: timeoutMs })
+                : session.page.content(),
+            context.signal,
+            () => closeSession(sessions, providerSessionId),
+          );
+          return { kind, content: content.slice(0, 100_000) };
+        } catch (error) {
+          throw browserError(error);
+        }
+      });
+    },
+
+    async interact(providerSessionId, action, timeoutMs, context) {
+      return runRemote(async () => {
+        const session = requiredSession(sessions, providerSessionId);
+        try {
+          await abortable(
+            performAction(session.page, action, timeoutMs),
+            context.signal,
+            () => closeSession(sessions, providerSessionId),
+          );
+          return {
+            url: safeUrl(session.page.url()),
+            title: await session.page.title(),
+          };
+        } catch (error) {
+          throw browserError(error);
+        }
+      });
+    },
+
+    close: (providerSessionId) => closeSession(sessions, providerSessionId),
+  };
+}
+
+async function performAction(page: Page, action: BrowserAction, timeoutMs: number) {
+  const timeout = Math.min(timeoutMs, 15_000);
+  if (action.kind === "click") {
+    await page.locator(action.selector).click({ timeout });
+  } else if (action.kind === "type") {
+    await page.locator(action.selector).fill(action.text, { timeout });
+  } else if (action.kind === "select") {
+    await page.locator(action.selector).selectOption(action.value, { timeout });
+  } else if (action.kind === "press") {
+    if (action.selector) {
+      await page.locator(action.selector).press(action.key, { timeout });
+    } else {
+      await page.keyboard.press(action.key);
+    }
+  } else if (action.kind === "wait") {
+    await page.locator(action.selector).waitFor({ state: action.state, timeout });
+  } else {
+    await page.mouse.wheel(0, action.deltaY);
+  }
+}
+
+function requiredSession(
+  sessions: Map<string, RemoteSession>,
+  providerSessionId: string,
+) {
+  const session = sessions.get(providerSessionId);
+  if (!session) {
+    throw new CapabilityError(
+      "browser_provider_session_lost",
+      "The remote browser session is no longer available.",
+      false,
+      "Start a new browser session.",
+    );
+  }
+  return session;
+}
+
+async function closeSession(
+  sessions: Map<string, RemoteSession>,
+  providerSessionId: string,
+) {
+  const session = sessions.get(providerSessionId);
+  if (!session) return;
+  sessions.delete(providerSessionId);
+  await session.browser.close().catch(() => undefined);
+}
+
+function browserEndpoint(credential: { username: string; password: string }) {
+  return `wss://${encodeURIComponent(credential.username)}:${encodeURIComponent(credential.password)}@brd.superproxy.io:9222`;
+}
+
+function safeUrl(value: string) {
+  try {
+    const url = new URL(value);
+    url.username = "";
+    url.password = "";
+    url.hash = "";
+    for (const key of [...url.searchParams.keys()]) {
+      if (/(?:token|secret|password|auth|session|api.?key|code)/i.test(key)) {
+        url.searchParams.set(key, "[redacted]");
+      }
+    }
+    return url.href;
+  } catch {
+    return "about:blank";
+  }
+}
+
+async function abortable<T>(
+  operation: Promise<T>,
+  signal: AbortSignal | undefined,
+  onAbort: () => void | Promise<void>,
+) {
+  if (!signal) return operation;
+  if (signal.aborted) {
+    await onAbort();
+    throw new CapabilityError("cancelled", "Browser operation was cancelled.");
+  }
+  return new Promise<T>((resolve, reject) => {
+    const abort = () => {
+      void onAbort();
+      reject(new CapabilityError("cancelled", "Browser operation was cancelled."));
+    };
+    signal.addEventListener("abort", abort, { once: true });
+    operation.then(resolve, reject).finally(() => {
+      signal.removeEventListener("abort", abort);
+    });
+  });
+}
+
+function browserError(error: unknown) {
+  if (error instanceof CapabilityError) return error;
+  const message = error instanceof Error ? error.message : "";
+  if (/timeout/i.test(message)) {
+    return new CapabilityError(
+      "browser_timeout",
+      "The remote browser did not finish before the bounded timeout.",
+      true,
+      "Retry once or simplify the browser action.",
+    );
+  }
+  if (/(?:401|403|407|authentication)/i.test(message)) {
+    return new CapabilityError(
+      "browser_authentication_failed",
+      "Bright Data rejected the configured Browser API credentials.",
+      false,
+      "Replace the Browser API username and password.",
+    );
+  }
+  return new CapabilityError(
+    "browser_upstream_unavailable",
+    "The Bright Data remote browser operation failed.",
+    true,
+    "Retry once or start a new browser session.",
+  );
+}

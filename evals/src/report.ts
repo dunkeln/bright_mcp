@@ -26,7 +26,7 @@ const complete = allSummaries.every(
 const publishable = report.providerParity === "live" && complete;
 const rootBlock = publishable
   ? [
-      "![Dithered forest plot comparing MCP tool-use completion](./assets/benchmark.svg)",
+      "![Forest plot comparing MCP tool-use completion](./assets/benchmark.svg)",
       "",
       `Bright MCP: ${percent(overall.bright.passRate)} pass · ${Math.round(overall.bright.averageTokens)} tokens · ${seconds(overall.bright.medianLatency)} p50. Upstream: ${percent(overall.upstream.passRate)} · ${Math.round(overall.upstream.averageTokens)} tokens · ${seconds(overall.upstream.medianLatency)} p50.`,
       `[Method and tables](./evals/README.md#latest-tool-use-benchmark) · \`${report.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}.`,

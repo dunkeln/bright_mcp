@@ -164,7 +164,7 @@ type RunDatasetInput = {
 
 export function createBrightMcpServer(dependencies: {
   datasets: DatasetUseCases;
-  web: WebUseCases;
+  createWeb: (server: McpServer) => WebUseCases;
   browser?: BrowserUseCases;
   results: ResultStore;
   tasks?: CancellableTaskStore;
@@ -187,6 +187,7 @@ export function createBrightMcpServer(dependencies: {
         "Use search_web to find current URLs and scrape to retrieve known URLs. For managed datasets, use find_datasets, then describe_dataset, then run_dataset with the returned ID and operation schema.",
     },
   );
+  const web = dependencies.createWeb(server);
 
   server.registerTool(
     "search_web",
@@ -211,7 +212,7 @@ export function createBrightMcpServer(dependencies: {
     },
     async (input, extra) =>
       runTool(async () => {
-        const structuredContent = await dependencies.web.searchWeb(
+        const structuredContent = await web.searchWeb(
           input,
           requestContext(
             dependencies.principalId,
@@ -245,7 +246,7 @@ export function createBrightMcpServer(dependencies: {
     },
     async (input, extra) =>
       runTool(async () => {
-        const structuredContent = await dependencies.web.scrape(
+        const structuredContent = await web.scrape(
           input,
           requestContext(
             dependencies.principalId,

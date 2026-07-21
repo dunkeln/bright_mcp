@@ -30,8 +30,10 @@ Products Search scraper. Set `BRIGHTDATA_SERP_ZONE` and
 `BRIGHTDATA_UNLOCKER_ZONE` to route `search_web` and `scrape` through the SERP and
 Web Unlocker APIs. Without an API key, bounded in-memory demo ports keep the full
 MCP and app loop runnable. Structured extraction requires an injected provider
-and otherwise returns an actionable capability error. Credentials and zone names
-are read only by the composition root and never enter tool inputs or results.
+and uses MCP host sampling in this executable; hosts without sampling receive an
+actionable per-page extraction error while retaining scraped content. Credentials
+and zone names are read only by the composition root and never enter tool inputs
+or results.
 
 For interactive local setup on macOS, run `bun run connect:brightdata`; the
 system Keychain prompt keeps the token out of command arguments and shell

@@ -2,12 +2,16 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { InMemoryTaskStore } from "@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js";
-import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import {
+  CallToolResultSchema,
+  CreateMessageRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 
 const bun = process.execPath;
 const projectRoot = new URL("../", import.meta.url).pathname;
 
 await checkStdio();
+await checkSamplingExtraction();
 await checkTaskExecution();
 await checkBrowserProfile();
 if (process.env.BRIGHTDATA_BROWSER_CHECK === "1") {
@@ -67,9 +71,13 @@ async function checkStdio() {
         },
       },
     });
+    const unavailable = extraction.structuredContent as {
+      results?: Array<{ extractionError?: { code?: string } }>;
+    };
     assert(
-      extraction.isError,
-      "scrape must fail clearly when extraction is requested without a provider.",
+      unavailable.results?.[0]?.extractionError?.code ===
+        "extraction_provider_unavailable",
+      "scrape did not explain that the host lacks a sampling provider.",
     );
 
     const privateTarget = await client.callTool({
@@ -116,6 +124,56 @@ async function checkStdio() {
     assert(
       widget.contents[0]?.mimeType === "text/html;profile=mcp-app",
       "The app resource has the wrong MIME type.",
+    );
+  } finally {
+    await client.close();
+  }
+}
+
+async function checkSamplingExtraction() {
+  const transport = new StdioClientTransport({
+    command: bun,
+    args: ["run", "src/main.ts"],
+    cwd: projectRoot,
+    env: environment({ MCP_TRANSPORT: "stdio" }),
+    stderr: "pipe",
+  });
+  const client = new Client(
+    { name: "bright-extraction-check", version: "0.1.0" },
+    { capabilities: { sampling: {} } },
+  );
+  client.setRequestHandler(CreateMessageRequestSchema, async () => ({
+    role: "assistant",
+    content: { type: "text", text: JSON.stringify({ title: "Demo page" }) },
+    model: "compatibility-fixture",
+    stopReason: "endTurn",
+  }));
+  await client.connect(transport);
+  try {
+    const extraction = await client.callTool({
+      name: "scrape",
+      arguments: {
+        urls: ["https://example.com/"],
+        extraction: {
+          instructions: "Return the page title.",
+          fields: { title: { kind: "string" } },
+        },
+      },
+    });
+    const result = extraction.structuredContent as {
+      results?: Array<{
+        extraction?: {
+          data?: { title?: string };
+          provenance?: { provider?: string; model?: string };
+        };
+      }>;
+    };
+    assert(!extraction.isError, "Sampling-backed extraction failed.");
+    assert(
+      result.results?.[0]?.extraction?.data?.title === "Demo page" &&
+        result.results[0].extraction?.provenance?.provider === "mcp-sampling" &&
+        result.results[0].extraction?.provenance?.model === "compatibility-fixture",
+      "Sampling-backed extraction lost validated data or provenance.",
     );
   } finally {
     await client.close();

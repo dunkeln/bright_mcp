@@ -24,6 +24,7 @@ import { staticBrowserCredential } from "./connections/browser-credentials";
 import { createDatasetUseCases } from "./core/datasets";
 import { createWebUseCases } from "./core/web";
 import { createBrightMcpServer } from "./mcp/server";
+import { createSamplingExtractionProvider } from "./mcp/sampling-extraction";
 import { CancellableTaskStore } from "./mcp/task-store";
 
 const transportName = process.env.MCP_TRANSPORT ?? "http";
@@ -100,7 +101,6 @@ const webAdapter = gateway
     })
   : createDemoWebAdapter();
 const datasets = createDatasetUseCases(datasetAdapter);
-const web = createWebUseCases(webAdapter);
 const browserProfile = process.env.MCP_BROWSER_PROFILE?.trim() || "disabled";
 if (
   browserProfile !== "disabled" &&
@@ -135,7 +135,11 @@ const widgetHtml = await widgetFile.text();
 const createServer = () =>
   createBrightMcpServer({
     datasets,
-    web,
+    createWeb: (server) =>
+      createWebUseCases({
+        ...webAdapter,
+        extraction: createSamplingExtractionProvider(server),
+      }),
     browser,
     results: resultStore,
     tasks: httpAuthorization ? undefined : taskStore,

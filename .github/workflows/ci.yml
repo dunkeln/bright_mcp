@@ -2,8 +2,38 @@ name: CI
 
 on:
   pull_request:
+    paths:
+      - .bun-version
+      - .github/workflows/ci.yml
+      - bun.lock
+      - checks/**
+      - components.json
+      - dist/**
+      - dither-kit.json
+      - fixtures/**
+      - package.json
+      - scripts/build-app.ts
+      - src/**
+      - tsconfig.json
   push:
     branches: [main]
+    paths:
+      - .bun-version
+      - .github/workflows/ci.yml
+      - bun.lock
+      - checks/**
+      - components.json
+      - dist/**
+      - dither-kit.json
+      - fixtures/**
+      - package.json
+      - scripts/build-app.ts
+      - src/**
+      - tsconfig.json
+
+concurrency:
+  group: render-production
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -23,3 +53,18 @@ jobs:
       - run: bun run check:browser
       - run: bun run check:compat
       - run: bun run check:coverage
+
+  deploy:
+    if: github.event_name == 'push'
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy this commit to Render
+        run: |
+          curl --fail-with-body --silent --show-error \
+            --request POST \
+            --header "Authorization: Bearer ${{ secrets.RENDER_API_KEY }}" \
+            --header "Content-Type: application/json" \
+            --data "{\"commitId\":\"${GITHUB_SHA}\",\"clearCache\":\"do_not_clear\"}" \
+            --output /dev/null \
+            "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys"

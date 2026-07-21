@@ -16,16 +16,35 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: vercel-production
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: site
     steps:
       - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
       - run: bun install --frozen-lockfile
-      - run: bun run build
+        working-directory: site
+      - if: github.event_name == 'pull_request'
+        run: bun run build
+        working-directory: site
+      - if: github.event_name == 'push'
+        run: bunx --bun vercel@56.4.1 pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - if: github.event_name == 'push'
+        run: bunx --bun vercel@56.4.1 build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      - if: github.event_name == 'push'
+        run: bunx --bun vercel@56.4.1 deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }} --meta githubCommitSha=${GITHUB_SHA}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

@@ -33,6 +33,13 @@ MCP and app loop runnable. Structured extraction requires an injected provider
 and otherwise returns an actionable capability error. Credentials and zone names
 are read only by the composition root and never enter tool inputs or results.
 
+For interactive local setup on macOS, run `bun run connect:brightdata`; the
+system Keychain prompt keeps the token out of command arguments and shell
+history, and the CLI validates it with Bright Data's bounded read-only account
+status endpoint before retaining it. Then set
+`BRIGHTDATA_CREDENTIAL_SOURCE=keychain` in the local MCP configuration. Run
+`bun run disconnect:brightdata` before replacing or revoking the stored token.
+
 Set `MCP_BROWSER_PROFILE=demo` to enable the four-tool browser profile against a
 bounded fake provider. The default is `disabled`, keeping the model-visible base
 surface at five tools. Set the profile to `brightdata` with

@@ -16,7 +16,10 @@ import {
 } from "./browser/stores";
 import { createBrowserUseCases } from "./browser/use-cases";
 import { LocalResultStore } from "./adapters/result-store";
-import { staticCredential } from "./connections/credentials";
+import {
+  macOsKeychainCredential,
+  staticCredential,
+} from "./connections/credentials";
 import { staticBrowserCredential } from "./connections/browser-credentials";
 import { createDatasetUseCases } from "./core/datasets";
 import { createWebUseCases } from "./core/web";
@@ -53,15 +56,34 @@ const allowedOrigins = new Set(
 const principalId = "local";
 const resultStore = new LocalResultStore();
 const taskStore = new CancellableTaskStore();
-const apiKey = process.env.BRIGHTDATA_API_KEY?.trim();
-if (httpAuthorization && apiKey) {
+const credentialSource = process.env.BRIGHTDATA_CREDENTIAL_SOURCE?.trim() || "auto";
+if (!(credentialSource === "auto" || credentialSource === "keychain")) {
   throw new Error(
-    "Hosted OIDC mode cannot use a deployment-global BRIGHTDATA_API_KEY; configure a principal-bound credential vault.",
+    'BRIGHTDATA_CREDENTIAL_SOURCE must be either "auto" or "keychain".',
   );
 }
-const gateway = apiKey
+const apiKey = process.env.BRIGHTDATA_API_KEY?.trim();
+if (credentialSource === "keychain" && apiKey) {
+  throw new Error(
+    "Choose either BRIGHTDATA_API_KEY or BRIGHTDATA_CREDENTIAL_SOURCE=keychain, not both.",
+  );
+}
+if (credentialSource === "keychain" && process.platform !== "darwin") {
+  throw new Error("The built-in keychain credential source currently supports macOS only.");
+}
+if (httpAuthorization && (apiKey || credentialSource === "keychain")) {
+  throw new Error(
+    "Hosted OIDC mode cannot use deployment-global Bright Data credentials; configure a principal-bound credential vault.",
+  );
+}
+const credentials = apiKey
+  ? staticCredential(apiKey)
+  : credentialSource === "keychain"
+    ? macOsKeychainCredential()
+    : undefined;
+const gateway = credentials
   ? new BrightDataGateway({
-        credentials: staticCredential(apiKey),
+        credentials,
         logger: {
           info: (record) => console.error(JSON.stringify(record)),
           error: (record) => console.error(JSON.stringify(record)),

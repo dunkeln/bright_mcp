@@ -1,5 +1,8 @@
 import { CapabilityError, type RequestContext } from "../../core/contracts";
-import type { CredentialProvider } from "../../connections/credentials";
+import {
+  CredentialResolutionError,
+  type CredentialProvider,
+} from "../../connections/credentials";
 
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const MAX_RESPONSE_BYTES = 2_000_000;
@@ -58,7 +61,12 @@ export class BrightDataGateway {
     for (const [key, value] of Object.entries(request.query ?? {})) {
       url.searchParams.set(key, value);
     }
-    const { apiKey } = await this.options.credentials(context.principalId);
+    let apiKey: string;
+    try {
+      ({ apiKey } = await this.options.credentials(context.principalId));
+    } catch (error) {
+      throw translateNetworkError(error, context.signal);
+    }
     const fetcher = this.options.fetch ?? fetch;
 
     for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -242,6 +250,18 @@ function translateNetworkError(
   callerSignal?: AbortSignal,
 ): CapabilityError {
   if (error instanceof CapabilityError) return error;
+  if (error instanceof CredentialResolutionError) {
+    return new CapabilityError(
+      error.reason === "missing"
+        ? "brightdata_connection_required"
+        : "brightdata_credential_unavailable",
+      error.message,
+      false,
+      error.reason === "missing"
+        ? "Run bun run connect:brightdata, then retry the tool call."
+        : "Unlock macOS Keychain or use explicit headless credential configuration.",
+    );
+  }
   if (callerSignal?.aborted) {
     return new CapabilityError(
       "cancelled",

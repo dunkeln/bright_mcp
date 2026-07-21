@@ -41,10 +41,12 @@ query. A failure means the remote contract drifted or became unavailable.
 BrightData MCP README against each server's search tool. It verifies successful,
 non-empty, bounded MCP results and records latency and result size.
 
-Live facts, search quality, and model tool selection are not deterministic.
-Those results must be graded over repeated agent runs before they support public
-positioning claims. The current Bright MCP deployment also uses its demo
-provider, so this scaffold does not yet claim provider-quality parity.
+The repeated agent suite covers two workflows each for Acquire, Extract,
+Research, and Operate. It accepts different valid tool paths for each MCP, then
+checks requested output fields, provenance, honest capability boundaries,
+latency, calls, and token use. Live factual values are not independently graded.
+The current Bright MCP deployment also uses its demo provider, so this scaffold
+does not yet claim provider-quality parity.
 
 ## Latest tool-use benchmark
 

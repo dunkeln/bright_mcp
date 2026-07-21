@@ -54,7 +54,7 @@ function BenchmarkChart() {
           margins={{ top: 8, right: 16, bottom: 36, left: 52 }}
         >
           <Grid />
-          <XAxis dataKey="label" maxTicks={7} />
+          <XAxis dataKey="label" maxTicks={8} />
           <YAxis tickCount={5} tickFormatter={(value) => `${Math.round(value)}%`} />
           <Bar dataKey="brightData" variant="dotted" />
           <Bar dataKey="bright" variant="gradient" />

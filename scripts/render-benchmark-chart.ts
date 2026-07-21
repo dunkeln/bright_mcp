@@ -2,7 +2,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
-import { useCases } from "../evals/src/cases";
+import { workflowCases } from "../evals/src/workflows";
 import { buildAppAssets } from "./app-build";
 
 const mode = process.argv[2];
@@ -11,21 +11,12 @@ if (!["--write", "--check", "--preview"].includes(mode ?? "")) {
 }
 
 const report = (await Bun.file(new URL("../evals/.artifacts/agent.json", import.meta.url)).json()) as Report;
-const labels: Record<(typeof useCases)[number]["id"], string> = {
-  "current-stock-price": "Stock",
-  "best-rated-restaurants": "Restaurants",
-  "weather-forecast": "Weather",
-  "movie-releases": "Movies",
-  "social-trends": "Social",
-  "npm-package-version": "npm",
-  "python-package-readme": "PyPI",
-};
-const data = useCases.map(({ id }) => ({
-  label: labels[id],
+const data = workflowCases.map(({ id, shortLabel }) => ({
+  label: shortLabel,
   brightData: passRate(report.results.filter((result) => result.caseId === id && result.server === "upstream")),
   bright: passRate(report.results.filter((result) => result.caseId === id && result.server === "bright")),
 }));
-const complete = useCases.every((useCase) =>
+const complete = workflowCases.every((useCase) =>
   (["bright", "upstream"] as const).every(
     (server) => report.results.filter((result) => result.caseId === useCase.id && result.server === server).length === report.runsPerCase,
   ),

@@ -125,7 +125,7 @@ export function registerDatasetTools(
         return reply(
           structuredContent,
           structuredContent.datasets.length
-            ? `Found ${structuredContent.datasets.length} matching dataset capability.`
+            ? `Dataset candidates:\n${JSON.stringify(structuredContent)}`
             : "No matching dataset capability was found. Try a broader task description.",
         );
       }),
@@ -147,7 +147,7 @@ export function registerDatasetTools(
           await dependencies.datasets.describeDataset(datasetId);
         return reply(
           structuredContent,
-          `${structuredContent.title} supports ${structuredContent.operations.map((item) => item.kind).join(", ")}.`,
+          `Dataset definition:\n${JSON.stringify(structuredContent)}`,
         );
       }),
   );
@@ -341,7 +341,13 @@ function executeRunDataset(
       content: [
         {
           type: "text" as const,
-          text: `${structuredContent.dataset.title} returned ${structuredContent.page.totalRows ?? structuredContent.rows.length} rows. The response includes a bounded preview.`,
+          text: `Dataset snapshot:\n${JSON.stringify({
+            dataset: structuredContent.dataset,
+            rowCount:
+              structuredContent.page.totalRows ?? structuredContent.rows.length,
+            fields: structuredContent.columns.map(({ key }) => key),
+            continuation: structuredContent.page.nextResourceUri ?? null,
+          })}`,
         },
         {
           type: "resource_link" as const,

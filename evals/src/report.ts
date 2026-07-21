@@ -1,4 +1,4 @@
-import { useCases } from "./cases";
+import { workflowCases } from "./workflows";
 
 const mode = process.argv[2];
 if (mode !== "--write" && mode !== "--check") throw new Error("Use --write or --check.");
@@ -9,8 +9,8 @@ const evalReadme = new URL("evals/README.md", projectRoot);
 const report = (await Bun.file(new URL("../.artifacts/agent.json", import.meta.url)).json()) as Report;
 validate(report);
 
-const allSummaries = useCases.map((useCase) => ({
-  label: title(useCase.id),
+const allSummaries = workflowCases.map((useCase) => ({
+  label: `${useCase.pillar} · ${useCase.shortLabel}`,
   bright: summarize(report.results.filter((result) => result.caseId === useCase.id && result.server === "bright")),
   upstream: summarize(report.results.filter((result) => result.caseId === useCase.id && result.server === "upstream")),
 }));
@@ -41,7 +41,7 @@ const evalBlock = [
     `| ${label} | ${percent(bright.passRate)} / ${percent(upstream.passRate)} | ${Math.round(bright.averageTokens)} / ${Math.round(upstream.averageTokens)} | ${seconds(bright.medianLatency)} / ${seconds(upstream.medianLatency)} | ${bright.averageTools.toFixed(2)} / ${upstream.averageTools.toFixed(2)} |`,
   ),
   "",
-  "A pass requires the intended search tool, a non-empty query and response, and no runner error; factual answer quality is not graded.",
+  "A pass requires a valid workflow tool path, populated arguments, the requested output fields and provenance, and no runner error. Factual values are not independently graded.",
 ].join("\n");
 
 const files = [
@@ -130,8 +130,4 @@ function percent(value: number) {
 
 function seconds(milliseconds: number) {
   return `${(milliseconds / 1000).toFixed(1)}s`;
-}
-
-function title(value: string) {
-  return value.replaceAll("-", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

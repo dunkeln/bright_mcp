@@ -492,41 +492,43 @@ function DatasetTable() {
         <p className="text-center text-xs text-secondary" aria-live="polite">
           {page.page.totalRows ?? page.rows.length} rows · page {pageIndex + 1}
         </p>
-        <div className="flex justify-self-end gap-2">
-          <Button
-            color="secondary"
-            variant="soft"
-            size="md"
-            iconSize="sm"
-            uniform
-            pill={false}
-            disabled={pageIndex === 0}
-            aria-label="Previous page"
-            title="Previous page"
-            onClick={() => {
-              setPageIndex((current) => Math.max(0, current - 1));
-              setFilter("");
-              setSort(null);
-            }}
-          >
-            <ArrowLeft className="rtl:rotate-180" aria-hidden="true" />
-          </Button>
-          <Button
-            color="secondary"
-            variant="soft"
-            size="md"
-            iconSize="sm"
-            uniform
-            pill={false}
-            loading={loadingPage}
-            disabled={!page.page.nextResourceUri || !app}
-            aria-label="Next page"
-            title="Next page"
-            onClick={loadNextPage}
-          >
-            <ArrowRight className="rtl:rotate-180" aria-hidden="true" />
-          </Button>
-        </div>
+        {(pageIndex > 0 || page.page.nextResourceUri) && (
+          <div className="flex justify-self-end gap-2">
+            <Button
+              color="secondary"
+              variant="soft"
+              size="md"
+              iconSize="sm"
+              uniform
+              pill={false}
+              disabled={pageIndex === 0}
+              aria-label="Previous page"
+              title="Previous page"
+              onClick={() => {
+                setPageIndex((current) => Math.max(0, current - 1));
+                setFilter("");
+                setSort(null);
+              }}
+            >
+              <ArrowLeft className="rtl:rotate-180" aria-hidden="true" />
+            </Button>
+            <Button
+              color="secondary"
+              variant="soft"
+              size="md"
+              iconSize="sm"
+              uniform
+              pill={false}
+              loading={loadingPage}
+              disabled={!page.page.nextResourceUri || !app}
+              aria-label="Next page"
+              title="Next page"
+              onClick={loadNextPage}
+            >
+              <ArrowRight className="rtl:rotate-180" aria-hidden="true" />
+            </Button>
+          </div>
+        )}
         </footer>
       )}
     </main>

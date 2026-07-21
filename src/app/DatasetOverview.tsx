@@ -90,13 +90,13 @@ export function DatasetOverview({
           <BarChart
             data={profile.buckets}
             config={config}
-            bloom="low"
+            bloom="off"
             animationDuration={550}
           >
             <XAxis dataKey="label" maxTicks={6} />
             <YAxis tickCount={4} />
             <Tooltip labelKey="label" />
-            <Bar dataKey="count" variant="dotted" />
+            <Bar dataKey="count" variant="gradient" />
           </BarChart>
         </div>
       </figure>

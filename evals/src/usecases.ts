@@ -35,7 +35,7 @@ for (const useCase of useCases) {
         arguments: server === "bright"
           ? { queries: [{ query: useCase.prompt }] }
           : { query: useCase.prompt },
-      });
+      }, undefined, { timeout: 120_000 });
       const bytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
       const ok =
         result.isError !== true &&

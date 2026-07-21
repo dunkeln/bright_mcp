@@ -4,12 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "agent": "bun run src/agent.ts",
     "check": "bun run src/check.ts",
     "usecases": "bun run src/usecases.ts",
-    "eval": "bun run check && bun run usecases",
+    "eval": "bun run check && bun run usecases && bun run agent",
+    "report:check": "bun run src/report.ts --check",
+    "report:write": "bun run src/report.ts --write",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mcpjam/sdk": "2.0.0",
     "@modelcontextprotocol/sdk": "1.29.0"
   },
   "devDependencies": {

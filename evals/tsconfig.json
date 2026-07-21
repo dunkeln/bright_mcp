@@ -5,6 +5,7 @@
     "module": "Preserve",
     "moduleResolution": "bundler",
     "moduleDetection": "force",
+    "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
     "types": ["bun"]

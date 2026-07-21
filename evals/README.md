@@ -12,7 +12,13 @@ credit for each search. The use-case suite makes seven upstream searches.
 ```bash
 cd evals
 bun install --frozen-lockfile
-BRIGHTDATA_API_KEY=your-key bun run eval
+bun run eval
+```
+
+From the repository root, the complete run-and-publish pipeline is:
+
+```bash
+bun run benchmark
 ```
 
 Run either layer independently:
@@ -39,3 +45,9 @@ Live facts, search quality, and model tool selection are not deterministic.
 Those results must be graded over repeated agent runs before they support public
 positioning claims. The current Bright MCP deployment also uses its demo
 provider, so this scaffold does not yet claim provider-quality parity.
+
+## Latest tool-use benchmark
+
+<!-- benchmark:start -->
+No agent benchmark has been published yet.
+<!-- benchmark:end -->

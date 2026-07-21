@@ -26,6 +26,12 @@ claude mcp add --transport http bright https://bright-mcp.onrender.com/mcp
 See [SETUP.md](./SETUP.md) for local development, credentials, live checks, and
 hosted authorization.
 
+## Benchmarks
+
+<!-- benchmark:start -->
+> Benchmark publication is blocked while the Bright MCP endpoint uses its demo provider.
+<!-- benchmark:end -->
+
 | Dimension | BrightData MCP | Bright MCP |
 |---|---:|---:|
 | Model-visible tools | 60+ maximum | 5 base / 9 browser |

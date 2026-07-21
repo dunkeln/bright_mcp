@@ -28,6 +28,12 @@ The current slice exposes `find_datasets`, `describe_dataset`, and `run_dataset`
 The five-tool base profile becomes complete when the later `search_web` and
 `scrape` vertical slice lands; no placeholder tools are registered in the meantime.
 
+Set `BRIGHTDATA_API_KEY` to route those dataset tools to the documented Amazon
+Products Search scraper. Without it, the server uses the bounded in-memory demo
+catalog so the entire MCP and app loop remains runnable. Credentials are read
+only by the composition root and never enter tool inputs, results, resources, or
+the app.
+
 
 | Dimension | BrightData MCP | Bright MCP |
 |---|---:|---:|

@@ -133,9 +133,9 @@ export function createBrightMcpServer(dependencies: {
         "openai/toolInvocation/invoked": "Dataset ready",
       },
     },
-    async ({ datasetId, operation, arguments: args }) =>
+    async ({ datasetId, operation, arguments: args }, extra) =>
       runTool(async () => {
-        const context = requestContext(dependencies.principalId);
+        const context = requestContext(dependencies.principalId, extra.signal);
         const structuredContent = await dependencies.datasets.runDataset(
           { datasetId, operation, arguments: args },
           context,
@@ -236,8 +236,11 @@ export function createBrightMcpServer(dependencies: {
   return server;
 }
 
-function requestContext(principalId: string): RequestContext {
-  return { principalId, requestId: crypto.randomUUID() };
+function requestContext(
+  principalId: string,
+  signal?: AbortSignal,
+): RequestContext {
+  return { principalId, requestId: crypto.randomUUID(), signal };
 }
 
 function reply<T extends Record<string, unknown>>(structuredContent: T, text: string) {

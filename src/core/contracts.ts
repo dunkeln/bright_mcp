@@ -71,6 +71,7 @@ export type DatasetDefinition = {
 export type RequestContext = {
   principalId: string;
   requestId: string;
+  signal?: AbortSignal;
 };
 
 export class CapabilityError extends Error {

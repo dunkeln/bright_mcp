@@ -1,14 +1,29 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { createBrightDataDatasetAdapter } from "./adapters/brightdata/datasets";
+import { BrightDataGateway } from "./adapters/brightdata/gateway";
 import { createDemoDatasetAdapter } from "./adapters/demo-datasets";
 import { LocalResultStore } from "./adapters/result-store";
+import { staticCredential } from "./connections/credentials";
 import { createDatasetUseCases } from "./core/datasets";
 import { createBrightMcpServer } from "./mcp/server";
 
 const transportName = process.env.MCP_TRANSPORT ?? "http";
 const principalId = "local";
 const resultStore = new LocalResultStore();
-const datasetAdapter = createDemoDatasetAdapter(resultStore);
+const apiKey = process.env.BRIGHTDATA_API_KEY?.trim();
+const datasetAdapter = apiKey
+  ? createBrightDataDatasetAdapter(
+      new BrightDataGateway({
+        credentials: staticCredential(apiKey),
+        logger: {
+          info: (record) => console.error(JSON.stringify(record)),
+          error: (record) => console.error(JSON.stringify(record)),
+        },
+      }),
+      resultStore,
+    )
+  : createDemoDatasetAdapter(resultStore);
 const datasets = createDatasetUseCases(datasetAdapter);
 const widgetFile = Bun.file(
   new URL("../dist/dataset-table.html", import.meta.url),

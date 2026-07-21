@@ -14,15 +14,15 @@ type Sort = { key: string; direction: "ascending" | "descending" } | null;
 type Selection = { rowRef: string; row: JsonObject };
 
 function DatasetTable() {
-  const [pages, setPages] = useState<DatasetResult[]>(() => {
-    const initial = readInitialResult();
-    return initial ? [initial] : [];
-  });
+  const [initial] = useState(readInitialResult);
+  const [pages, setPages] = useState<DatasetResult[]>(
+    initial.result ? [initial.result] : [],
+  );
   const [pageIndex, setPageIndex] = useState(0);
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<Sort>(null);
   const [selection, setSelection] = useState<Selection[]>([]);
-  const [pageError, setPageError] = useState<string | null>(null);
+  const [pageError, setPageError] = useState<string | null>(initial.error ?? null);
   const [contextError, setContextError] = useState<string | null>(null);
   const [loadingPage, setLoadingPage] = useState(false);
 
@@ -327,12 +327,13 @@ function parseResult(
   return { ok: true, value: parsed.data };
 }
 
-function readInitialResult(): DatasetResult | null {
+function readInitialResult(): { result?: DatasetResult; error?: string } {
   const value = (
     window as Window & { openai?: { toolOutput?: unknown } }
   ).openai?.toolOutput;
+  if (value === undefined) return {};
   const parsed = parseResult(value);
-  return parsed.ok ? parsed.value : null;
+  return parsed.ok ? { result: parsed.value } : { error: parsed.message };
 }
 
 function displayValue(value: unknown): string {

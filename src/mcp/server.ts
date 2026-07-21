@@ -41,7 +41,7 @@ export function createBrightMcpServer(dependencies: {
           }
         : {}),
       instructions:
-        "Use search_web to find current URLs and scrape to retrieve known URLs. For managed datasets, use find_datasets, then describe_dataset, then run_dataset with the returned ID and operation schema.",
+        "Use search_web once to find current URLs, then scrape the relevant pages. For managed datasets, call find_datasets once, then describe_dataset with the returned ID, then run_dataset with that operation schema.",
     },
   );
   registerWebTools(

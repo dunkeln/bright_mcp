@@ -59,7 +59,7 @@ const definitionSchema = z.object({
 const runDatasetConfig = {
   title: "Run dataset",
   description:
-    "Use this when you have described a dataset and want to execute one returned operation with schema-valid arguments. Returns a bounded preview and a completed result resource.",
+    "Execute an operation returned by describe_dataset using its exact input schema. Returns a bounded preview and a completed result resource.",
   inputSchema: {
     datasetId: z.string().trim().min(1).max(120),
     operation: datasetOperationSchema,
@@ -104,7 +104,7 @@ export function registerDatasetTools(
     {
       title: "Find datasets",
       description:
-        "Use this when you need to discover a dataset for a web-data task. Returns concise candidates that can be passed to describe_dataset.",
+        "Search the managed-dataset catalog once for a web-data task. If a candidate is returned, call describe_dataset with its ID; do not repeat the same search.",
       inputSchema: {
         query: z.string().trim().min(1).max(500),
         limit: z.number().int().min(1).max(10).default(5),
@@ -120,7 +120,7 @@ export function registerDatasetTools(
         return reply(
           structuredContent,
           structuredContent.datasets.length
-            ? `Dataset candidates:\n${JSON.stringify(structuredContent)}`
+            ? `Dataset candidates:\n${JSON.stringify(structuredContent)}\nNext: call describe_dataset with the chosen ID.`
             : "No matching dataset capability was found. Try a broader task description.",
         );
       }),
@@ -131,7 +131,7 @@ export function registerDatasetTools(
     {
       title: "Describe dataset",
       description:
-        "Use this when you have a dataset ID from find_datasets and need its exact operations and executable input schemas.",
+        "Get executable operations and input schemas for an ID returned by find_datasets. Then call run_dataset with one returned operation and schema-valid arguments.",
       inputSchema: { datasetId: z.string().trim().min(1).max(120) },
       outputSchema: definitionSchema,
       annotations,
@@ -142,7 +142,7 @@ export function registerDatasetTools(
           await dependencies.datasets.describeDataset(datasetId);
         return reply(
           structuredContent,
-          `Dataset definition:\n${JSON.stringify(structuredContent)}`,
+          `Dataset definition:\n${JSON.stringify(structuredContent)}\nNext: call run_dataset with this ID, one returned operation, and matching arguments.`,
         );
       }),
   );

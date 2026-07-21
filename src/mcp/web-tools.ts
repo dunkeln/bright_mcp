@@ -97,7 +97,7 @@ export function registerWebTools(
     {
       title: "Search web",
       description:
-        "Find current public web resources with Google, Bing, or DuckDuckGo. Returns canonical organic results rather than engine-specific response data. On first use, Bright MCP may create the required SERP zone in the caller's Bright Data account.",
+        "Find current public pages with Google, Bing, or DuckDuckGo. Use returned URLs directly; scrape relevant pages when their contents are needed. Do not repeat an unchanged query that returned results.",
       inputSchema: {
         query: z.string().trim().min(1).max(500),
         engine: z.enum(["google", "bing", "duckduckgo"]).default("google"),
@@ -135,7 +135,7 @@ export function registerWebTools(
     {
       title: "Scrape URLs",
       description:
-        "Use this to retrieve readable content from one to five known public HTTP(S) URLs. Results preserve input order and isolate per-URL failures. On first use, Bright MCP may create the required Web Unlocker zone in the caller's Bright Data account.",
+        "Retrieve readable content from one to five known public HTTP(S) URLs in one call. Results preserve input order and isolate per-URL failures.",
       inputSchema: {
         urls: z
           .array(z.url().refine(isPublicHttpUrl, "URL must be a public HTTP(S) URL."))

@@ -1,0 +1,494 @@
+---
+import HeroDither from "../components/HeroDither";
+
+const startUrl = "#install";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta
+      name="description"
+      content="Bright MCP gives agents a small, task-oriented interface to Bright Data."
+    />
+    <title>Bright MCP</title>
+  </head>
+  <body>
+    <header class="site-header-section">
+      <div class="site-header rail gutter-left gutter-right">
+        <a class="brand header-brand" href="/" aria-label="Bright MCP home">
+          <img
+            class="brand-icon"
+            src="/assets/icon.png"
+            alt=""
+            width="32"
+            height="32"
+          />
+          <span>Bright MCP</span>
+        </a>
+        <nav aria-label="Primary navigation">
+          <a href="#overview">Overview</a>
+          <a href="#install">Install</a>
+          <a href="#bench">Bench</a>
+          <a href="#start">Docs</a>
+        </nav>
+        <a class="button button-light header-button" href={startUrl}>Read docs</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="section-shell" id="overview">
+        <div class="hero rail gutter-left gutter-right">
+          <div class="hero-gutter-leak"><HeroDither client:load variant="gutter" /></div>
+          <div class="hero-media"><HeroDither client:load /></div>
+          <div class="hero-content">
+            <span class="announcement"><i></i>Web data where agent work happens<b>›</b></span>
+            <h1>From a cold start to<br />useful web data.</h1>
+            <p></p>
+            <a class="button button-light" href={startUrl}>Read docs</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-shell" id="install">
+        <div class="command-intro dot-grid rail gutter-left gutter-right">
+          <p class="label">Lorem ipsum</p>
+          <h2>Lorem ipsum dolor sit amet</h2>
+          <div class="install-command">
+            <span class="package">lorem <b>⌄</b></span>
+            <code>lorem ipsum dolor sit amet</code>
+            <span class="copy" aria-hidden="true">▢</span>
+          </div>
+          <p class="meta">Lorem ipsum <span>·</span> dolor sit amet <span>★</span> 0.0K</p>
+        </div>
+      </section>
+
+      <section class="section-shell" id="bench">
+        <div class="bench rail gutter-left gutter-right">
+          <div class="bench-heading">
+            <p class="label">Lorem ipsum</p>
+            <h2>Lorem ipsum dolor sit amet</h2>
+            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+          </div>
+          <div class="bench-results">
+            <article><small>01</small><strong>00.0</strong><p>Lorem ipsum</p></article>
+            <article><small>02</small><strong>00ms</strong><p>Dolor sit</p></article>
+            <article><small>03</small><strong>0 / 0</strong><p>Amet elit</p></article>
+            <article><small>04</small><strong>00%</strong><p>Consectetur</p></article>
+            <article><small>05</small><strong>0.00</strong><p>Adipiscing</p></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section-shell" id="start">
+        <div class="cta rail gutter-left gutter-right">
+          <div>
+            <p class="label">Bright MCP</p>
+            <h2>Five tools. One clear path to web data.</h2>
+            <p>Discover, inspect, and run Bright Data capabilities without exposing the entire upstream API.</p>
+          </div>
+          <a class="button button-light" href="#overview">Get started</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer-shell">
+      <div class="site-footer rail gutter-left gutter-right">
+        <a class="brand" href="/">Bright MCP</a>
+        <div>
+          <strong>Product</strong>
+          <a href="#overview">Overview</a>
+          <a href="#install">Install</a>
+        </div>
+        <div>
+          <strong>Resources</strong>
+          <a href="#bench">Benchmarks</a>
+          <a href="#start">Get started</a>
+        </div>
+        <span>© 2026</span>
+      </div>
+    </footer>
+  </body>
+</html>
+
+<style>
+  :global(*) { box-sizing: border-box; }
+  :global(html) { scroll-behavior: smooth; }
+  :global(body) {
+    --bg: #141414;
+    --line: #ffffff17;
+    --muted: #aaa;
+    --accent: #8da8c7;
+    background: var(--bg);
+    color: #f2f2f2;
+    font-family: Inter, Arial, sans-serif;
+    margin: 0;
+    overflow-x: hidden;
+  }
+  :global(a) { color: inherit; text-decoration: none; }
+  h1, h2, p { margin-top: 0; }
+
+  .section-shell,
+  .site-header-section { border-bottom: 1px solid var(--line); }
+
+  .rail {
+    margin-inline: auto;
+    max-width: 1280px;
+    width: 100%;
+  }
+
+  .site-header-section {
+    background: #151515;
+    position: relative;
+    z-index: 3;
+  }
+
+  .site-header {
+    align-items: center;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    height: 64px;
+    padding: 0 16px;
+  }
+
+  .brand {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .header-brand {
+    align-items: center;
+    display: inline-flex;
+    font-size: 22px;
+    gap: 16px;
+    height: 100%;
+  }
+
+  .brand-icon {
+    border-radius: 22%;
+    display: block;
+    flex: 0 0 32px;
+    height: 32px;
+    object-fit: cover;
+    width: 32px;
+  }
+
+  nav { display: flex; gap: 38px; }
+  nav a { color: #bdbdbd; font-size: 14px; }
+  nav a:hover,
+  .site-footer a:hover { color: white; }
+  .header-button { justify-self: end; }
+
+  .button {
+    border: 1px solid #ffffff22;
+    border-radius: 7px;
+    display: inline-flex;
+    font-size: 14px;
+    justify-content: center;
+    padding: 11px 16px;
+  }
+
+  .button-light { background: #f4f4f4; color: #171717; }
+  .button-light:hover { background: white; }
+
+  .hero {
+    align-items: center;
+    display: flex;
+    justify-content: center;
+    min-height: 560px;
+    overflow: visible;
+    position: relative;
+    text-align: center;
+  }
+
+  .hero-gutter-leak { display: none; }
+
+  .hero-media {
+    background-color: #20212a;
+    inset: 0;
+    overflow: hidden;
+    position: absolute;
+    z-index: 1;
+  }
+
+  .hero-gutter-leak :global(canvas),
+  .hero-media :global(canvas) {
+    display: block;
+  }
+
+  .hero-media::after {
+    background: linear-gradient(#14151a22, #14151a77);
+    content: '';
+    inset: 0;
+    position: absolute;
+  }
+
+  .hero-content {
+    max-width: 700px;
+    padding: 70px 24px;
+    position: relative;
+    z-index: 2;
+  }
+
+  .announcement {
+    align-items: center;
+    background: #ffffff12;
+    border: 1px solid #ffffff12;
+    border-radius: 7px;
+    color: #e2e2e2;
+    display: inline-flex;
+    font-size: 13px;
+    gap: 10px;
+    padding: 8px 12px;
+  }
+
+  .announcement i {
+    background: #9ff;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #8ff;
+    height: 7px;
+    width: 7px;
+  }
+
+  .announcement b {
+    color: #aaa;
+    font-size: 18px;
+    font-weight: 400;
+  }
+
+  .hero h1 {
+    font-size: clamp(34px, 4vw, 48px);
+    font-weight: 600;
+    letter-spacing: 0;
+    line-height: 1;
+    margin: 26px 0 16px;
+  }
+
+  .hero-content > p {
+    font-size: 16px;
+    line-height: 1.45;
+    margin: 0 auto 26px;
+    max-width: 590px;
+  }
+
+  .label {
+    color: var(--accent);
+    font: 500 11px/1.2 "SFMono-Regular", Consolas, monospace;
+    margin: 0;
+    text-transform: uppercase;
+  }
+
+  .dot-grid {
+    background-color: var(--bg);
+    background-image: radial-gradient(#ffffff0c 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
+
+  .command-intro {
+    align-items: center;
+    display: flex;
+    flex-direction: column;
+    min-height: 315px;
+    padding: 62px 20px 38px;
+    text-align: center;
+  }
+
+  .command-intro h2,
+  .bench-heading h2 {
+    font-size: 24px;
+    font-weight: 600;
+    line-height: 1.15;
+    margin: 12px 0 0;
+  }
+
+  .install-command {
+    align-items: stretch;
+    background: #202020;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    display: grid;
+    grid-template-columns: 80px 1fr 55px;
+    margin-top: 32px;
+    max-width: 640px;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .install-command .package,
+  .install-command .copy {
+    align-items: center;
+    display: flex;
+    font-size: 13px;
+    justify-content: center;
+    min-height: 50px;
+  }
+
+  .install-command .package { border-right: 1px solid var(--line); gap: 8px; }
+  .install-command .package b { font-size: 11px; font-weight: 400; }
+  .install-command .copy { border-left: 1px solid var(--line); font-size: 19px; }
+  .install-command code {
+    align-items: center;
+    color: #c8c8c8;
+    display: flex;
+    font: 13px "SFMono-Regular", Consolas, monospace;
+    padding: 0 18px;
+    text-align: left;
+  }
+
+  .meta { color: #9d9d9d; font-size: 13px; margin: 24px 0 0; }
+  .meta span { margin: 0 8px; }
+
+  .bench-heading {
+    align-items: center;
+    background-color: var(--bg);
+    background-image: radial-gradient(#ffffff0c 1px, transparent 1px);
+    background-size: 16px 16px;
+    display: flex;
+    flex-direction: column;
+    min-height: 210px;
+    padding: 52px 20px 36px;
+    text-align: center;
+  }
+
+  .bench-heading > p:last-child {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 12px 0 0;
+  }
+
+  .bench-results { display: grid; grid-template-columns: repeat(5, 1fr); }
+  .bench-results article {
+    min-height: 150px;
+    padding: 26px 24px;
+  }
+  .bench-results article + article { border-left: 1px solid var(--line); }
+  .bench-results small {
+    color: var(--accent);
+    display: block;
+    font: 10px "SFMono-Regular", Consolas, monospace;
+  }
+  .bench-results strong { display: block; font-size: 24px; margin-top: 23px; }
+  .bench-results p { color: var(--muted); font-size: 12px; margin: 7px 0 0; }
+
+  .cta {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
+    min-height: 230px;
+    padding: 48px 5%;
+  }
+
+  .cta h2 {
+    font-size: 32px;
+    font-weight: 600;
+    line-height: 1.15;
+    margin: 12px 0 0;
+  }
+
+  .cta > div > p:last-child {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 14px 0 0;
+    max-width: 560px;
+  }
+
+  .site-footer {
+    display: grid;
+    gap: 30px;
+    grid-template-columns: 2fr 1fr 1fr auto;
+    min-height: 220px;
+    padding: 44px 32px;
+  }
+
+  .site-footer div {
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+    gap: 8px;
+  }
+
+  .site-footer strong { margin-bottom: 6px; }
+  .site-footer span {
+    color: #777;
+    font: 11px "SFMono-Regular", Consolas, monospace;
+  }
+
+  @media (min-width: 1280px) {
+    .gutter-left {
+      border-left-color: var(--gutter-left-color, var(--line));
+      border-left-style: solid;
+      border-left-width: var(--gutter-left-width, 1px);
+    }
+
+    .gutter-right {
+      border-right-color: var(--gutter-right-color, var(--line));
+      border-right-style: solid;
+      border-right-width: var(--gutter-right-width, 1px);
+    }
+  }
+
+  @media (min-width: 1281px) {
+    .hero-gutter-leak {
+      -webkit-mask-image: linear-gradient(
+        90deg,
+        transparent 0,
+        #000 calc(50% - 640px),
+        transparent calc(50% - 628px),
+        transparent calc(50% + 628px),
+        #000 calc(50% + 640px),
+        transparent 100%
+      );
+      clip-path: inset(0);
+      display: block;
+      filter: blur(0.6px);
+      inset-block: 0;
+      left: 50%;
+      mask-image: linear-gradient(
+        90deg,
+        transparent 0,
+        #000 calc(50% - 640px),
+        transparent calc(50% - 628px),
+        transparent calc(50% + 628px),
+        #000 calc(50% + 640px),
+        transparent 100%
+      );
+      mix-blend-mode: screen;
+      opacity: 0.3;
+      overflow: hidden;
+      pointer-events: none;
+      position: absolute;
+      transform: translateX(-50%);
+      width: 100vw;
+      z-index: 0;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .site-header { grid-template-columns: 1fr auto; }
+    .site-header nav { display: none; }
+    .hero { min-height: 520px; }
+    .hero h1 { font-size: 36px; }
+    .bench-results { grid-template-columns: repeat(2, 1fr); }
+    .bench-results article { border-bottom: 1px solid var(--line); }
+    .bench-results article:nth-child(odd) { border-left: 0; }
+    .bench-results article:last-child { grid-column: 1 / -1; }
+    .cta {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 28px;
+      padding: 42px 24px;
+    }
+    .site-footer { grid-template-columns: 1fr 1fr; }
+    .site-footer > .brand { grid-column: 1 / -1; }
+  }
+
+  @media (max-width: 480px) {
+    .install-command { grid-template-columns: 72px 1fr 46px; }
+    .install-command code { font-size: 11px; padding: 0 10px; }
+  }
+</style>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" role="img" aria-labelledby="title">
+  <title id="title">Bright MCP</title>
+  <defs>
+    <clipPath id="app-icon-shape">
+      <path d="M360 0C160 0 85 0 42 42S0 160 0 360v534c0 200 0 275 42 318s118 42 318 42h534c200 0 275 0 318-42s42-118 42-318V360c0-200 0-275-42-318S1094 0 894 0H360Z" />
+    </clipPath>
+  </defs>
+  <image
+    href="icon.png"
+    width="1254"
+    height="1254"
+    preserveAspectRatio="xMidYMid slice"
+    clip-path="url(#app-icon-shape)"
+  />
+</svg>

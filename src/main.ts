@@ -156,12 +156,21 @@ const browserProvider = browserProfile === "disabled"
 const widgetFile = Bun.file(
   new URL("../dist/dataset-table.html", import.meta.url),
 );
+const iconFile = Bun.file(new URL("../assets/icon.png", import.meta.url));
 
 if (!(await widgetFile.exists())) {
   throw new Error('Dataset table bundle is missing. Run "bun run build" first.');
 }
+if (!(await iconFile.exists())) {
+  throw new Error("Bright MCP icon is missing at assets/icon.png.");
+}
 
 const widgetHtml = await widgetFile.text();
+const icon = {
+  src: `data:image/png;base64,${Buffer.from(await iconFile.arrayBuffer()).toString("base64")}`,
+  mimeType: "image/png" as const,
+  sizes: ["1254x1254"],
+};
 const activeBrowsers = new Set<BrowserUseCases>();
 const createServer = () => {
   const browser = browserProvider ? createBrowser(browserProvider) : undefined;
@@ -177,6 +186,7 @@ const createServer = () => {
     tasks: httpAuthorization ? undefined : taskStore,
     widgetHtml,
     principalId,
+    icon,
     connection: hostedConnection,
   });
   if (browser) {

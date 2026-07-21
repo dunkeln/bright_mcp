@@ -23,6 +23,11 @@ export function createBrightMcpServer(dependencies: {
   tasks?: CancellableTaskStore;
   widgetHtml: string;
   principalId: string;
+  icon: {
+    src: string;
+    mimeType: "image/png";
+    sizes: string[];
+  };
   connection?: {
     manualUrl: string;
     createElicitation(
@@ -35,7 +40,11 @@ export function createBrightMcpServer(dependencies: {
   };
 }) {
   const server = new McpServer(
-    { name: "bright-mcp", version: "0.1.0" },
+    {
+      name: "bright-mcp",
+      version: "0.1.0",
+      icons: [dependencies.icon],
+    },
     {
       ...(dependencies.tasks
         ? {

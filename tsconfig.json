@@ -28,6 +28,7 @@
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
   },
+  "include": ["src", "scripts", "checks"],
   "exclude": [
     "src/components/dither-kit/polar.ts",
     "src/components/dither-kit/polar-context.tsx",

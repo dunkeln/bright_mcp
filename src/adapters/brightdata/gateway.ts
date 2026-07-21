@@ -21,15 +21,35 @@ export class BrightDataGateway {
   ) {}
 
   async requestJson(
-    request: {
-      method: "GET" | "POST";
-      path: string;
-      query?: Record<string, string>;
-      body?: unknown;
-      timeoutMs?: number;
-    },
+    request: GatewayRequest,
     context: RequestContext,
   ): Promise<{ status: number; data: unknown }> {
+    return this.request(request, context, (text) => {
+      try {
+        return text.length ? JSON.parse(text) : null;
+      } catch {
+        throw new CapabilityError(
+          "malformed_upstream_response",
+          "Bright Data returned a response that was not valid JSON.",
+          false,
+          "Retry once. If this persists, verify the configured Bright Data product.",
+        );
+      }
+    });
+  }
+
+  async requestText(
+    request: GatewayRequest,
+    context: RequestContext,
+  ): Promise<{ status: number; data: string }> {
+    return this.request(request, context, (text) => text);
+  }
+
+  private async request<T>(
+    request: GatewayRequest,
+    context: RequestContext,
+    parse: (text: string) => T,
+  ): Promise<{ status: number; data: T }> {
     const startedAt = performance.now();
     const url = new URL(
       request.path,
@@ -58,35 +78,18 @@ export class BrightDataGateway {
           body: request.body === undefined ? undefined : JSON.stringify(request.body),
           signal,
         });
-        const text = await response.text();
 
         if (!response.ok) {
+          await response.body?.cancel();
           if (RETRYABLE_STATUS.has(response.status) && attempt < 3) {
             await this.retryDelay(attempt, context.signal);
             continue;
           }
           throw statusError(response.status);
         }
-        if (new TextEncoder().encode(text).byteLength > MAX_RESPONSE_BYTES) {
-          throw new CapabilityError(
-            "upstream_response_too_large",
-            "Bright Data returned more data than this synchronous operation accepts.",
-            false,
-            "Use a smaller page count or task-backed execution when available.",
-          );
-        }
+        const text = await readBoundedText(response, MAX_RESPONSE_BYTES);
 
-        let data: unknown;
-        try {
-          data = text.length ? JSON.parse(text) : null;
-        } catch {
-          throw new CapabilityError(
-            "malformed_upstream_response",
-            "Bright Data returned a response that was not valid JSON.",
-            false,
-            "Retry once. If this persists, verify the selected dataset contract.",
-          );
-        }
+        const data = parse(text);
 
         this.options.logger.info({
           operation: `${request.method} ${request.path}`,
@@ -135,13 +138,55 @@ export class BrightDataGateway {
   }
 }
 
+type GatewayRequest = {
+  method: "GET" | "POST";
+  path: string;
+  query?: Record<string, string>;
+  body?: unknown;
+  timeoutMs?: number;
+};
+
+async function readBoundedText(response: Response, maxBytes: number) {
+  const declaredLength = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    await response.body?.cancel();
+    throw responseTooLarge();
+  }
+  if (!response.body) return "";
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = "";
+  while (true) {
+    const chunk = await reader.read();
+    if (chunk.done) break;
+    bytes += chunk.value.byteLength;
+    if (bytes > maxBytes) {
+      await reader.cancel();
+      throw responseTooLarge();
+    }
+    text += decoder.decode(chunk.value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
+function responseTooLarge() {
+  return new CapabilityError(
+    "upstream_response_too_large",
+    "Bright Data returned more data than this operation accepts.",
+    false,
+    "Request less data or use task-backed execution when available.",
+  );
+}
+
 function statusError(status: number): CapabilityError {
   if (status === 400 || status === 422) {
     return new CapabilityError(
       "upstream_rejected_input",
-      "Bright Data rejected the dataset input.",
+      "Bright Data rejected the upstream request input.",
       false,
-      "Call describe_dataset and verify the arguments against its schema.",
+      "Verify the tool arguments and configured Bright Data product zone.",
     );
   }
   if (status === 401) {
@@ -163,17 +208,17 @@ function statusError(status: number): CapabilityError {
   if (status === 403) {
     return new CapabilityError(
       "brightdata_permission_denied",
-      "The configured Bright Data API key lacks access to this dataset.",
+      "The configured Bright Data API key lacks access to this product.",
       false,
       "Grant the API key product access or use another key.",
     );
   }
   if (status === 404) {
     return new CapabilityError(
-      "upstream_dataset_unavailable",
-      "The configured Bright Data dataset is unavailable.",
+      "upstream_capability_unavailable",
+      "The configured Bright Data capability is unavailable.",
       false,
-      "Verify the adapter's upstream dataset mapping.",
+      "Verify the adapter mapping and product zone.",
     );
   }
   if (status === 429) {

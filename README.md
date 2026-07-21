@@ -3,10 +3,10 @@
   <i>unofficial iteration on BrightData API served as MCP</i>
 </div>
 
-Agent-oriented Bright Data capabilities over MCP, built on Bun. The current
-vertical slice includes dataset discovery, exact dataset description, synchronous
-demo execution, authorized-in-process result resources, opaque pagination, and a
-React table MCP App. Bright Data network calls are the next adapter slice.
+Agent-oriented Bright Data capabilities over MCP, built on Bun. The five-tool
+base profile includes canonical web search, ordered batch scraping, dataset
+discovery and execution, result resources, optional MCP tasks, and a React table
+MCP App.
 
 ## Run locally
 
@@ -24,15 +24,13 @@ The HTTP MCP endpoint is `http://localhost:8787/mcp`; the health endpoint is
 `http://localhost:8787/`. Set `MCP_TRANSPORT=stdio` to use stdio instead. The
 compatibility check exercises both transports and the complete demo dataset flow.
 
-The current slice exposes `find_datasets`, `describe_dataset`, and `run_dataset`.
-The five-tool base profile becomes complete when the later `search_web` and
-`scrape` vertical slice lands; no placeholder tools are registered in the meantime.
-
-Set `BRIGHTDATA_API_KEY` to route those dataset tools to the documented Amazon
-Products Search scraper. Without it, the server uses the bounded in-memory demo
-catalog so the entire MCP and app loop remains runnable. Credentials are read
-only by the composition root and never enter tool inputs, results, resources, or
-the app.
+Set `BRIGHTDATA_API_KEY` to route dataset execution to the documented Amazon
+Products Search scraper. Set `BRIGHTDATA_SERP_ZONE` and
+`BRIGHTDATA_UNLOCKER_ZONE` to route `search_web` and `scrape` through the SERP and
+Web Unlocker APIs. Without an API key, bounded in-memory demo ports keep the full
+MCP and app loop runnable. Structured extraction requires an injected provider
+and otherwise returns an actionable capability error. Credentials and zone names
+are read only by the composition root and never enter tool inputs or results.
 
 
 | Dimension | BrightData MCP | Bright MCP |

@@ -26,9 +26,53 @@ async function checkStdio() {
     const tools = await client.listTools();
     assert(
       tools.tools.map((tool) => tool.name).join(",") ===
-        "find_datasets,describe_dataset,run_dataset",
-      "The dataset slice must expose exactly its three routed tools.",
+        "search_web,scrape,find_datasets,describe_dataset,run_dataset",
+      "The base profile must expose exactly its five routed tools.",
     );
+
+    const searched = await client.callTool({
+      name: "search_web",
+      arguments: { query: "Bright Data" },
+    });
+    assert(!searched.isError, "search_web failed.");
+
+    const scraped = await client.callTool({
+      name: "scrape",
+      arguments: {
+        urls: ["https://example.com/one", "https://example.com/two"],
+        format: "markdown",
+      },
+    });
+    assert(!scraped.isError, "scrape failed.");
+    const scrapeResult = scraped.structuredContent as {
+      results?: Array<{ url?: string }>;
+    };
+    assert(
+      scrapeResult.results?.map((item) => item.url).join(",") ===
+        "https://example.com/one,https://example.com/two",
+      "scrape did not preserve input order.",
+    );
+
+    const extraction = await client.callTool({
+      name: "scrape",
+      arguments: {
+        urls: ["https://example.com/"],
+        extraction: {
+          instructions: "Return the page title.",
+          fields: { title: { kind: "string" } },
+        },
+      },
+    });
+    assert(
+      extraction.isError,
+      "scrape must fail clearly when extraction is requested without a provider.",
+    );
+
+    const privateTarget = await client.callTool({
+      name: "scrape",
+      arguments: { urls: ["http://127.0.0.1/private"] },
+    });
+    assert(privateTarget.isError, "scrape accepted a private-network URL.");
 
     const found = await client.callTool({
       name: "find_datasets",
@@ -134,7 +178,7 @@ async function checkHttp() {
     );
     try {
       const tools = await client.listTools();
-      assert(tools.tools.length === 3, "Bun HTTP did not expose the dataset tools.");
+      assert(tools.tools.length === 5, "Bun HTTP did not expose the base tools.");
     } finally {
       await client.close();
     }
@@ -162,7 +206,13 @@ function environment(overrides: Record<string, string>): Record<string, string> 
       (entry): entry is [string, string] => entry[1] !== undefined,
     ),
   );
-  return { ...inherited, ...overrides };
+  return {
+    ...inherited,
+    BRIGHTDATA_API_KEY: "",
+    BRIGHTDATA_SERP_ZONE: "",
+    BRIGHTDATA_UNLOCKER_ZONE: "",
+    ...overrides,
+  };
 }
 
 function assert(value: unknown, message: string): asserts value {

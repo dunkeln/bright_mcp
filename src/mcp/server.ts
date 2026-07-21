@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { DatasetUseCases } from "../core/datasets";
+import type { DatasetAdapter } from "../core/datasets";
 import type { ResultStore } from "../core/results";
 import type { WebUseCases } from "../core/web";
 import type { BrowserUseCases } from "../browser/use-cases";
@@ -11,7 +11,7 @@ import { registerWebTools } from "./web-tools";
 export { DATASET_WORKBENCH_URI } from "./dataset-tools";
 
 export function createBrightMcpServer(dependencies: {
-  datasets: DatasetUseCases;
+  datasets: DatasetAdapter;
   createWeb: (server: McpServer) => WebUseCases;
   browser?: BrowserUseCases;
   results: ResultStore;

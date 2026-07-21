@@ -21,7 +21,7 @@ import {
   type JsonObject,
   type RequestContext,
 } from "../core/contracts";
-import type { DatasetUseCases } from "../core/datasets";
+import type { DatasetAdapter } from "../core/datasets";
 import type { ResultStore } from "../core/results";
 import { jsonResourceReply, reply, requestContext, runTool } from "./support";
 import type { CancellableTaskStore } from "./task-store";
@@ -90,7 +90,7 @@ type RunDatasetInput = {
 };
 
 type DatasetToolDependencies = {
-  datasets: DatasetUseCases;
+  datasets: DatasetAdapter;
   results: ResultStore;
   tasks?: CancellableTaskStore;
   widgetHtml: string;
@@ -122,7 +122,7 @@ export function registerDatasetTools(
           extra.authInfo,
         );
         const structuredContent = {
-          datasets: await dependencies.datasets.findDatasets(query, limit, context),
+          datasets: await dependencies.datasets.catalog.find(query, limit, context),
         };
         return reply(
           structuredContent,
@@ -151,7 +151,7 @@ export function registerDatasetTools(
           extra.authInfo,
         );
         const structuredContent =
-          await dependencies.datasets.describeDataset(datasetId, context);
+          await dependencies.datasets.catalog.describe(datasetId, context);
         return reply(
           structuredContent,
           `Dataset definition:\n${JSON.stringify(structuredContent)}\nNext: call run_dataset with this ID, one returned operation, and matching arguments.`,
@@ -327,7 +327,7 @@ function executeRunDataset(
   ) => CapabilityError | undefined | Promise<CapabilityError | undefined>,
 ): Promise<CallToolResult> {
   return runTool(async () => {
-    const structuredContent = await dependencies.datasets.runDataset(
+    const structuredContent = await dependencies.datasets.runner.run(
       input,
       context,
     );

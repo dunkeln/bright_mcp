@@ -20,7 +20,6 @@ import {
   staticCredential,
 } from "./connections/credentials";
 import { staticBrowserCredential } from "./connections/browser-credentials";
-import { createDatasetUseCases } from "./core/datasets";
 import { createWebUseCases } from "./core/web";
 import { createBrightMcpServer } from "./mcp/server";
 import { startHttpServer } from "./mcp/http-server";
@@ -115,7 +114,6 @@ const webAdapter = testFixtures
       serp: process.env.BRIGHTDATA_SERP_ZONE?.trim() || undefined,
       unlocker: process.env.BRIGHTDATA_UNLOCKER_ZONE?.trim() || undefined,
     });
-const datasets = createDatasetUseCases(datasetAdapter);
 const browserProfile = process.env.MCP_BROWSER_PROFILE?.trim() || "disabled";
 if (
   browserProfile !== "disabled" &&
@@ -154,7 +152,7 @@ const activeBrowsers = new Set<BrowserUseCases>();
 const createServer = (requestPrincipal = principalId) => {
   const browser = browserProvider ? createBrowser(browserProvider) : undefined;
   const server = createBrightMcpServer({
-    datasets,
+    datasets: datasetAdapter,
     createWeb: (server) =>
       createWebUseCases({
         ...webAdapter,

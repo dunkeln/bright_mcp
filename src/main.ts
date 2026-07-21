@@ -7,10 +7,12 @@ import { LocalResultStore } from "./adapters/result-store";
 import { staticCredential } from "./connections/credentials";
 import { createDatasetUseCases } from "./core/datasets";
 import { createBrightMcpServer } from "./mcp/server";
+import { CancellableTaskStore } from "./mcp/task-store";
 
 const transportName = process.env.MCP_TRANSPORT ?? "http";
 const principalId = "local";
 const resultStore = new LocalResultStore();
+const taskStore = new CancellableTaskStore();
 const apiKey = process.env.BRIGHTDATA_API_KEY?.trim();
 const datasetAdapter = apiKey
   ? createBrightDataDatasetAdapter(
@@ -38,6 +40,7 @@ const createServer = () =>
   createBrightMcpServer({
     datasets,
     results: resultStore,
+    tasks: taskStore,
     widgetHtml,
     principalId,
   });

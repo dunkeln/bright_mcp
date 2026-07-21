@@ -1,19 +1,25 @@
 import {
   registerAppResource,
-  registerAppTool,
   RESOURCE_MIME_TYPE,
 } from "@modelcontextprotocol/ext-apps/server";
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import {
+  CallToolResultSchema,
+  type CallToolResult,
+} from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import {
   CapabilityError,
   datasetOperationSchema,
   datasetResultSchema,
   jsonValueSchema,
+  type DatasetOperation,
+  type JsonObject,
   type RequestContext,
 } from "../core/contracts";
 import type { DatasetUseCases } from "../core/datasets";
 import type { ResultStore } from "../core/results";
+import type { CancellableTaskStore } from "./task-store";
 
 export const DATASET_TABLE_URI = "ui://bright-mcp/dataset-table";
 
@@ -48,12 +54,18 @@ const definitionSchema = z.object({
 export function createBrightMcpServer(dependencies: {
   datasets: DatasetUseCases;
   results: ResultStore;
+  tasks: CancellableTaskStore;
   widgetHtml: string;
   principalId: string;
 }) {
   const server = new McpServer(
     { name: "bright-mcp", version: "0.1.0" },
     {
+      capabilities: {
+        tasks: { list: {}, cancel: {}, requests: { tools: { call: {} } } },
+      },
+      taskStore: dependencies.tasks,
+      defaultTaskPollInterval: 500,
       instructions:
         "Use find_datasets, then describe_dataset, then run_dataset. Only pass a dataset ID returned by discovery and arguments matching the described operation schema.",
     },
@@ -107,8 +119,7 @@ export function createBrightMcpServer(dependencies: {
       }),
   );
 
-  registerAppTool(
-    server,
+  server.experimental.tasks.registerToolTask(
     "run_dataset",
     {
       title: "Run dataset",
@@ -126,37 +137,66 @@ export function createBrightMcpServer(dependencies: {
         idempotentHint: false,
         openWorldHint: false,
       },
+      execution: { taskSupport: "optional" },
       _meta: {
         ui: { resourceUri: DATASET_TABLE_URI, visibility: ["model", "app"] },
+        "ui/resourceUri": DATASET_TABLE_URI,
         "openai/outputTemplate": DATASET_TABLE_URI,
         "openai/toolInvocation/invoking": "Running dataset…",
         "openai/toolInvocation/invoked": "Dataset ready",
       },
     },
-    async ({ datasetId, operation, arguments: args }, extra) =>
-      runTool(async () => {
-        const context = requestContext(dependencies.principalId, extra.signal);
-        const structuredContent = await dependencies.datasets.runDataset(
-          { datasetId, operation, arguments: args },
-          context,
+    {
+      async createTask(input, extra) {
+        const task = await extra.taskStore.createTask({
+          ttl: taskTtl(extra.taskRequestedTtl),
+          pollInterval: 500,
+        });
+        const controller = new AbortController();
+        dependencies.tasks.bind(task.taskId, controller);
+        const abortFromRequest = () => controller.abort(extra.signal.reason);
+        extra.signal.addEventListener("abort", abortFromRequest, { once: true });
+
+        void executeRunDataset(input, dependencies, controller.signal)
+          .then(async (result) => {
+            await extra.taskStore.storeTaskResult(
+              task.taskId,
+              result.isError ? "failed" : "completed",
+              result,
+            );
+          })
+          .catch(async (error) => {
+            await extra.taskStore.storeTaskResult(task.taskId, "failed", {
+              isError: true,
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({
+                    code: "internal_error",
+                    message: error instanceof Error ? error.message : "Task failed.",
+                    retryable: true,
+                    nextAction: "Retry once.",
+                  }),
+                },
+              ],
+            });
+          })
+          .finally(() => {
+            extra.signal.removeEventListener("abort", abortFromRequest);
+            dependencies.tasks.release(task.taskId);
+          });
+
+        return { task };
+      },
+      async getTask(_input, extra) {
+        return extra.taskStore.getTask(extra.taskId);
+      },
+      async getTaskResult(_input, extra) {
+        return CallToolResultSchema.parse(
+          await extra.taskStore.getTaskResult(extra.taskId),
         );
-        return {
-          structuredContent,
-          content: [
-            {
-              type: "text" as const,
-              text: `${structuredContent.dataset.title} returned ${structuredContent.page.totalRows ?? structuredContent.rows.length} rows. The response includes a bounded preview.`,
-            },
-            {
-              type: "resource_link" as const,
-              uri: structuredContent.artifact.uri,
-              name: `${structuredContent.dataset.title} result`,
-              description: "Completed canonical dataset result",
-              mimeType: structuredContent.artifact.mediaType,
-            },
-          ],
-        };
-      }),
+      },
+    },
   );
 
   server.registerResource(
@@ -234,6 +274,48 @@ export function createBrightMcpServer(dependencies: {
   );
 
   return server;
+}
+
+function executeRunDataset(
+  input: {
+    datasetId: string;
+    operation: DatasetOperation;
+    arguments: JsonObject;
+  },
+  dependencies: {
+    datasets: DatasetUseCases;
+    principalId: string;
+  },
+  signal: AbortSignal,
+): Promise<CallToolResult> {
+  return runTool(async () => {
+    const context = requestContext(dependencies.principalId, signal);
+    const structuredContent = await dependencies.datasets.runDataset(
+      input,
+      context,
+    );
+    return {
+      structuredContent,
+      content: [
+        {
+          type: "text" as const,
+          text: `${structuredContent.dataset.title} returned ${structuredContent.page.totalRows ?? structuredContent.rows.length} rows. The response includes a bounded preview.`,
+        },
+        {
+          type: "resource_link" as const,
+          uri: structuredContent.artifact.uri,
+          name: `${structuredContent.dataset.title} result`,
+          description: "Completed canonical dataset result",
+          mimeType: structuredContent.artifact.mediaType,
+        },
+      ],
+    };
+  });
+}
+
+function taskTtl(requested: number | null | undefined) {
+  if (requested === null || requested === undefined) return 15 * 60_000;
+  return Math.min(Math.max(requested, 60_000), 15 * 60_000);
 }
 
 function requestContext(

@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ArrowRight,
   ArrowUpSm,
+  BarChart as BarChartIcon,
   DotsVerticalMoreMenu,
   Eye,
   EyeOff,
@@ -20,9 +21,11 @@ import {
   type DatasetResult,
   type JsonObject,
 } from "../core/contracts";
+import { DatasetOverview } from "./DatasetOverview";
 
 type Sort = { key: string; direction: "ascending" | "descending" } | null;
 type Selection = { rowRef: string; row: JsonObject };
+type View = "table" | "overview";
 
 function DatasetTable() {
   const isBrowserPreview = Boolean(
@@ -35,6 +38,8 @@ function DatasetTable() {
   const [pageIndex, setPageIndex] = useState(0);
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<Sort>(null);
+  const [view, setView] = useState<View>("table");
+  const [profileIndex, setProfileIndex] = useState(0);
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
   const [hiddenColumnKeys, setHiddenColumnKeys] = useState<string[]>([]);
   const [menuColumnKey, setMenuColumnKey] = useState<string | null>(null);
@@ -56,6 +61,8 @@ function DatasetTable() {
         }
         setPages([parsed.value]);
         setPageIndex(0);
+        setView("table");
+        setProfileIndex(0);
         setColumnWidths({});
         setHiddenColumnKeys([]);
         setMenuColumnKey(null);
@@ -240,21 +247,6 @@ function DatasetTable() {
 
   return (
     <main className="flex min-w-0 flex-col gap-3 p-3 sm:p-4">
-      <header className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="text-xs text-secondary">Dataset result</p>
-          <h1 className="heading-lg">{page.dataset.title}</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          {selection.length > 0 && (
-            <Badge color="info" pill>
-              {selection.length} selected
-            </Badge>
-          )}
-          {page.page.truncated && <Badge color="warning">Preview</Badge>}
-        </div>
-      </header>
-
       {page.warnings?.map((warning) => (
         <p
           key={warning.code}
@@ -265,9 +257,45 @@ function DatasetTable() {
         </p>
       ))}
 
-      <div className="flex justify-end">
+      <section className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_224px]">
+        <nav
+          className="flex min-w-0 items-center gap-2 overflow-x-auto"
+          role="tablist"
+          aria-label="Open tables"
+        >
+          <button
+            className="max-w-full truncate rounded-lg bg-surface-secondary px-3 py-1.5 text-sm font-medium"
+            type="button"
+            role="tab"
+            aria-selected="true"
+          >
+            {page.dataset.title}
+          </button>
+          {selection.length > 0 && (
+            <Badge color="info" pill>
+              {selection.length} selected
+            </Badge>
+          )}
+          {page.page.truncated && <Badge color="warning">Preview</Badge>}
+        </nav>
+        <Button
+          variant="ghost"
+          color="secondary"
+          size="sm"
+          uniform
+          aria-label={view === "table" ? "Show overview" : "Show table"}
+          aria-pressed={view === "overview"}
+          title={view === "table" ? "Show overview" : "Show table"}
+          onClick={() =>
+            setView((current) =>
+              current === "table" ? "overview" : "table",
+            )
+          }
+        >
+          <BarChartIcon className="size-4" aria-hidden="true" />
+        </Button>
         <Input
-          className="w-full max-w-sm"
+          className="col-span-2 w-full sm:col-span-1"
           type="search"
           aria-label="Filter rows on this page"
           placeholder="Search visible values"
@@ -276,10 +304,18 @@ function DatasetTable() {
           value={filter}
           onChange={(event) => setFilter(event.currentTarget.value)}
         />
-      </div>
+      </section>
 
-      <div className="overflow-x-auto rounded-xl border border-subtle">
-        <table className="w-full min-w-max table-fixed border-collapse text-left text-sm">
+      {view === "overview" ? (
+        <DatasetOverview
+          profiles={page.profiles}
+          profileIndex={profileIndex}
+          rowCount={page.page.totalRows ?? page.rows.length}
+          onProfileIndexChange={setProfileIndex}
+        />
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-subtle">
+          <table className="w-full min-w-max table-fixed border-collapse text-left text-sm">
           <colgroup>
             <col className="w-10" />
             {visibleColumns.map((column) => (
@@ -426,15 +462,17 @@ function DatasetTable() {
               );
             })}
           </tbody>
-        </table>
-        {visibleRows.length === 0 && (
-          <p className="p-4 text-center text-sm text-secondary" role="status">
-            No rows match this page filter.
-          </p>
-        )}
-      </div>
+          </table>
+          {visibleRows.length === 0 && (
+            <p className="p-4 text-center text-sm text-secondary" role="status">
+              No rows match this page filter.
+            </p>
+          )}
+        </div>
+      )}
 
-      <footer className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+      {view === "table" && (
+        <footer className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div className="flex min-w-0 items-center gap-2">
           {!isBrowserPreview && (
             <p className="truncate text-xs text-secondary" aria-live="polite">
@@ -489,7 +527,8 @@ function DatasetTable() {
             <ArrowRight className="rtl:rotate-180" aria-hidden="true" />
           </Button>
         </div>
-      </footer>
+        </footer>
+      )}
     </main>
   );
 }

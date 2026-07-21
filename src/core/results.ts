@@ -1,8 +1,12 @@
-import type { DatasetResult, RequestContext } from "./contracts";
+import type {
+  DatasetResult,
+  DatasetResultBase,
+  RequestContext,
+} from "./contracts";
 
 export type ResultStore = {
   save(
-    result: Omit<DatasetResult, "rows" | "rowRefs" | "page" | "artifact">,
+    result: DatasetResultBase,
     rows: DatasetResult["rows"],
     context: RequestContext,
   ): DatasetResult;

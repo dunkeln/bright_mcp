@@ -2,8 +2,10 @@ import { LRUCache } from "lru-cache";
 import {
   CapabilityError,
   type DatasetResult,
+  type DatasetResultBase,
   type RequestContext,
 } from "../core/contracts";
+import { profileDataset } from "../core/profiles";
 import type { ResultStore } from "../core/results";
 
 const PREVIEW_ROWS = 8;
@@ -30,15 +32,19 @@ export class LocalResultStore implements ResultStore {
   });
 
   save(
-    base: StoredResult["base"],
+    base: DatasetResultBase,
     rows: DatasetResult["rows"],
     context: RequestContext,
   ): DatasetResult {
     const expiresAt = new Date(Date.now() + RESULT_TTL_MS).toISOString();
+    const profiledBase: StoredResult["base"] = {
+      ...base,
+      profiles: profileDataset(base.columns, rows),
+    };
     this.results.set(base.resultId, {
       owner: context.principalId,
       expiresAt,
-      base,
+      base: profiledBase,
       rows,
     });
     return this.page(base.resultId, 0, PREVIEW_ROWS);

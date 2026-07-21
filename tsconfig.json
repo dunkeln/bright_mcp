@@ -11,6 +11,7 @@
 
     // Bundler mode
     "moduleResolution": "bundler",
+    "paths": { "@/*": ["./src/*"] },
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
@@ -26,5 +27,10 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "exclude": [
+    "src/components/dither-kit/polar.ts",
+    "src/components/dither-kit/polar-context.tsx",
+    "src/components/dither-kit/polar-root.tsx"
+  ]
 }

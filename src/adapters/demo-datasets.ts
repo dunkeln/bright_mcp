@@ -3,6 +3,7 @@ import {
   CapabilityError,
   type DatasetDefinition,
   type DatasetResult,
+  type DatasetResultBase,
   type DatasetSummary,
 } from "../core/contracts";
 import type { DatasetCatalog, DatasetRunner } from "../core/datasets";
@@ -98,10 +99,7 @@ export function createDemoDatasetAdapter(resultStore: ResultStore): {
           ? searchRows(parseInput(searchInputSchema, input.arguments))
           : collectRows(parseInput(collectInputSchema, input.arguments));
 
-        const base: Omit<
-          DatasetResult,
-          "rows" | "rowRefs" | "page" | "artifact"
-        > = {
+        const base: DatasetResultBase = {
           schemaVersion: 1,
           resultId: `result_${crypto.randomUUID()}`,
           dataset: { id: definition.id, title: definition.title },

@@ -4,6 +4,7 @@ import {
   jsonValueSchema,
   type DatasetDefinition,
   type DatasetResult,
+  type DatasetResultBase,
   type DatasetSummary,
 } from "../../core/contracts";
 import type { DatasetCatalog, DatasetRunner } from "../../core/datasets";
@@ -114,10 +115,7 @@ export function createBrightDataDatasetAdapter(
           ? parseRows(response.data)
           : await finishSnapshot(gateway, response.data, context);
         const bounded = boundRows(rows);
-        const base: Omit<
-          DatasetResult,
-          "rows" | "rowRefs" | "page" | "artifact"
-        > = {
+        const base: DatasetResultBase = {
           schemaVersion: 1,
           resultId: `result_${crypto.randomUUID()}`,
           dataset: { id: definition.id, title: definition.title },

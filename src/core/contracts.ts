@@ -24,12 +24,30 @@ export const datasetWarningSchema = z.object({
   message: z.string(),
 });
 
+export const datasetProfileSchema = z.object({
+  columnKey: z.string().min(1),
+  label: z.string().min(1),
+  kind: z.enum(["numeric", "date", "category", "boolean"]),
+  populated: z.number().int().nonnegative(),
+  missing: z.number().int().nonnegative(),
+  distinct: z.number().int().nonnegative(),
+  buckets: z.array(z.object({
+    label: z.string(),
+    count: z.number().int().nonnegative(),
+  })).max(8),
+  stats: z.array(z.object({
+    label: z.string(),
+    value: z.union([z.string(), z.number()]),
+  })).max(5),
+});
+
 export const datasetResultSchema = z.object({
   schemaVersion: z.literal(1),
   resultId: z.string().min(1),
   dataset: z.object({ id: z.string().min(1), title: z.string().min(1) }),
   operation: datasetOperationSchema,
   columns: z.array(datasetColumnSchema),
+  profiles: z.array(datasetProfileSchema),
   rows: z.array(z.record(z.string(), jsonValueSchema)),
   rowRefs: z.array(z.string().min(1)),
   page: z.object({
@@ -70,7 +88,12 @@ export const datasetResultSchema = z.object({
 
 export type JsonObject = Record<string, unknown>;
 export type DatasetOperation = z.infer<typeof datasetOperationSchema>;
+export type DatasetProfile = z.infer<typeof datasetProfileSchema>;
 export type DatasetResult = z.infer<typeof datasetResultSchema>;
+export type DatasetResultBase = Omit<
+  DatasetResult,
+  "profiles" | "rows" | "rowRefs" | "page" | "artifact"
+>;
 
 export type DatasetSummary = {
   id: string;

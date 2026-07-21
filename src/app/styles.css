@@ -2,6 +2,15 @@
 @import "@openai/apps-sdk-ui/css";
 @source "../../node_modules/@openai/apps-sdk-ui";
 @source "./main.tsx";
+@source "../components";
+
+:root {
+  --color-foreground: var(--color-text-primary, #1f1f1f);
+  --color-muted-foreground: var(--color-text-secondary, #666);
+  --color-popover: var(--color-background-primary, #fff);
+  --color-popover-foreground: var(--color-text-primary, #1f1f1f);
+  --color-border: var(--color-border-default, #d9d9d9);
+}
 
 html,
 body,

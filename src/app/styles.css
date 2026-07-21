@@ -21,3 +21,56 @@ input:focus-visible {
   outline: 2px solid var(--focus-ring-color, #2563eb);
   outline-offset: 2px;
 }
+
+.column-header {
+  position: relative;
+  height: 36px;
+  padding-block: 0;
+  padding-inline: 12px 34px;
+}
+
+.column-menu {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 6px;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 120ms ease;
+}
+
+.column-header:hover .column-menu,
+.column-header:focus-within .column-menu,
+.column-menu[data-state="open"] {
+  opacity: 0.7;
+}
+
+.resize-handle {
+  position: absolute;
+  z-index: 2;
+  inset-block: 4px;
+  inset-inline-end: -3px;
+  width: 7px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.resize-handle::after {
+  position: absolute;
+  inset-block: 4px;
+  inset-inline-start: 3px;
+  width: 1px;
+  background: currentColor;
+  content: "";
+  opacity: 0;
+}
+
+.column-header:hover .resize-handle::after,
+.resize-handle:focus-visible::after,
+.resizing-column .resize-handle::after {
+  opacity: 0.35;
+}
+
+.resizing-column {
+  cursor: col-resize;
+  user-select: none;
+}

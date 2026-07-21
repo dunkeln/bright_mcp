@@ -1,12 +1,18 @@
 import { Badge } from "@openai/apps-sdk-ui/components/Badge";
 import { Button } from "@openai/apps-sdk-ui/components/Button";
 import {
+  ArrowDownSm,
   ArrowLeft,
   ArrowRight,
+  ArrowUpSm,
+  DotsVerticalMoreMenu,
+  Eye,
+  EyeOff,
 } from "@openai/apps-sdk-ui/components/Icon";
 import { Input } from "@openai/apps-sdk-ui/components/Input";
+import { Menu } from "@openai/apps-sdk-ui/components/Menu";
 import { useApp, useHostStyles } from "@modelcontextprotocol/ext-apps/react";
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   datasetResultSchema,
@@ -28,10 +34,14 @@ function DatasetTable() {
   const [pageIndex, setPageIndex] = useState(0);
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<Sort>(null);
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({});
+  const [hiddenColumnKeys, setHiddenColumnKeys] = useState<string[]>([]);
+  const [menuColumnKey, setMenuColumnKey] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection[]>([]);
   const [pageError, setPageError] = useState<string | null>(initial.error ?? null);
   const [contextError, setContextError] = useState<string | null>(null);
   const [loadingPage, setLoadingPage] = useState(false);
+  const activeResize = useRef<AbortController | null>(null);
 
   const { app, isConnected, error } = useApp({
     appInfo: { name: "bright-dataset-table", version: "0.1.0" },
@@ -45,6 +55,9 @@ function DatasetTable() {
         }
         setPages([parsed.value]);
         setPageIndex(0);
+        setColumnWidths({});
+        setHiddenColumnKeys([]);
+        setMenuColumnKey(null);
         setSelection([]);
         setPageError(null);
       };
@@ -53,6 +66,13 @@ function DatasetTable() {
   useHostStyles(app, app?.getHostContext());
 
   const page = pages[pageIndex];
+  const visibleColumns = useMemo(
+    () =>
+      page?.columns.filter(
+        (column) => !hiddenColumnKeys.includes(column.key),
+      ) ?? [],
+    [hiddenColumnKeys, page],
+  );
   const visibleRows = useMemo(() => {
     if (!page) return [];
     const query = filter.trim().toLocaleLowerCase();
@@ -161,6 +181,52 @@ function DatasetTable() {
     );
   };
 
+  const beginColumnResize = (
+    event: React.PointerEvent<HTMLButtonElement>,
+    key: string,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+    activeResize.current?.abort();
+
+    const controller = new AbortController();
+    const header = event.currentTarget.parentElement;
+    if (!header) return;
+    const startX = event.clientX;
+    const startWidth = header.getBoundingClientRect().width;
+    const direction = getComputedStyle(header).direction === "rtl" ? -1 : 1;
+    activeResize.current = controller;
+    document.body.classList.add("resizing-column");
+
+    window.addEventListener(
+      "pointermove",
+      (moveEvent) => {
+        const width = Math.min(
+          640,
+          Math.max(96, startWidth + (moveEvent.clientX - startX) * direction),
+        );
+        setColumnWidths((current) => ({ ...current, [key]: width }));
+      },
+      { signal: controller.signal },
+    );
+    window.addEventListener(
+      "pointerup",
+      () => {
+        controller.abort();
+        activeResize.current = null;
+        document.body.classList.remove("resizing-column");
+      },
+      { once: true, signal: controller.signal },
+    );
+  };
+
+  const hideColumn = (key: string) => {
+    if (visibleColumns.length > 1) {
+      setHiddenColumnKeys((current) => [...current, key]);
+    }
+    setMenuColumnKey(null);
+  };
+
   const toggleSelection = (rowRef: string, row: JsonObject, checked: boolean) => {
     setSelection((current) =>
       checked
@@ -213,28 +279,123 @@ function DatasetTable() {
       </label>
 
       <div className="overflow-x-auto rounded-xl border border-subtle">
-        <table className="w-full min-w-max border-collapse text-left text-sm">
+        <table className="w-full min-w-max table-fixed border-collapse text-left text-sm">
+          <colgroup>
+            <col className="w-10" />
+            {visibleColumns.map((column) => (
+              <col
+                key={column.key}
+                style={{ width: columnWidths[column.key] ?? 180 }}
+              />
+            ))}
+          </colgroup>
           <thead className="bg-surface-secondary">
             <tr>
               <th className="w-10 border-b border-subtle px-3 py-2">
                 <span className="sr-only">Select row</span>
               </th>
-              {page.columns.map((column) => (
+              {visibleColumns.map((column) => (
                 <th
                   key={column.key}
-                  className="border-b border-subtle px-3 py-2 font-medium"
+                  className="column-header border-b border-subtle font-medium"
                   aria-sort={sort?.key === column.key ? sort.direction : "none"}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setMenuColumnKey(column.key);
+                  }}
                 >
                   <button
                     type="button"
-                    className="flex items-center gap-1 rounded-sm"
+                    className="flex h-full w-full items-center gap-1 overflow-hidden rounded-sm text-start"
                     onClick={() => changeSort(column.key)}
                     aria-label={`Sort by ${column.label}`}
                   >
-                    {column.label}
+                    <span className="truncate">{column.label}</span>
                     {sort?.key === column.key &&
                       (sort.direction === "ascending" ? " ↑" : " ↓")}
                   </button>
+                  <Menu
+                    forceOpen={menuColumnKey === column.key}
+                    onClose={() => setMenuColumnKey(null)}
+                  >
+                    <Menu.Trigger>
+                      <Button
+                        className="column-menu"
+                        variant="ghost"
+                        color="secondary"
+                        size="xs"
+                        uniform
+                        aria-label={`Options for ${column.label}`}
+                        title={`Options for ${column.label}`}
+                        onClick={() => setMenuColumnKey(column.key)}
+                      >
+                        <DotsVerticalMoreMenu className="size-4" aria-hidden="true" />
+                      </Button>
+                    </Menu.Trigger>
+                    <Menu.Content align="end" minWidth={210}>
+                      <Menu.Item
+                        onSelect={() =>
+                          setSort({ key: column.key, direction: "ascending" })
+                        }
+                      >
+                        <ArrowUpSm className="size-4" aria-hidden="true" />
+                        Sort ascending
+                      </Menu.Item>
+                      <Menu.Item
+                        onSelect={() =>
+                          setSort({ key: column.key, direction: "descending" })
+                        }
+                      >
+                        <ArrowDownSm className="size-4" aria-hidden="true" />
+                        Sort descending
+                      </Menu.Item>
+                      <Menu.Separator />
+                      <Menu.Item
+                        disabled={visibleColumns.length === 1}
+                        onSelect={() => hideColumn(column.key)}
+                      >
+                        <EyeOff className="size-4" aria-hidden="true" />
+                        Hide column
+                      </Menu.Item>
+                      {hiddenColumnKeys.length > 0 && (
+                        <Menu.Sub>
+                          <Menu.SubTrigger>
+                            <Eye className="size-4" aria-hidden="true" />
+                            Show columns
+                          </Menu.SubTrigger>
+                          <Menu.SubContent minWidth={180}>
+                            {page.columns
+                              .filter((candidate) =>
+                                hiddenColumnKeys.includes(candidate.key),
+                              )
+                              .map((hiddenColumn) => (
+                                <Menu.Item
+                                  key={hiddenColumn.key}
+                                  onSelect={() =>
+                                    setHiddenColumnKeys((current) =>
+                                      current.filter(
+                                        (key) => key !== hiddenColumn.key,
+                                      ),
+                                    )
+                                  }
+                                >
+                                  {hiddenColumn.label}
+                                </Menu.Item>
+                              ))}
+                          </Menu.SubContent>
+                        </Menu.Sub>
+                      )}
+                    </Menu.Content>
+                  </Menu>
+                  <button
+                    className="resize-handle"
+                    type="button"
+                    aria-label={`Resize ${column.label} column`}
+                    title="Drag to resize"
+                    onPointerDown={(event) =>
+                      beginColumnResize(event, column.key)
+                    }
+                  />
                 </th>
               ))}
             </tr>
@@ -254,8 +415,8 @@ function DatasetTable() {
                       }
                     />
                   </td>
-                  {page.columns.map((column) => (
-                    <td key={column.key} className="max-w-80 px-3 py-2 align-top">
+                  {visibleColumns.map((column) => (
+                    <td key={column.key} className="px-3 py-2 align-top">
                       <span className="line-clamp-3 break-words">
                         {displayValue(row[column.key])}
                       </span>

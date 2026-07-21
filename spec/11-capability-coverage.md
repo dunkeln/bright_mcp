@@ -22,7 +22,7 @@ capability, not endpoint inventory.
 | Reference capability | V1 disposition |
 |---|---|
 | Search, batch search, engines, pagination | `search_web` |
-| Intent-ranked and content-inclusive research | `search_web: ranked | deep` |
+| Intent-ranked research with selected page content | `search_web: ranked | deep` composed with `scrape` |
 | Markdown/HTML scrape and batch scrape | `scrape` |
 | Schema-directed extraction | `scrape.extraction` via `ExtractionProvider` |
 | Web Data collectors | dataset discovery, description, `run_dataset: collect` |

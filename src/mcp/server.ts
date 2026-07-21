@@ -41,7 +41,7 @@ export function createBrightMcpServer(dependencies: {
           }
         : {}),
       instructions:
-        "Batch related web queries in one search_web call; ranked or deep search can include page content. For structured data, call find_datasets once, run direct candidates immediately, and use describe_dataset only when discovery omits an operation and example.",
+        "Batch related web queries in one search_web call, then scrape only the selected pages whose full text is needed. For structured data, call find_datasets once, run direct candidates immediately, and use describe_dataset only when discovery omits an operation and example.",
     },
   );
   registerWebTools(

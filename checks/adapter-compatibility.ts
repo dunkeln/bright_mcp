@@ -84,7 +84,6 @@ async function checkSearchReusesUnlocker() {
     {
       queries: [{ query: "Bright Data", engine: "google", locale: "en-US" }],
       depth: "fast",
-      includeContent: false,
     },
     context,
   );
@@ -124,7 +123,6 @@ async function checkBatchAndDiscover() {
       { query: "two", engine: "google", locale: "en-US" },
     ],
     depth: "fast",
-    includeContent: false,
   }, context);
   assert(
     batch.searches.map(({ query }) => query).join(",") === "one,two",
@@ -133,11 +131,10 @@ async function checkBatchAndDiscover() {
   const ranked = await adapter.search.search({
     queries: [{ query: "research", engine: "google", locale: "en-US" }],
     depth: "ranked",
-    includeContent: true,
   }, context);
   assert(
-    ranked.searches[0]?.results[0]?.content === "# Full content",
-    "Discover research did not retain optional page content.",
+    !("content" in (ranked.searches[0]?.results[0] ?? {})),
+    "Search exposed full page content instead of a compact result.",
   );
 }
 
@@ -159,7 +156,6 @@ async function searchWith(
     {
       queries: [{ query: "Bright Data", engine: "google", locale: "en-US" }],
       depth: "fast",
-      includeContent: false,
     },
     context,
   );

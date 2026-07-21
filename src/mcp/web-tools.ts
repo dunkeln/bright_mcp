@@ -16,7 +16,6 @@ const searchResultSchema = z.object({
   title: z.string(),
   url: z.url(),
   summary: z.string(),
-  content: z.string().optional(),
 });
 
 const itemFailureSchema = z.object({
@@ -95,7 +94,7 @@ export function registerWebTools(
     {
       title: "Search web",
       description:
-        "Discover current public-web information when the relevant pages are not yet known. Submit one to five distinct queries together when they investigate the same objective. Use fast to locate current sources, ranked to prioritize relevant evidence, and deep for broader source discovery. With ranked or deep, set includeContent=true when the answer requires page-level evidence; this can complete research without a separate scrape. Use returned cursors only to continue an incomplete result set. Do not use this tool for already-known URLs, structured dataset records, or unchanged queries that already returned useful results. After successful discovery, answer from included content or scrape only the selected sources whose full text is still needed.",
+        "Discover current public-web sources when the relevant pages are not yet known. Submit one to five distinct queries together when they investigate the same objective. Use fast to locate current sources, ranked to prioritize relevant evidence, and deep for broader source discovery. Results contain compact titles, URLs, and summaries; call scrape with markdown for only the selected pages whose full text is needed. Use returned cursors only to continue an incomplete result set. Do not use this tool for already-known URLs, structured dataset records, or unchanged queries that already returned useful results.",
       inputSchema: {
         queries: z.array(z.object({
           query: z.string().trim().min(1).max(500),
@@ -104,7 +103,6 @@ export function registerWebTools(
           cursor: z.string().max(80).optional(),
         })).min(1).max(5),
         depth: z.enum(["fast", "ranked", "deep"]).default("fast"),
-        includeContent: z.boolean().default(false),
         intent: z.string().trim().min(1).max(3_000).optional(),
       },
       outputSchema: {

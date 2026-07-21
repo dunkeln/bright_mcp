@@ -11,7 +11,6 @@ export type SearchQuery = {
 export type SearchRequest = {
   queries: SearchQuery[];
   depth: "fast" | "ranked" | "deep";
-  includeContent: boolean;
   intent?: string;
 };
 
@@ -22,7 +21,6 @@ export type SearchResponse = {
       title: string;
       url: string;
       summary: string;
-      content?: string;
     }>;
     nextCursor?: string;
     error?: ItemFailure;

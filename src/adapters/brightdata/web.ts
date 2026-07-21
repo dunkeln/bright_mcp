@@ -33,7 +33,6 @@ const discoverPollSchema = z.object({
     title: z.string(),
     link: z.url(),
     description: z.string().optional(),
-    content: z.string().optional(),
   })).optional(),
   error: z.string().optional(),
   message: z.string().optional(),
@@ -65,14 +64,6 @@ export function createBrightDataWebAdapter(
   return {
     search: {
       async search(input, context) {
-        if (input.depth === "fast" && input.includeContent) {
-          throw new CapabilityError(
-            "invalid_search_options",
-            "Fast SERP search cannot include page content.",
-            false,
-            "Use ranked or deep depth, or set includeContent to false and call scrape.",
-          );
-        }
         const serpZone = input.depth === "fast"
           ? await resolveZone(gateway, activeZones, zones.serp, "serp", context)
           : undefined;
@@ -200,7 +191,7 @@ async function searchSerp(
 async function searchDiscover(
   gateway: BrightDataGateway,
   query: SearchQuery,
-  options: { depth: "fast" | "ranked" | "deep"; includeContent: boolean; intent?: string },
+  options: { depth: "fast" | "ranked" | "deep"; intent?: string },
   context: RequestContext,
 ) {
   if (query.cursor) {
@@ -218,7 +209,6 @@ async function searchDiscover(
       query: query.query,
       intent: options.intent ?? query.query,
       mode: options.depth === "deep" ? "deep" : "standard",
-      include_content: options.includeContent,
       format: "json",
       language: query.locale.split("-")[0]?.toLowerCase(),
       country: query.locale.split("-")[1]?.toUpperCase() ?? "US",
@@ -264,7 +254,6 @@ async function searchDiscover(
       title: item.title,
       url: item.link,
       summary: item.description ?? "",
-      content: item.content,
     })),
   };
 }

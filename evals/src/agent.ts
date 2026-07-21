@@ -79,7 +79,7 @@ try {
       job.server === "bright" &&
       "requiresOpenedSources" in job.useCase &&
       job.useCase.requiresOpenedSources
-    ) || called.includes("scrape") || contentInclusiveSearch(result.getToolArguments("search_web"));
+    ) || called.includes("scrape");
     const argumentsValid = pathArgumentsValid && openedSources;
     const responseComplete = result.text.trim().length > 0;
     const outcomeValid = validatesOutcome(result.text, job.useCase);
@@ -176,11 +176,6 @@ function validatesOutcome(
     !("mustRefuse" in useCase) ||
     /["']supported["']\s*:\s*false/i.test(text);
   return fieldsPresent && urls.size >= minimumUrls && refusalValid;
-}
-
-function contentInclusiveSearch(value: Record<string, unknown> | undefined) {
-  return value?.includeContent === true &&
-    (value.depth === "ranked" || value.depth === "deep");
 }
 
 function hasToolExecutionError(value: unknown): boolean {

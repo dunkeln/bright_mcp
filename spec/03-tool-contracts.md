@@ -9,13 +9,15 @@ behavior accurately.
 Purpose: find current web resources for one or more related research angles.
 
 - Input: one to five ordered non-empty queries; optional engine, locale,
-  pagination cursor, explicit `fast | ranked | deep` depth, intent, and content.
+  pagination cursor, explicit `fast | ranked | deep` depth, and intent.
 - Output: one ordered result group per query containing title, URL, summary,
-  optional content, continuation cursor, or isolated error.
+  continuation cursor, or isolated error.
 - `fast` MUST use SERP. `ranked` and `deep` MUST use Discover and MUST fail
   actionably when the caller lacks Discover access; routing MUST NOT silently
   switch products with different cost or latency semantics.
 - Engine-specific response envelopes MUST NOT escape the adapter.
+- Page content MUST be acquired explicitly through `scrape`; search results
+  remain compact so one discovery call cannot exhaust the model context.
 
 ## `scrape`
 

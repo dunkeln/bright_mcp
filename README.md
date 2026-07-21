@@ -18,6 +18,7 @@ bun run build
 bun run typecheck
 bun run check:compat
 bun run check:auth
+bun run check:connection
 bun run check:coverage
 bun run start
 ```
@@ -26,11 +27,13 @@ The HTTP MCP endpoint is `http://localhost:8787/mcp`; the health endpoint is
 `http://localhost:8787/`. Set `MCP_TRANSPORT=stdio` to use stdio instead. The
 compatibility check exercises both transports and the complete demo dataset flow.
 
-Set `BRIGHTDATA_API_KEY` to route dataset execution to the documented Amazon
+Set `BRIGHTDATA_PROFILE=live` with `BRIGHTDATA_API_KEY` to route dataset execution to the documented Amazon
 Products Search scraper. Set `BRIGHTDATA_SERP_ZONE` and
 `BRIGHTDATA_UNLOCKER_ZONE` to route `search_web` and `scrape` through the SERP and
 Web Unlocker APIs. Without an API key, bounded in-memory demo ports keep the full
-MCP and app loop runnable. Structured extraction requires an injected provider
+MCP and app loop runnable; `BRIGHTDATA_PROFILE=demo` selects them explicitly.
+The default `auto` profile selects live adapters when a deployment-appropriate
+credential provider is configured. Structured extraction requires an injected provider
 and uses MCP host sampling in this executable; hosts without sampling receive an
 actionable per-page extraction error while retaining scraped content. Credentials
 and zone names are read only by the composition root and never enter tool inputs
@@ -67,11 +70,31 @@ incremental `bright:web`, `bright:datasets:run`, and `bright:browser` scopes.
 `bun run check:auth` starts a temporary issuer and verifies discovery, JWT and
 scope enforcement, and cross-principal result isolation.
 
-Hosted OIDC mode currently uses the demo Bright Data adapters. It deliberately
-rejects deployment-global Bright Data API and Browser API credentials: real
-hosted calls require a principal-bound encrypted credential vault and connection
-flow. Local/headless mode may continue to use the explicit environment settings
-above.
+For real hosted Bright Data calls, set `BRIGHTDATA_PROFILE=live` and configure:
+
+- `MCP_OIDC_CLIENT_ID` and, for a confidential client, `MCP_OIDC_CLIENT_SECRET`;
+- the exact redirect URI `https://<host>/connections/brightdata/callback` at the
+  authorization server;
+- an absolute `MCP_VAULT_PATH` on persistent storage; and
+- `MCP_VAULT_KEY` as a secret-manager-injected 32-byte key encoded as 64 hex
+  characters.
+
+When a principal has no credential, URL-capable MCP clients receive the secure
+connection page. Other clients receive the manual route
+`https://<host>/connections/brightdata`. The token is accepted only on that
+server page, checked against Bright Data's read-only account-status endpoint,
+and encrypted with principal- and deployment-bound AES-GCM before storage.
+Replacement uses the same connection route; revocation is available at
+`https://<host>/connections/brightdata/revoke`. `bun run check:connection`
+verifies PKCE, principal binding, replay resistance, encrypted storage,
+completion notification, manual fallback, and session isolation without using a
+real Bright Data credential.
+
+The built-in hosted vault uses Bun SQLite and therefore targets one Bun instance
+with a persistent volume. Replace the credential provider before running
+multiple instances that need shared writes. Hosted OIDC mode rejects
+deployment-global Bright Data API and Browser API credentials; local/headless
+mode may continue to use the explicit environment or Keychain settings above.
 
 
 | Dimension | BrightData MCP | Bright MCP |

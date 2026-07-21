@@ -1,6 +1,8 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
+import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
+import { LRUCache } from "lru-cache";
 import { createBrightDataDatasetAdapter } from "./adapters/brightdata/datasets";
 import { BrightDataGateway } from "./adapters/brightdata/gateway";
 import { createBrightDataWebAdapter } from "./adapters/brightdata/web";
@@ -21,6 +23,8 @@ import {
   staticCredential,
 } from "./connections/credentials";
 import { staticBrowserCredential } from "./connections/browser-credentials";
+import { createEncryptedCredentialVault } from "./connections/encrypted-vault";
+import { createHostedConnectionService } from "./connections/hosted-connection";
 import { createDatasetUseCases } from "./core/datasets";
 import { createWebUseCases } from "./core/web";
 import { createBrightMcpServer } from "./mcp/server";
@@ -54,6 +58,7 @@ const allowedOrigins = new Set(
     .map((origin) => origin.trim())
     .filter(Boolean),
 );
+if (publicMcpUrl) allowedOrigins.add(publicMcpUrl.origin);
 const principalId = "local";
 const resultStore = new LocalResultStore();
 const taskStore = new CancellableTaskStore();
@@ -64,6 +69,10 @@ if (!(credentialSource === "auto" || credentialSource === "keychain")) {
   );
 }
 const apiKey = process.env.BRIGHTDATA_API_KEY?.trim();
+const dataProfile = process.env.BRIGHTDATA_PROFILE?.trim() || "auto";
+if (!(dataProfile === "auto" || dataProfile === "demo" || dataProfile === "live")) {
+  throw new Error('BRIGHTDATA_PROFILE must be "auto", "demo", or "live".');
+}
 if (credentialSource === "keychain" && apiKey) {
   throw new Error(
     "Choose either BRIGHTDATA_API_KEY or BRIGHTDATA_CREDENTIAL_SOURCE=keychain, not both.",
@@ -77,11 +86,43 @@ if (httpAuthorization && (apiKey || credentialSource === "keychain")) {
     "Hosted OIDC mode cannot use deployment-global Bright Data credentials; configure a principal-bound credential vault.",
   );
 }
-const credentials = apiKey
+if (dataProfile === "demo" && (apiKey || credentialSource === "keychain")) {
+  throw new Error("The demo Bright Data profile cannot accept live credentials.");
+}
+const localCredentials = apiKey
   ? staticCredential(apiKey)
   : credentialSource === "keychain"
     ? macOsKeychainCredential()
     : undefined;
+const liveData = dataProfile === "live" ||
+  (dataProfile === "auto" && (httpAuthorization !== undefined || localCredentials !== undefined));
+if (liveData && !httpAuthorization && !localCredentials) {
+  throw new Error(
+    "The live Bright Data profile requires BRIGHTDATA_API_KEY or BRIGHTDATA_CREDENTIAL_SOURCE=keychain.",
+  );
+}
+const credentialVault = liveData && httpAuthorization
+  ? await createEncryptedCredentialVault({
+      path: requiredSetting("MCP_VAULT_PATH", process.env.MCP_VAULT_PATH),
+      keyHex: requiredSetting("MCP_VAULT_KEY", process.env.MCP_VAULT_KEY),
+      deploymentId: publicMcpUrl!.href,
+    })
+  : undefined;
+const hostedConnection = credentialVault && httpAuthorization
+  ? createHostedConnectionService({
+      authorization: httpAuthorization,
+      publicMcpUrl: publicMcpUrl!,
+      clientId: requiredSetting(
+        "MCP_OIDC_CLIENT_ID",
+        process.env.MCP_OIDC_CLIENT_ID,
+      ),
+      clientSecret: process.env.MCP_OIDC_CLIENT_SECRET || undefined,
+      vault: credentialVault,
+      validateCredential: validateBrightDataCredential,
+      audit: (event) => console.error(JSON.stringify(event)),
+    })
+  : undefined;
+const credentials = credentialVault?.credentials ?? localCredentials;
 const gateway = credentials
   ? new BrightDataGateway({
         credentials,
@@ -114,15 +155,6 @@ if (
 const browser = browserProfile === "disabled"
   ? undefined
   : createBrowser(browserProfile);
-let shuttingDown = false;
-const shutdown = async () => {
-  if (shuttingDown) return;
-  shuttingDown = true;
-  await browser?.shutdown();
-  process.exit(0);
-};
-process.on("SIGINT", shutdown);
-process.on("SIGTERM", shutdown);
 const widgetFile = Bun.file(
   new URL("../dist/dataset-table.html", import.meta.url),
 );
@@ -145,7 +177,58 @@ const createServer = () =>
     tasks: httpAuthorization ? undefined : taskStore,
     widgetHtml,
     principalId,
+    connection: hostedConnection,
   });
+
+const httpSessions = new LRUCache<
+  string,
+  {
+    principalId: string;
+    server: ReturnType<typeof createServer>;
+    transport: WebStandardStreamableHTTPServerTransport;
+  }
+>({
+  max: 1_000,
+  ttl: 60 * 60_000,
+  updateAgeOnGet: true,
+  ttlAutopurge: true,
+  dispose: ({ server }) => void server.close().catch(() => undefined),
+});
+
+let shuttingDown = false;
+const shutdown = async () => {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  httpSessions.clear();
+  await browser?.shutdown();
+  credentialVault?.close();
+  process.exit(0);
+};
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
+async function validateBrightDataCredential(
+  apiKey: string,
+): Promise<"rejected_or_expired" | "permission" | "unavailable" | undefined> {
+  const validationGateway = new BrightDataGateway({
+    credentials: staticCredential(apiKey),
+    logger: { info() {}, error() {} },
+  });
+  try {
+    await validationGateway.requestJson(
+      { method: "GET", path: "/status", timeoutMs: 10_000 },
+      { principalId: "connection-validation", requestId: crypto.randomUUID() },
+    );
+    return undefined;
+  } catch (error) {
+    const code = error && typeof error === "object" && "code" in error
+      ? String(error.code)
+      : "unavailable";
+    if (code === "brightdata_authentication_failed") return "rejected_or_expired";
+    if (code === "brightdata_permission_denied") return "permission";
+    return "unavailable";
+  }
+}
 
 function createBrowser(profile: "demo" | "brightdata") {
   if (httpAuthorization && profile === "brightdata") {
@@ -191,6 +274,8 @@ if (transportName === "stdio") {
         allowedOrigins,
       );
       if (rejectedEdgeRequest) return rejectedEdgeRequest;
+      const connectionResponse = await hostedConnection?.handle(request);
+      if (connectionResponse) return connectionResponse;
       if (
         httpAuthorization &&
         request.method === "GET" &&
@@ -260,13 +345,47 @@ if (transportName === "stdio") {
         }
       }
 
-      const server = createServer();
-      const transport = new WebStandardStreamableHTTPServerTransport({
-        sessionIdGenerator: undefined,
-        enableJsonResponse: true,
-      });
-      await server.connect(transport);
-      const response = await transport.handleRequest(request, {
+      const sessionId = request.headers.get("mcp-session-id");
+      let session = sessionId ? httpSessions.get(sessionId) : undefined;
+      const requestPrincipal = authenticatedPrincipal(authInfo);
+      if (sessionId && (!session || session.principalId !== requestPrincipal)) {
+        return withCors(
+          Response.json(
+            { jsonrpc: "2.0", error: { code: -32_000, message: "Session not found." }, id: null },
+            { status: 404 },
+          ),
+          request,
+          httpAuthorization !== undefined,
+          allowedOrigins,
+        );
+      }
+      if (!session) {
+        if (!isInitializeRequest(parsedBody)) {
+          return withCors(
+            Response.json(
+              { jsonrpc: "2.0", error: { code: -32_000, message: "Initialize an MCP session first." }, id: null },
+              { status: 400 },
+            ),
+            request,
+            httpAuthorization !== undefined,
+            allowedOrigins,
+          );
+        }
+        const server = createServer();
+        const transport = new WebStandardStreamableHTTPServerTransport({
+          sessionIdGenerator: () => crypto.randomUUID(),
+          enableJsonResponse: true,
+          onsessioninitialized(id) {
+            httpSessions.set(id, { principalId: requestPrincipal, server, transport });
+          },
+          onsessionclosed(id) {
+            httpSessions.delete(id);
+          },
+        });
+        session = { principalId: requestPrincipal, server, transport };
+        await server.connect(transport);
+      }
+      const response = await session.transport.handleRequest(request, {
         authInfo,
         parsedBody,
       });
@@ -298,6 +417,17 @@ function configuredUrl(name: string, value: string | undefined) {
   } catch {
     throw new Error(`${name} must be an absolute URL.`);
   }
+}
+
+function requiredSetting(name: string, value: string | undefined) {
+  const configured = value?.trim();
+  if (!configured) throw new Error(`${name} is required.`);
+  return configured;
+}
+
+function authenticatedPrincipal(authInfo: AuthInfo | undefined) {
+  const authenticated = authInfo?.extra?.principalId;
+  return typeof authenticated === "string" ? authenticated : principalId;
 }
 
 function readMaxTokenAge(value: string | undefined) {

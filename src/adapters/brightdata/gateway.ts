@@ -13,13 +13,18 @@ type Logger = {
   error(record: LogRecord): void;
 };
 
+export type FetchFunction = (
+  input: string | URL | Request,
+  init?: RequestInit,
+) => Promise<Response>;
+
 export class BrightDataGateway {
   constructor(
     private readonly options: {
       credentials: CredentialProvider;
       logger: Logger;
       baseUrl?: string;
-      fetch?: typeof fetch;
+      fetch?: FetchFunction;
     },
   ) {}
 

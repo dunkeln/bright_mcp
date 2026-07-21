@@ -411,6 +411,7 @@ function environment(overrides: Record<string, string>): Record<string, string> 
     BRIGHTDATA_BROWSER_USERNAME: "",
     BRIGHTDATA_BROWSER_PASSWORD: "",
     MCP_BROWSER_PROFILE: "disabled",
+    BRIGHTDATA_PROFILE: "demo",
     ...overrides,
   };
 }

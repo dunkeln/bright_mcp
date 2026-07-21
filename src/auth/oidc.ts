@@ -1,7 +1,7 @@
 import { discoverAuthorizationServerMetadata } from "@modelcontextprotocol/sdk/client/auth.js";
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import type { FetchLike } from "@modelcontextprotocol/sdk/shared/transport.js";
-import { createRemoteJWKSet, errors, jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import { ACCESS_SCOPE, missingScopes } from "./scopes";
 
 export type HttpAuthorization = Awaited<ReturnType<typeof createOidcAuthorization>>;
@@ -38,9 +38,15 @@ export async function createOidcAuthorization(options: {
   ) {
     throw new Error("OIDC discovery failed or returned a different issuer.");
   }
+  const issuer = metadata.issuer;
   if (!metadata.code_challenge_methods_supported?.includes("S256")) {
     throw new Error("The authorization server must advertise PKCE S256 support.");
   }
+  const authorizationEndpoint = requiredEndpoint(
+    metadata.authorization_endpoint,
+    "authorization_endpoint",
+  );
+  const tokenEndpoint = requiredEndpoint(metadata.token_endpoint, "token_endpoint");
   const jwksUri = "jwks_uri" in metadata ? metadata.jwks_uri : undefined;
   if (typeof jwksUri !== "string") {
     throw new Error("The authorization server metadata omitted jwks_uri.");
@@ -54,14 +60,62 @@ export async function createOidcAuthorization(options: {
   const resourceMetadataUrl = protectedResourceMetadataUrl(options.resource);
   const maxTokenAgeSeconds = options.maxTokenAgeSeconds ?? 3_600;
 
+  async function verifyToken(token: string): Promise<AuthInfo> {
+    const verified = await jwtVerify(token, keySet, {
+      issuer,
+      audience: options.resource.href,
+      algorithms: asymmetricJwtAlgorithms,
+      requiredClaims: ["sub", "exp", "iat"],
+      clockTolerance: 5,
+    });
+    const { payload } = verified;
+    if (
+      typeof payload.sub !== "string" ||
+      !payload.sub ||
+      typeof payload.exp !== "number" ||
+      typeof payload.iat !== "number" ||
+      payload.exp <= payload.iat ||
+      payload.exp - payload.iat > maxTokenAgeSeconds ||
+      payload.iat > Date.now() / 1_000 + 5
+    ) {
+      throw new Error("Access token lifetime exceeds the configured maximum.");
+    }
+    const subject = payload.sub;
+    const tenant = stringClaim(payload.tid) ?? stringClaim(payload.org_id) ?? "";
+    return {
+      token,
+      clientId:
+        stringClaim(payload.client_id) ?? stringClaim(payload.azp) ?? subject,
+      scopes: readScopes(payload.scope, payload.scp),
+      expiresAt: payload.exp,
+      resource: options.resource,
+      extra: {
+        principalId: principalId(issuer, tenant, subject),
+      },
+    };
+  }
+
   return {
     metadataPath: new URL(resourceMetadataUrl).pathname,
     protectedResourceMetadata: {
       resource: options.resource.href,
-      authorization_servers: [metadata.issuer],
+      authorization_servers: [issuer],
       bearer_methods_supported: ["header"],
       scopes_supported: [ACCESS_SCOPE],
       resource_name: "Bright MCP",
+    },
+    authorizationEndpoint,
+    tokenEndpoint,
+
+    async authenticateToken(token: string) {
+      try {
+        const authInfo = await verifyToken(token);
+        return missingScopes(authInfo, [ACCESS_SCOPE]).length
+          ? undefined
+          : authInfo;
+      } catch {
+        return undefined;
+      }
     },
 
     async authenticate(request: Request): Promise<AuthInfo | Response> {
@@ -71,49 +125,13 @@ export async function createOidcAuthorization(options: {
         return challenge(401, "invalid_token", "A Bearer access token is required.", [ACCESS_SCOPE], resourceMetadataUrl);
       }
       try {
-        const verified = await jwtVerify(match[1]!, keySet, {
-          issuer: metadata.issuer,
-          audience: options.resource.href,
-          algorithms: asymmetricJwtAlgorithms,
-          requiredClaims: ["sub", "exp", "iat"],
-          clockTolerance: 5,
-        });
-        const { payload } = verified;
-        if (
-          typeof payload.sub !== "string" ||
-          !payload.sub ||
-          typeof payload.exp !== "number" ||
-          typeof payload.iat !== "number" ||
-          payload.exp <= payload.iat ||
-          payload.exp - payload.iat > maxTokenAgeSeconds ||
-          payload.iat > Date.now() / 1_000 + 5
-        ) {
-          throw new Error("Access token lifetime exceeds the configured maximum.");
-        }
-        const subject = payload.sub;
-        const tenant = stringClaim(payload.tid) ?? stringClaim(payload.org_id) ?? "";
-        const clientId =
-          stringClaim(payload.client_id) ?? stringClaim(payload.azp) ?? subject;
-        const scopes = readScopes(payload.scope, payload.scp);
-        const authInfo: AuthInfo = {
-          token: match[1]!,
-          clientId,
-          scopes,
-          expiresAt: payload.exp,
-          resource: options.resource,
-          extra: {
-            principalId: principalId(metadata.issuer, tenant, subject),
-          },
-        };
+        const authInfo = await verifyToken(match[1]!);
         const missing = missingScopes(authInfo, [ACCESS_SCOPE]);
         return missing.length
           ? challenge(403, "insufficient_scope", "Additional authorization is required.", [ACCESS_SCOPE], resourceMetadataUrl)
           : authInfo;
-      } catch (error) {
-        const description = error instanceof errors.JOSEError
-          ? "The access token is invalid or expired."
-          : "The access token does not satisfy this resource policy.";
-        return challenge(401, "invalid_token", description, [ACCESS_SCOPE], resourceMetadataUrl);
+      } catch {
+        return challenge(401, "invalid_token", "The access token is invalid or expired.", [ACCESS_SCOPE], resourceMetadataUrl);
       }
     },
 
@@ -166,6 +184,13 @@ function stringClaim(value: unknown) {
 function requireHttps(url: URL, label: string) {
   if (url.protocol !== "https:") throw new Error(`${label} must use HTTPS.`);
   if (url.hash) throw new Error(`${label} must not contain a hash.`);
+}
+
+function requiredEndpoint(value: string | undefined, name: string) {
+  if (!value) throw new Error(`The authorization server metadata omitted ${name}.`);
+  const url = new URL(value);
+  requireHttps(url, name);
+  return url;
 }
 
 function protectedResourceMetadataUrl(resource: URL) {

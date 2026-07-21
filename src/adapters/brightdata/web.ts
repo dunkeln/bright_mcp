@@ -111,6 +111,7 @@ export function createBrightDataWebAdapter(
                     true,
                     "Retry the failed URL once.",
                   );
+              if (failure.code === "brightdata_connection_required") throw failure;
               return {
                 url,
                 format: input.format,

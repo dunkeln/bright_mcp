@@ -9,10 +9,12 @@ import type {
 } from "@modelcontextprotocol/sdk/experimental/tasks/interfaces.js";
 import {
   CallToolResultSchema,
+  UrlElicitationRequiredError,
   type CallToolResult,
 } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import {
+  CapabilityError,
   datasetOperationSchema,
   datasetResultSchema,
   jsonValueSchema,
@@ -170,6 +172,16 @@ export function createBrightMcpServer(dependencies: {
   tasks?: CancellableTaskStore;
   widgetHtml: string;
   principalId: string;
+  connection?: {
+    manualUrl: string;
+    createElicitation(
+      principalId: string,
+      completion: (elicitationId: string) => () => Promise<void>,
+    ): Promise<{
+      elicitationId: string;
+      url: string;
+    }>;
+  };
 }) {
   const server = new McpServer(
     { name: "bright-mcp", version: "0.1.0" },
@@ -188,6 +200,36 @@ export function createBrightMcpServer(dependencies: {
     },
   );
   const web = dependencies.createWeb(server);
+  const connectionError = (context: RequestContext) => async (error: unknown) => {
+    if (
+      !(error instanceof CapabilityError) ||
+      error.code !== "brightdata_connection_required" ||
+      !dependencies.connection
+    ) {
+      return;
+    }
+    if (server.server.getClientCapabilities()?.elicitation?.url) {
+      const elicitation = await dependencies.connection.createElicitation(
+        context.principalId,
+        (elicitationId) =>
+          server.server.createElicitationCompletionNotifier(elicitationId),
+      );
+      throw new UrlElicitationRequiredError([
+        {
+          mode: "url",
+          message:
+            "Connect Bright Data in the secure server page, then retry this request.",
+          ...elicitation,
+        },
+      ]);
+    }
+    return new CapabilityError(
+      "brightdata_connection_required",
+      "Bright Data is not connected for this account.",
+      false,
+      `Open ${dependencies.connection.manualUrl}, connect Bright Data, then retry.`,
+    );
+  };
 
   server.registerTool(
     "search_web",
@@ -210,21 +252,20 @@ export function createBrightMcpServer(dependencies: {
       },
       annotations: { ...annotations, openWorldHint: true },
     },
-    async (input, extra) =>
-      runTool(async () => {
-        const structuredContent = await web.searchWeb(
-          input,
-          requestContext(
-            dependencies.principalId,
-            extra.signal,
-            extra.authInfo,
-          ),
-        );
+    async (input, extra) => {
+      const context = requestContext(
+        dependencies.principalId,
+        extra.signal,
+        extra.authInfo,
+      );
+      return runTool(async () => {
+        const structuredContent = await web.searchWeb(input, context);
         return reply(
           structuredContent,
           `Found ${structuredContent.results.length} web results.`,
         );
-      }),
+      }, connectionError(context));
+    },
   );
 
   server.registerTool(
@@ -244,22 +285,21 @@ export function createBrightMcpServer(dependencies: {
       outputSchema: { results: z.array(scrapeItemSchema) },
       annotations: { ...annotations, openWorldHint: true },
     },
-    async (input, extra) =>
-      runTool(async () => {
-        const structuredContent = await web.scrape(
-          input,
-          requestContext(
-            dependencies.principalId,
-            extra.signal,
-            extra.authInfo,
-          ),
-        );
+    async (input, extra) => {
+      const context = requestContext(
+        dependencies.principalId,
+        extra.signal,
+        extra.authInfo,
+      );
+      return runTool(async () => {
+        const structuredContent = await web.scrape(input, context);
         const failures = structuredContent.results.filter((item) => item.error).length;
         return reply(
           structuredContent,
           `Scraped ${structuredContent.results.length - failures} of ${structuredContent.results.length} URLs.`,
         );
-      }),
+      }, connectionError(context));
+    },
   );
 
   server.registerTool(
@@ -383,16 +423,22 @@ export function createBrightMcpServer(dependencies: {
       },
     );
   } else {
-    server.registerTool("run_dataset", runDatasetConfig, async (input, extra) =>
-      executeRunDataset(
-        input,
-        dependencies,
-        requestContext(
+    server.registerTool(
+      "run_dataset",
+      runDatasetConfig,
+      async (input, extra) => {
+        const context = requestContext(
           dependencies.principalId,
           extra.signal,
           extra.authInfo,
-        ),
-      ),
+        );
+        return executeRunDataset(
+          input,
+          dependencies,
+          context,
+          connectionError(context),
+        );
+      },
     );
   }
 
@@ -496,6 +542,9 @@ function executeRunDataset(
     principalId: string;
   },
   context: RequestContext,
+  onError?: (
+    error: unknown,
+  ) => CapabilityError | undefined | Promise<CapabilityError | undefined>,
 ): Promise<CallToolResult> {
   return runTool(async () => {
     const structuredContent = await dependencies.datasets.runDataset(
@@ -518,7 +567,7 @@ function executeRunDataset(
         },
       ],
     };
-  });
+  }, onError);
 }
 
 function taskTtl(requested: number | null | undefined) {

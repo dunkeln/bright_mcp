@@ -91,6 +91,7 @@ function cleanEnvironment(overrides: Record<string, string>) {
     BRIGHTDATA_BROWSER_USERNAME: "",
     BRIGHTDATA_BROWSER_PASSWORD: "",
     BRIGHTDATA_CREDENTIAL_SOURCE: "auto",
+    BRIGHTDATA_PROFILE: "demo",
     ...overrides,
   };
 }

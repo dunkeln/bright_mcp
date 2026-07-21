@@ -16,7 +16,7 @@ const context: RequestContext = {
 const records: Array<Record<string, unknown>> = [];
 
 await checkSearchShapes();
-await checkZoneCreation();
+await checkUnlockerSearch();
 await checkDatasetPolling();
 await checkExpectedFailures();
 
@@ -61,7 +61,7 @@ async function checkSearchShapes() {
   );
 }
 
-async function checkZoneCreation() {
+async function checkUnlockerSearch() {
   const requests: Array<{ path: string; body?: unknown }> = [];
   const adapter = createBrightDataWebAdapter(
     gateway(async (input, init) => {
@@ -70,8 +70,9 @@ async function checkZoneCreation() {
         path,
         body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
       });
-      if (path === "/zone/get_active_zones") return json([]);
-      if (path === "/zone") return json({});
+      if (path === "/zone/get_active_zones") {
+        return json([{ name: "fixture-unlocker", type: "unblocker" }]);
+      }
       return json({ organic: [] });
     }),
     {},
@@ -81,16 +82,11 @@ async function checkZoneCreation() {
     { query: "Bright Data", engine: "google", locale: "en-US" },
     context,
   );
-  const creation = requests.find(({ path }) => path === "/zone")?.body as {
-    zone?: { name?: string };
-    plan?: { serp?: boolean };
-  } | undefined;
   assert(
     requests.map(({ path }) => path).join(",") ===
-      "/zone/get_active_zones,/zone,/request" &&
-      creation?.zone?.name === "bright_mcp_serp" &&
-      creation.plan?.serp === true,
-    "Missing SERP zones were not created before search.",
+      "/zone/get_active_zones,/request" &&
+      (requests[1]?.body as { zone?: string })?.zone === "fixture-unlocker",
+    "Search did not reuse the account's active Web Unlocker zone.",
   );
 }
 

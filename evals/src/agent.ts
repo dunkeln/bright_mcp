@@ -19,7 +19,10 @@ const upstreamEcommerce = new URL(upstream);
 upstreamEcommerce.searchParams.set("groups", "ecommerce");
 const manager = new MCPClientManager(undefined, { defaultTimeout: 60_000 });
 
-const results: AgentResult[] = [];
+const artifact = Bun.file(new URL("../.artifacts/agent.json", import.meta.url));
+const previous = await readPrevious();
+const expectedRuns = selectedCases.length * 2 * runs;
+const results: AgentResult[] = previous.length === expectedRuns ? [] : previous;
 try {
   await Promise.all([
     manager.connectToServer("bright", {
@@ -34,12 +37,17 @@ try {
     upstream: await manager.getToolsForAiSdk("upstream"),
     upstreamEcommerce: await manager.getToolsForAiSdk("upstream-ecommerce"),
   };
+  const completed = new Set(results.map(resultKey));
   const jobs = shuffle(
     selectedCases.flatMap((useCase) =>
       (["bright", "upstream"] as const).flatMap((server) =>
         Array.from({ length: runs }, (_, run) => ({ useCase, server, run: run + 1 })),
       ),
-    ),
+    ).filter((job) => !completed.has(resultKey({
+      caseId: job.useCase.id,
+      server: job.server,
+      run: job.run,
+    }))),
   );
 
   for (const [index, job] of jobs.entries()) {
@@ -88,6 +96,7 @@ try {
       mcpLatencyMs: result.mcpLatencyMs(),
       ...(result.hasError() ? { error: safeError(result.getError()) } : {}),
     });
+    await persist();
     console.log(`${index + 1}/${jobs.length} ${job.useCase.id} ${serverLabel(job.server)}`);
   }
 } finally {
@@ -98,16 +107,7 @@ try {
   ]);
 }
 
-await writeReport("agent", {
-  schemaVersion: 1,
-  generatedAt: new Date().toISOString(),
-  mode: "mcpjam-openrouter-tool-use",
-  model,
-  runsPerCase: runs,
-  grading:
-    "Pass requires the case's valid tool path, non-empty tool arguments, required output fields and provenance, and no runner error. Factual values are not independently graded.",
-  results,
-});
+await persist();
 
 type AgentResult = {
   caseId: string;
@@ -175,4 +175,33 @@ function shuffle<T>(values: T[]) {
     .map((value) => ({ value, order: crypto.getRandomValues(new Uint32Array(1))[0] }))
     .toSorted((left, right) => left.order - right.order)
     .map(({ value }) => value);
+}
+
+async function readPrevious(): Promise<AgentResult[]> {
+  if (!(await artifact.exists())) return [];
+  const report = await artifact.json() as {
+    model?: string;
+    runsPerCase?: number;
+    results?: AgentResult[];
+  };
+  return report.model === model && report.runsPerCase === runs && Array.isArray(report.results)
+    ? report.results
+    : [];
+}
+
+function resultKey(result: Pick<AgentResult, "caseId" | "server" | "run">) {
+  return `${result.caseId}:${result.server}:${result.run}`;
+}
+
+async function persist() {
+  await writeReport("agent", {
+    schemaVersion: 1,
+    generatedAt: new Date().toISOString(),
+    mode: "mcpjam-openrouter-tool-use",
+    model,
+    runsPerCase: runs,
+    grading:
+      "Pass requires the case's valid tool path, non-empty tool arguments, required output fields and provenance, and no runner error. Factual values are not independently graded.",
+    results,
+  });
 }

@@ -24,12 +24,10 @@ supporting hosts resolve the app resource from tool metadata.
 - Render dataset title, columns, rows, truncation state, and warnings.
 - Support keyboard-accessible sorting, text filtering, pagination, and ordered
   row selection.
-- Support bounded row inspection, selected-row comparison, loaded-row quality
+- Support bounded row inspection, loaded-row quality
   checks, profiles and charts, provenance, HTTP link handoff, and CSV/JSON
   export without adding model-visible tools.
 - Send bounded selected-row context to the host when that capability exists.
-- Selection actions MAY send a user-initiated follow-up after updating model
-  context when the host supports both capabilities.
 - Preserve source row identity when sorting, filtering, or paging.
 - Render arbitrary values as text; never execute result HTML or script.
 - Label exports as loaded or selected rows; the app MUST NOT imply that unloaded

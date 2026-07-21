@@ -7,7 +7,6 @@ import type { DatasetResult, JsonObject } from "../core/contracts";
 import { displayValue, linksFromRows } from "./dataset-utils";
 
 export type WorkbenchPanel =
-  | "compare"
   | "details"
   | "links"
   | "provenance"
@@ -33,7 +32,6 @@ export function DatasetWorkbench({
   onOpenLink: (url: string) => void;
 }) {
   const heading = {
-    compare: "Compare selected rows",
     details: "Row details",
     links: "Sources and links",
     provenance: "Result provenance",
@@ -66,9 +64,6 @@ export function DatasetWorkbench({
           columns={page.columns}
           onOpenLink={onOpenLink}
         />
-      )}
-      {panel === "compare" && (
-        <Comparison selection={selection} columns={page.columns} />
       )}
       {panel === "links" && <Links rows={rows} onOpenLink={onOpenLink} />}
     </section>
@@ -156,29 +151,6 @@ function Details({
         );
       })}
     </dl>
-  );
-}
-
-function Comparison({ selection, columns }: { selection: Selection[]; columns: DatasetResult["columns"] }) {
-  const compared = selection.slice(0, 4);
-  if (compared.length < 2) return <p className="text-sm text-secondary">Select at least two rows to compare.</p>;
-  return (
-    <div className="overflow-x-auto rounded-lg border border-subtle">
-      <table className="w-full min-w-max border-collapse text-sm">
-        <thead className="bg-surface-secondary">
-          <tr><th className="p-2 text-start">Field</th>{compared.map((item, index) => <th key={item.rowRef} className="p-2 text-start">Row {index + 1}</th>)}</tr>
-        </thead>
-        <tbody>
-          {columns.map((column) => (
-            <tr key={column.key} className="border-t border-subtle">
-              <th className="p-2 text-start text-xs font-medium text-secondary">{column.label}</th>
-              {compared.map((item) => <td key={item.rowRef} className="max-w-72 p-2 align-top"><span className="line-clamp-4 break-words">{displayValue(item.row[column.key])}</span></td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {selection.length > 4 && <p className="p-2 text-xs text-secondary">Comparing the first 4 selected rows.</p>}
-    </div>
   );
 }
 

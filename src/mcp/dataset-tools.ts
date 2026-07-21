@@ -295,7 +295,7 @@ export function registerDatasetTools(
           csp: { connectDomains: [], resourceDomains: [] },
         },
         "openai/widgetDescription":
-          "Inspects a dataset through a table, profiles, quality checks, row comparison, provenance, exports, and model handoff.",
+          "Inspects a dataset through a table, profiles, quality checks, provenance, and exports.",
       },
     },
     async () => ({
@@ -310,7 +310,7 @@ export function registerDatasetTools(
               csp: { connectDomains: [], resourceDomains: [] },
             },
             "openai/widgetDescription":
-              "Inspects a dataset through a table, profiles, quality checks, row comparison, provenance, exports, and model handoff.",
+              "Inspects a dataset through a table, profiles, quality checks, provenance, and exports.",
           },
         },
       ],

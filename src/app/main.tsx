@@ -8,13 +8,11 @@ import {
   ArrowUpSm,
   AnalyzeData,
   BarChart as BarChartIcon,
-  Compare,
   DataControls,
   DotsVerticalMoreMenu,
   Download,
   Eye,
   EyeOff,
-  FileSpreadsheet,
   InfoCircle,
   Link,
   Search,
@@ -157,23 +155,6 @@ function DatasetWorkbenchApp() {
     const timeout = window.setTimeout(() => void shareSelection(), 250);
     return () => window.clearTimeout(timeout);
   }, [app, selection]);
-
-  const sendSelectionAction = async (prompt: string) => {
-    if (!app || !app.getHostCapabilities()?.message?.text) {
-      setContextError("This host cannot start a follow-up from the app.");
-      return;
-    }
-    await shareSelection();
-    try {
-      const result = await app.sendMessage({
-        role: "user",
-        content: [{ type: "text", text: prompt }],
-      });
-      setContextError(result.isError ? "The host rejected the follow-up." : null);
-    } catch {
-      setContextError("The host could not start the follow-up.");
-    }
-  };
 
   const openLink = async (url: string) => {
     if (app?.getHostCapabilities()?.openLinks) {
@@ -325,11 +306,6 @@ function DatasetWorkbenchApp() {
           >
             {page.dataset.title}
           </button>
-          {selection.length > 0 && (
-            <Badge color="info" pill>
-              {selection.length} selected
-            </Badge>
-          )}
           {page.page.truncated && <Badge color="warning">Preview</Badge>}
         </nav>
         <Button
@@ -600,53 +576,6 @@ function DatasetWorkbenchApp() {
         </div>
       )}
 
-      {view === "table" && selection.length > 0 && (
-        <aside className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-secondary p-2" aria-label="Selection actions">
-          <p className="px-1 text-xs text-secondary">{selection.length} rows ready for the model</p>
-          <div className="flex flex-wrap gap-1.5">
-            <Button
-              variant="ghost"
-              color="secondary"
-              size="sm"
-              disabled={selection.length < 2}
-              onClick={() => setView("compare")}
-            >
-              <Compare className="size-4" aria-hidden="true" />
-              Compare
-            </Button>
-            <Button
-              variant="ghost"
-              color="secondary"
-              size="sm"
-              onClick={() =>
-                downloadRows("csv", `${page.dataset.title}-selection`, page.columns, selection.map(({ row }) => row))
-              }
-            >
-              <Download className="size-4" aria-hidden="true" />
-              Export
-            </Button>
-            <Button
-              variant="soft"
-              color="secondary"
-              size="sm"
-              onClick={() => void sendSelectionAction("Analyze the selected dataset rows, surface notable patterns, and cite the fields you used.")}
-            >
-              <AnalyzeData className="size-4" aria-hidden="true" />
-              Analyze
-            </Button>
-            <Button
-              variant="soft"
-              color="secondary"
-              size="sm"
-              onClick={() => void sendSelectionAction("Prepare the selected dataset rows for spreadsheet analysis. Preserve field names and explain the cleanest next spreadsheet step.")}
-            >
-              <FileSpreadsheet className="size-4" aria-hidden="true" />
-              Spreadsheet
-            </Button>
-          </div>
-        </aside>
-      )}
-
       {view === "table" && (
         <footer className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
         <div className="flex min-w-0 items-center gap-2">
@@ -668,41 +597,66 @@ function DatasetWorkbenchApp() {
         <p className="text-center text-xs text-secondary" aria-live="polite">
           {page.page.totalRows ?? page.rows.length} rows · page {pageIndex + 1}
         </p>
-        {(pageIndex > 0 || page.page.nextResourceUri) && (
+        {(selection.length > 0 || pageIndex > 0 || page.page.nextResourceUri) && (
           <div className="flex justify-self-end gap-2">
-            <Button
-              color="secondary"
-              variant="soft"
-              size="md"
-              iconSize="sm"
-              uniform
-              pill={false}
-              disabled={pageIndex === 0}
-              aria-label="Previous page"
-              title="Previous page"
-              onClick={() => {
-                setPageIndex((current) => Math.max(0, current - 1));
-                setFilter("");
-                setSort(null);
-              }}
-            >
-              <ArrowLeft className="rtl:rotate-180" aria-hidden="true" />
-            </Button>
-            <Button
-              color="secondary"
-              variant="soft"
-              size="md"
-              iconSize="sm"
-              uniform
-              pill={false}
-              loading={loadingPage}
-              disabled={!page.page.nextResourceUri || !app}
-              aria-label="Next page"
-              title="Next page"
-              onClick={loadNextPage}
-            >
-              <ArrowRight className="rtl:rotate-180" aria-hidden="true" />
-            </Button>
+            {selection.length > 0 && (
+              <Button
+                color="secondary"
+                variant="ghost"
+                size="md"
+                iconSize="sm"
+                uniform
+                aria-label="Export selected rows as CSV"
+                title="Export selected rows"
+                onClick={() =>
+                  downloadRows(
+                    "csv",
+                    `${page.dataset.title}-selection`,
+                    page.columns,
+                    selection.map(({ row }) => row),
+                  )
+                }
+              >
+                <Download aria-hidden="true" />
+              </Button>
+            )}
+            {(pageIndex > 0 || page.page.nextResourceUri) && (
+              <>
+                <Button
+                  color="secondary"
+                  variant="soft"
+                  size="md"
+                  iconSize="sm"
+                  uniform
+                  pill={false}
+                  disabled={pageIndex === 0}
+                  aria-label="Previous page"
+                  title="Previous page"
+                  onClick={() => {
+                    setPageIndex((current) => Math.max(0, current - 1));
+                    setFilter("");
+                    setSort(null);
+                  }}
+                >
+                  <ArrowLeft className="rtl:rotate-180" aria-hidden="true" />
+                </Button>
+                <Button
+                  color="secondary"
+                  variant="soft"
+                  size="md"
+                  iconSize="sm"
+                  uniform
+                  pill={false}
+                  loading={loadingPage}
+                  disabled={!page.page.nextResourceUri || !app}
+                  aria-label="Next page"
+                  title="Next page"
+                  onClick={loadNextPage}
+                >
+                  <ArrowRight className="rtl:rotate-180" aria-hidden="true" />
+                </Button>
+              </>
+            )}
           </div>
         )}
         </footer>

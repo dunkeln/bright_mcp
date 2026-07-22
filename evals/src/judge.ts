@@ -146,7 +146,7 @@ function responseSchema(pairIds: string[]) {
   const scores = { type: "object", additionalProperties: false, required: [...dimensions], properties: scoreProperties };
   return {
     type: "object", additionalProperties: false, required: ["judgments"], properties: {
-      judgments: { type: "array", minItems: pairIds.length, maxItems: pairIds.length, items: {
+      judgments: { type: "array", items: {
         type: "object", additionalProperties: false, required: ["pairId", "scores", "winner", "confidence", "reason"], properties: {
           pairId: { type: "string", enum: pairIds },
           scores: { type: "object", additionalProperties: false, required: ["A", "B"], properties: { A: scores, B: scores } },

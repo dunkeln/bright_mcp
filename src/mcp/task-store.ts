@@ -5,14 +5,28 @@ import type { Result, TaskStatus } from "@modelcontextprotocol/sdk/types.js";
 export class CancellableTaskStore extends InMemoryTaskStore {
   private readonly controllers = new Map<string, AbortController>();
   private readonly cancelled = new Set<string>();
+  private readonly expiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-  bind(taskId: string, controller: AbortController) {
+  bind(taskId: string, controller: AbortController, ttl: number | null) {
     this.controllers.set(taskId, controller);
+    if (ttl) {
+      this.expiryTimers.set(taskId, setTimeout(() => {
+        this.cancelled.add(taskId);
+        this.controllers.get(taskId)?.abort(
+          new DOMException("Dataset task expired.", "AbortError"),
+        );
+        this.controllers.delete(taskId);
+        this.expiryTimers.delete(taskId);
+      }, ttl));
+    }
   }
 
   release(taskId: string) {
     this.controllers.delete(taskId);
     this.cancelled.delete(taskId);
+    const timer = this.expiryTimers.get(taskId);
+    if (timer) clearTimeout(timer);
+    this.expiryTimers.delete(taskId);
   }
 
   override async storeTaskResult(
@@ -38,5 +52,16 @@ export class CancellableTaskStore extends InMemoryTaskStore {
       );
     }
     return super.updateTaskStatus(taskId, status, statusMessage, sessionId);
+  }
+
+  override cleanup() {
+    for (const [taskId, controller] of this.controllers) {
+      this.cancelled.add(taskId);
+      controller.abort(new DOMException("MCP session closed.", "AbortError"));
+    }
+    for (const timer of this.expiryTimers.values()) clearTimeout(timer);
+    this.controllers.clear();
+    this.expiryTimers.clear();
+    super.cleanup();
   }
 }

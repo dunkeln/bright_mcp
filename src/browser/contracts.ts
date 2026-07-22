@@ -1,13 +1,13 @@
 import type { RequestContext } from "../core/contracts";
 
 export type BrowserAction =
-  | { kind: "click"; selector: string }
-  | { kind: "type"; selector: string; text: string }
-  | { kind: "select"; selector: string; value: string }
-  | { kind: "press"; selector?: string; key: string }
+  | { kind: "click"; ref: string }
+  | { kind: "type"; ref: string; text: string }
+  | { kind: "select"; ref: string; value: string }
+  | { kind: "press"; ref?: string; key: string }
   | {
       kind: "wait";
-      selector: string;
+      ref: string;
       state: "attached" | "visible" | "hidden";
     }
   | { kind: "scroll"; deltaY: number };

@@ -4,14 +4,14 @@
   <i>unofficial iteration on BrightData API served as MCP</i>
 </div>
 
-Agent-oriented Bright Data capabilities over MCP, built on Bun. The six-tool
-all profile separates search, exact reading, extraction, research, maintained
+Agent-oriented Bright Data capabilities over MCP, built on Bun. The seven-tool
+all profile separates search, ranked source discovery, exact reading, extraction, research, maintained
 dataset discovery, and execution. It pages complete pages and upstream snapshots
 as resources and renders structured results in a
 transient React MCP workbench.
 
-The full six-tool contract remains at `/mcp`. Entitlement-aligned installs can
-use stable two-tool surfaces at `/mcp/web`, `/mcp/deep-lookup`, or
+The full seven-tool contract remains at `/mcp`. Entitlement-aligned installs can
+use stable three- or two-tool surfaces at `/mcp/web`, `/mcp/deep-lookup`, or
 `/mcp/marketplace`; Scraping Browser is a separate four-tool surface at
 `/mcp/browser`. Tool lists never change after initialization based on a probe.
 
@@ -40,18 +40,20 @@ Choose the narrowest surface your account and workflow need:
 
 | Endpoint | Tools | Bright Data access | Authorization |
 |---|---|---|---|
-| `/mcp` | All six data tools | SERP, Web Unlocker, Deep Lookup, Marketplace as used | Bearer API key |
-| `/mcp/web` | `search_web`, `read_web` | SERP + Web Unlocker | Bearer API key |
+| `/mcp` | All seven data tools | SERP, Discover, Web Unlocker, Deep Lookup, Marketplace as used | Bearer API key |
+| `/mcp/web` | `search_web`, `discover_web`, `read_web` | SERP + Discover + Web Unlocker | Bearer API key |
 | `/mcp/deep-lookup` | `extract_web`, `research_web` | General Deep Lookup | Bearer API key |
 | `/mcp/marketplace` | `find_datasets`, `run_dataset` | Account-visible Marketplace datasets | Bearer API key |
 | `/mcp/browser` | Four `browser_*` tools | Scraping Browser | HTTP Basic with Browser API username/password |
 
-Choose among the six data tools by intent:
+Choose among the seven data tools by intent:
 
 | Sources | Needed result | Tool |
 |---|---|---|
 | Unknown | Compact links and summaries | `search_web` |
+| Unknown, goal-constrained | Ranked source shortlist | `discover_web` |
 | Known URLs | Readable page evidence | `read_web` |
+| Known URLs | Exact source HTML | `read_web` with `representation: source` |
 | Known URLs | Temporary named fields | `extract_web` |
 | Unknown | Sourced structured records | `research_web` |
 | Maintained vertical data | Typed records | `find_datasets` then `run_dataset` |
@@ -98,7 +100,7 @@ Recurring delivery is intentionally excluded from the current benchmark score. B
 
 | Dimension | BrightData MCP | Bright MCP |
 |---|---:|---:|
-| Model-visible tools | 60+ maximum | 6 data / 4 browser |
+| Model-visible tools | 60+ maximum | 7 data / 4 browser |
 | Browser tools | 14 | 4 |
 | Dataset tools | One per dataset | Discovery + execution |
 | Dataset catalog | Tool inventory grows with products | Caller-scoped catalog behind discovery |

@@ -1,6 +1,6 @@
 {
   "name": "bright_mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "private": true,
   "scripts": {
@@ -45,8 +45,5 @@
     "tailwind-merge": "3.6.0",
     "tailwindcss": "4.3.3",
     "zod": "4.4.3"
-  },
-  "patchedDependencies": {
-    "@modelcontextprotocol/sdk@1.29.0": "patches/@modelcontextprotocol%2Fsdk@1.29.0.patch"
   }
 }

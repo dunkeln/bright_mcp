@@ -29,7 +29,6 @@ export const marketplaceInputSchema = z.object({
     z.enum(["default", "random"]),
     z.array(z.record(z.string().min(1), z.enum(["asc", "desc"]))).min(1).max(5),
   ]).optional(),
-  cursor: z.array(z.union([z.string(), z.number(), z.boolean()])).max(20).optional(),
   acknowledgeCost: z.literal(true),
 }).strict();
 
@@ -59,10 +58,16 @@ export const keywordCollectionInputSchema = z.object({
   acknowledgeCost: z.literal(true),
 }).strict();
 
+export const packageCollectionInputSchema = z.object({
+  packageName: z.string().trim().min(1).max(214),
+  acknowledgeCost: z.literal(true),
+}).strict();
+
 const datasetIdSchema = z.string().trim().min(1).max(120);
 export const datasetRunArgumentsSchema = z.union([
   urlCollectionInputSchema,
   keywordCollectionInputSchema,
+  packageCollectionInputSchema,
   marketplaceInputSchema,
 ]);
 
@@ -70,7 +75,11 @@ export const datasetRunInputSchema = z.discriminatedUnion("operation", [
   z.object({
     datasetId: datasetIdSchema,
     operation: z.literal("collect"),
-    arguments: z.union([urlCollectionInputSchema, keywordCollectionInputSchema]),
+    arguments: z.union([
+      urlCollectionInputSchema,
+      keywordCollectionInputSchema,
+      packageCollectionInputSchema,
+    ]),
   }).strict(),
   z.object({
     datasetId: datasetIdSchema,

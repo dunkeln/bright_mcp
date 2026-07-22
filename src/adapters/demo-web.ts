@@ -1,4 +1,4 @@
-import type { ReadPort, SearchPort } from "../core/web";
+import type { DiscoverPort, ReadPort, SearchPort } from "../core/web";
 
 const pages = [
   {
@@ -15,6 +15,7 @@ const pages = [
 
 export function createDemoWebAdapter(): {
   search: SearchPort;
+  discover: DiscoverPort;
   read: ReadPort;
 } {
   return {
@@ -30,11 +31,27 @@ export function createDemoWebAdapter(): {
         };
       },
     },
+    discover: {
+      async discover(input) {
+        return {
+          results: pages.slice(0, input.limit).map((page, index) => ({
+            ...page,
+            relevanceScore: 1 - index * 0.1,
+          })),
+        };
+      },
+    },
     read: {
       async read(input) {
         return input.urls.map((url) => ({
           url,
-          content: `# Demo page\n\nLocally generated preview for ${url}`,
+          representation: input.representation,
+          mediaType: input.representation === "source"
+            ? "text/html" as const
+            : "text/markdown" as const,
+          content: input.representation === "source"
+            ? `<!doctype html><html><body>Demo page for ${url}</body></html>`
+            : `# Demo page\n\nLocally generated preview for ${url}`,
         }));
       },
     },

@@ -18,7 +18,9 @@ const records: Array<Record<string, unknown>> = [];
 await checkSearchShapes();
 await checkBatchSearch();
 await checkSearchCreatesSerpZone();
+await checkDiscoverAndSourceRead();
 await checkDatasetPolling();
+await checkPackageCollector();
 await checkMarketplaceAndDeepLookup();
 await checkExpectedFailures();
 
@@ -122,6 +124,64 @@ async function checkBatchSearch() {
   );
 }
 
+async function checkDiscoverAndSourceRead() {
+  const requests: Array<{ path: string; method?: string; body?: unknown }> = [];
+  const adapter = createBrightDataWebAdapter(
+    gateway(async (input, init) => {
+      const url = new URL(String(input));
+      const body = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+      requests.push({ path: url.pathname, method: init?.method, body });
+      if (url.pathname === "/discover" && init?.method === "POST") {
+        return json({ task_id: "discover-task" }, 202);
+      }
+      if (url.pathname === "/discover") {
+        return json({
+          status: "completed",
+          results: [{
+            link: "https://example.com/source",
+            title: "Primary source",
+            description: "Relevant documentation",
+            relevance_score: 0.91,
+          }],
+        });
+      }
+      if (url.pathname === "/request") {
+        return new Response("<!doctype html><title>Source</title>");
+      }
+      return new Response(null, { status: 404 });
+    }),
+    { serp: "fixture-serp", unlocker: "fixture-unlocker" },
+  );
+
+  const discovered = await adapter.discover.discover({
+    query: "documentation",
+    intent: "Find the primary source",
+    limit: 1,
+    country: "us",
+    publishedAfter: "2026-01-01",
+  }, context);
+  assert(
+    discovered.results[0]?.relevanceScore === 0.91 &&
+      requests[0]?.path === "/discover" &&
+      (requests[0]?.body as { country?: string })?.country === "US",
+    "Discover did not trigger, poll, and normalize the ranked shortlist.",
+  );
+
+  const source = await adapter.read.read({
+    urls: ["https://example.com/source"],
+    representation: "source",
+  }, context);
+  const readBody = requests.find(({ path }) => path === "/request")?.body as
+    | { data_format?: string }
+    | undefined;
+  assert(
+    source[0]?.mediaType === "text/html" &&
+      source[0]?.content?.startsWith("<!doctype html>") &&
+      readBody?.data_format === undefined,
+    "Source reading did not preserve exact HTML through Web Unlocker.",
+  );
+}
+
 async function searchWith(
   envelope: unknown,
   requests: Array<{ url: string; authorization: string | null }>,
@@ -201,9 +261,50 @@ async function checkDatasetPolling() {
   );
 }
 
+async function checkPackageCollector() {
+  let triggerBody: unknown;
+  const adapter = createBrightDataDatasetAdapter(
+    gateway(async (input, init) => {
+      const path = new URL(String(input)).pathname;
+      if (path === "/datasets/list") return json([]);
+      if (path === "/datasets/v3/trigger") {
+        triggerBody = typeof init?.body === "string" ? JSON.parse(init.body) : undefined;
+        return json({ snapshot_id: "package-snapshot" }, 202);
+      }
+      if (path === "/datasets/v3/progress/package-snapshot") {
+        return json({ status: "ready", dataset_size: 1 });
+      }
+      if (path === "/datasets/v3/snapshot/package-snapshot") {
+        return json([{ name: "langchain-brightdata", version: "1.0.0" }]);
+      }
+      return new Response(null, { status: 404 });
+    }),
+    new LocalResultStore(),
+  );
+
+  const found = await adapter.catalog.find("Python PyPI package", 3, context);
+  const definition = found.find(({ id }) => id === "marketplace:gd_mk57kc3t1wwgmnepp9");
+  assert(
+    JSON.stringify(definition?.operations[0]?.inputSchema).includes("packageName"),
+    "Marketplace discovery omitted the executable PyPI package schema.",
+  );
+  const result = await adapter.runner.run({
+    datasetId: "marketplace:gd_mk57kc3t1wwgmnepp9",
+    operation: "collect",
+    arguments: { packageName: "langchain-brightdata", acknowledgeCost: true },
+  }, context);
+  assert(
+    (triggerBody as Array<{ package_name?: string }>)?.[0]?.package_name ===
+      "langchain-brightdata" && result.rows[0]?.version === "1.0.0",
+    "PyPI package discovery did not execute its exact upstream collector schema.",
+  );
+}
+
 async function checkMarketplaceAndDeepLookup() {
   let deepTriggers = 0;
   let previewCount = 0;
+  const searchBodies: Array<{ search_after?: unknown[] }> = [];
+  const resultStore = new LocalResultStore();
   const adapter = createBrightDataDatasetAdapter(
     gateway(async (input, init) => {
       const path = new URL(String(input)).pathname;
@@ -215,9 +316,21 @@ async function checkMarketplaceAndDeepLookup() {
         id: path.includes("gd_custom") ? "gd_custom" : "gd_l1vikfnt1wgvvqz95w",
         fields: { name: { type: "text", active: true, description: "Record name" } },
       });
-      if (path.startsWith("/datasets/search/")) return json({
-        hits: [{ name: "Synchronous company" }], total_hits: 1,
-      });
+      if (path.startsWith("/datasets/search/")) {
+        const body = typeof init?.body === "string"
+          ? JSON.parse(init.body) as { search_after?: unknown[] }
+          : {};
+        searchBodies.push(body);
+        const offset = body.search_after ? 10 : 0;
+        return json({
+          hits: Array.from(
+            { length: offset ? 8 : 10 },
+            (_, index) => ({ name: `Synchronous company ${offset + index + 1}` }),
+          ),
+          total_hits: 18,
+          search_after: offset ? undefined : ["next-page"],
+        });
+      }
       if (path === "/datasets/filter") return json({ snapshot_id: "filtered-snapshot" });
       if (path === "/datasets/v3/progress/filtered-snapshot") return json({
         snapshot_id: "filtered-snapshot", status: "ready", dataset_size: 1, cost: 0.01,
@@ -249,7 +362,7 @@ async function checkMarketplaceAndDeepLookup() {
       });
       return new Response(null, { status: 404 });
     }),
-    new LocalResultStore(),
+    resultStore,
   );
 
   const found = await adapter.catalog.find("custom marketplace records", 10, context);
@@ -279,7 +392,29 @@ async function checkMarketplaceAndDeepLookup() {
       acknowledgeCost: true,
     },
   }, context);
-  assert(searched.rows[0]?.name === "Synchronous company", "Supported Marketplace search was not routed synchronously.");
+  assert(
+    searched.rows[0]?.name === "Synchronous company 1" &&
+      searched.page.totalRows === 18 &&
+      searched.page.nextResourceUri,
+    "Supported Marketplace search did not retain its upstream continuation.",
+  );
+  const firstPageToken = searched.page.nextResourceUri.split("/").at(-1)!;
+  const firstPage = await resultStore.readPage(firstPageToken, context);
+  assert(
+    firstPage.rows.length === 2 && firstPage.page.nextResourceUri,
+    "Marketplace continuation did not finish the cached upstream page.",
+  );
+  const secondPage = await resultStore.readPage(
+    firstPage.page.nextResourceUri.split("/").at(-1)!,
+    context,
+  );
+  assert(
+    secondPage.rows.length === 8 &&
+      secondPage.page.totalRows === 18 &&
+      !secondPage.page.nextResourceUri &&
+      JSON.stringify(searchBodies[1]?.search_after) === JSON.stringify(["next-page"]),
+    "Marketplace continuation did not fetch the next upstream cursor page.",
+  );
   const filtered = await adapter.runner.run({
     datasetId: "marketplace:gd_custom",
     operation: "search",

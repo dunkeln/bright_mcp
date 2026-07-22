@@ -1,6 +1,6 @@
 # V1 agent contracts
 
-The V1 all profile MUST expose exactly these six model-visible tools. All tools MUST provide MCP
+The V1 all profile MUST expose exactly these seven model-visible tools. All tools MUST provide MCP
 annotations describing read-only, destructive, idempotent, and open-world
 behavior accurately.
 
@@ -12,7 +12,9 @@ upstream product or endpoint:
 | Sources | Requested output | Contract |
 |---|---|---|
 | Unknown | Compact links and summaries | `search_web` |
+| Unknown, constrained by goal | Ranked source shortlist | `discover_web` |
 | Known URLs | Readable page evidence | `read_web` |
+| Known URLs | Exact source markup | `read_web: source` |
 | Known URLs | Temporary named fields | `extract_web` |
 | Unknown | Sourced structured records | `research_web` |
 | Maintained vertical capability | Typed records | `find_datasets` then `run_dataset` |
@@ -31,20 +33,41 @@ Purpose: find current web resources for one or more related research angles.
   continuation cursor, or isolated error.
 - Search MUST use SERP and MUST NOT expose a mode that switches to another
   Bright Data product with different access, cost, latency, or failure semantics.
+- The description MUST disclose that first use may create the deterministic
+  `bright_mcp_serp` zone when the caller has no compatible SERP zone.
 - Engine-specific response envelopes MUST NOT escape the adapter.
 - Page content MUST be acquired explicitly through `read_web`; search results
   remain compact so one discovery call cannot exhaust the model context.
+
+## `discover_web`
+
+Purpose: rank a bounded source shortlist against an explicit goal and optional
+geography, language, keyword, or publication-date constraints.
+
+- Input: query, optional intent and constraints, and a result limit of 1–20.
+- Output: ordered title, URL, summary, and optional upstream relevance score.
+- Bright Data Discover MUST perform the ranking; the MCP MUST NOT crawl, index,
+  or implement a local relevance model.
+- Triggering and polling are internal. The result is not page evidence or a
+  completed research answer; the client may select URLs for `read_web` or choose
+  `research_web` when it needs a sourced structured table.
+- The tool remains distinct from `search_web` because its product access,
+  latency, billing, failure semantics, and ranked outcome differ from SERP.
 
 ## `read_web`
 
 Purpose: retrieve exact readable evidence from one or more known URLs.
 
-- Input: one to five HTTP(S) URLs.
-- Output: one ordered Markdown preview per URL, a complete principal-bound
-  resource URI, or a normalized item error.
+- Input: one to five HTTP(S) URLs and a representation of `readable` (default)
+  or `source`.
+- Output: one ordered Markdown or HTML preview per URL, a complete
+  principal-bound resource URI with the matching media type, or a normalized item error.
 - Batch execution is part of this contract; no separate batch tool is exposed.
-- The contract has no format or extraction mode. A truncated inline preview MUST
-  retain the complete Markdown through its returned resource.
+- The description MUST disclose that first use may create the deterministic
+  `bright_mcp_unlocker` zone when the caller has no compatible Web Unlocker zone.
+- Representation selects readable evidence or exact source; it MUST NOT become a
+  generic format or extraction dispatcher. A truncated inline preview MUST retain
+  the complete representation through its returned resource.
 
 ## `extract_web`
 
@@ -80,7 +103,8 @@ Purpose: find Bright Data datasets relevant to an agent's stated task.
   supported operations, an input JSON Schema for each operation, and documented
   limits and examples.
 - V1 operation kinds are `collect` and `search`; a dataset MAY support either or
-  both. Search schemas describe filters, sorting, page size, and continuation.
+  both. Search schemas describe filters, sorting, and page size. Upstream
+  continuation cursors remain private behind `page.nextResourceUri`.
 - Output MUST contain only candidates accepted by `run_dataset`.
 
 ## `run_dataset`
@@ -124,6 +148,8 @@ DatasetResult {
 - Embedded rows are a bounded preview or current page; omission MUST be declared.
 - Result and page resource URIs MUST be opaque, authorization-checked, and
   stable only for their stated lifetime.
+- Resource reads MUST continue upstream synchronous searches when more matches
+  exist; upstream cursors MUST NOT become model-visible input or output.
 - `artifact.uri` MUST identify the same canonical result represented by the
   embedded preview; it MUST NOT contain a credential.
 
@@ -145,4 +171,4 @@ headers, or unbounded upstream response bodies.
 The same contracts are grouped at `/mcp/web`, `/mcp/deep-lookup`, and
 `/mcp/marketplace`; grouping MUST NOT change their schemas or execution meaning.
 The browser profile is specified separately in
-`09-browser-capability.md`; it MUST NOT alter these six contracts.
+`09-browser-capability.md`; it MUST NOT alter these seven contracts.

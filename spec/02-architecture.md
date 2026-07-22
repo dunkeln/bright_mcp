@@ -41,11 +41,11 @@ MUST NOT become core domain models.
 
 ### Core
 
-- Defines source search, exact page reading, ad hoc extraction, open-ended
-  research, catalog discovery, and maintained dataset execution use cases, plus
+- Defines source search, intent-ranked source discovery, exact page reading, ad
+  hoc extraction, open-ended research, catalog discovery, and maintained dataset execution use cases, plus
   browser session use cases when that profile is enabled.
-- Exact reading returns bounded Markdown previews plus complete transient
-  resources. Ad hoc extraction and research use Deep Lookup; maintained
+- Exact reading returns bounded readable Markdown or source HTML previews plus
+  complete transient resources. Ad hoc extraction and research use Deep Lookup; maintained
   structured extraction remains in dataset execution.
 - Owns canonical result and error contracts.
 - Depends only on injected ports.

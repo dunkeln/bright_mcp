@@ -2,7 +2,11 @@ import pLimit from "p-limit";
 import { chromium, type Browser, type Page } from "playwright-core";
 import type { BrowserCredentialProvider } from "../connections/browser-credentials";
 import { CapabilityError } from "../core/contracts";
-import { isPublicHttpUrl } from "../core/public-url";
+import {
+  isCredentialParameter,
+  isPublicHttpUrl,
+  isPublicNetworkHttpUrl,
+} from "../core/public-url";
 import type {
   BrowserAction,
   BrowserNetworkEntry,
@@ -47,11 +51,12 @@ export function createBrightDataBrowserProvider(
           const page = await browser.newPage({ acceptDownloads: false });
           await page.route("**/*", async (route) => {
             const request = route.request();
+            const mainNavigation =
+              request.isNavigationRequest() && request.frame() === page.mainFrame();
             if (
-              request.isNavigationRequest() &&
-              request.frame() === page.mainFrame() &&
-              (!isPublicHttpUrl(request.url()) ||
-                redirectDepth(request) > MAX_REDIRECTS)
+              !isPublicNetworkHttpUrl(request.url()) ||
+              (mainNavigation &&
+                (!isPublicHttpUrl(request.url()) || redirectDepth(request) > MAX_REDIRECTS))
             ) {
               await route.abort("blockedbyclient");
               return;
@@ -147,7 +152,7 @@ export function createBrightDataBrowserProvider(
           }
           const content = await abortable(
             kind === "accessibility"
-              ? session.page.locator("body").ariaSnapshot({ timeout: timeoutMs })
+              ? session.page.ariaSnapshot({ mode: "ai", timeout: timeoutMs })
               : kind === "text"
                 ? session.page.locator("body").innerText({ timeout: timeoutMs })
                 : session.page.content(),
@@ -191,22 +196,43 @@ export function createBrightDataBrowserProvider(
 async function performAction(page: Page, action: BrowserAction, timeoutMs: number) {
   const timeout = Math.min(timeoutMs, 15_000);
   if (action.kind === "click") {
-    await page.locator(action.selector).click({ timeout });
+    await targetLocator(page, action.ref).then((locator) => locator.click({ timeout }));
   } else if (action.kind === "type") {
-    await page.locator(action.selector).fill(action.text, { timeout });
+    await targetLocator(page, action.ref).then((locator) => locator.fill(action.text, { timeout }));
   } else if (action.kind === "select") {
-    await page.locator(action.selector).selectOption(action.value, { timeout });
+    await targetLocator(page, action.ref).then((locator) =>
+      locator.selectOption(action.value, { timeout }),
+    );
   } else if (action.kind === "press") {
-    if (action.selector) {
-      await page.locator(action.selector).press(action.key, { timeout });
+    if (action.ref) {
+      await targetLocator(page, action.ref).then((locator) =>
+        locator.press(action.key, { timeout }),
+      );
     } else {
       await page.keyboard.press(action.key);
     }
   } else if (action.kind === "wait") {
-    await page.locator(action.selector).waitFor({ state: action.state, timeout });
+    await targetLocator(page, action.ref).then((locator) =>
+      locator.waitFor({ state: action.state, timeout }),
+    );
   } else {
     await page.mouse.wheel(0, action.deltaY);
   }
+}
+
+async function targetLocator(page: Page, ref: string) {
+  const locator = page.locator(`aria-ref=${ref}`);
+  try {
+    await locator.normalize();
+  } catch {
+    throw new CapabilityError(
+      "browser_ref_stale",
+      `Ref ${ref} was not found in the current page snapshot.`,
+      false,
+      "Capture a fresh accessibility observation and use one of its refs.",
+    );
+  }
+  return locator;
 }
 
 function requiredSession(
@@ -246,7 +272,7 @@ export function redactBrowserUrl(value: string) {
     url.password = "";
     url.hash = "";
     for (const key of [...url.searchParams.keys()]) {
-      if (/(?:token|secret|password|auth|session|api.?key|code)/i.test(key)) {
+      if (isCredentialParameter(key)) {
         url.searchParams.set(key, "[redacted]");
       }
     }
@@ -300,7 +326,7 @@ export function normalizeBrowserError(error: unknown) {
   if (/ERR_BLOCKED_BY_CLIENT/i.test(message)) {
     return new CapabilityError(
       "browser_navigation_blocked",
-      "The remote browser blocked a non-public destination or excessive redirect chain.",
+      "The remote browser blocked a non-public request, credential-bearing navigation, or excessive redirect chain.",
       false,
       "Navigate to a public HTTP(S) URL without embedded credentials.",
     );

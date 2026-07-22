@@ -9,6 +9,7 @@ import {
 import {
   keywordCollectionInputSchema,
   marketplaceInputSchema,
+  packageCollectionInputSchema,
   urlCollectionInputSchema,
 } from "../../core/dataset-inputs";
 import type { DatasetCatalog } from "../../core/datasets";
@@ -40,7 +41,7 @@ const metadataSchema = z.object({
   }).passthrough()),
 });
 
-type CollectorInputKind = "urls" | "keyword";
+type CollectorInputKind = "urls" | "keyword" | "package";
 type MaintainedCollector = {
   upstreamId: string;
   kind: CollectorInputKind;
@@ -70,6 +71,30 @@ const maintainedCollectors = new Map<string, MaintainedCollector>([
     kind: "keyword",
     title: "Amazon product search",
     description: "Collect fresh structured Amazon product search records by keyword.",
+  }],
+  ["gd_mk57m0301khq4jmsul", {
+    upstreamId: "gd_mk57m0301khq4jmsul",
+    kind: "package",
+    title: "npm package",
+    description: "Collect current structured JavaScript and Node package metadata from npm by package name.",
+  }],
+  ["gd_mk57kc3t1wwgmnepp9", {
+    upstreamId: "gd_mk57kc3t1wwgmnepp9",
+    kind: "package",
+    title: "PyPI package",
+    description: "Collect current structured Python package metadata from PyPI by package name.",
+  }],
+  ["gd_lyrexgxc24b3d4imjt", {
+    upstreamId: "gd_lyrexgxc24b3d4imjt",
+    kind: "urls",
+    title: "GitHub repository file",
+    description: "Collect structured repository file content from known public GitHub file URLs.",
+  }],
+  ["gd_lyptx9h74wtlvpnfu", {
+    upstreamId: "gd_lyptx9h74wtlvpnfu",
+    kind: "urls",
+    title: "Reuters news report",
+    description: "Collect structured news data from known public Reuters report URLs.",
   }],
 ]);
 
@@ -195,14 +220,18 @@ function maintainedCollectorDefinition(collector: MaintainedCollector): DatasetD
 function collectorOperation(collector: NonNullable<ReturnType<typeof collectorFor>>) {
   const schema = collector.kind === "urls"
     ? urlCollectionInputSchema
-    : keywordCollectionInputSchema;
+    : collector.kind === "keyword"
+      ? keywordCollectionInputSchema
+      : packageCollectionInputSchema;
   return {
     kind: "collect" as const,
     inputSchema: z.toJSONSchema(schema, { target: "draft-7" }) as JsonObject,
     limits: ["Runs a paid managed scraper and returns an upstream-backed result resource."],
     examples: [collector.kind === "urls"
       ? { urls: ["https://example.com/record"], acknowledgeCost: true }
-      : { query: "wireless earbuds", pages: 1, acknowledgeCost: true }],
+      : collector.kind === "keyword"
+        ? { query: "wireless earbuds", pages: 1, acknowledgeCost: true }
+        : { packageName: "express", acknowledgeCost: true }],
   };
 }
 

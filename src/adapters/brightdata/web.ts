@@ -2,13 +2,14 @@ import { LRUCache } from "lru-cache";
 import { z } from "zod";
 import { CapabilityError, type RequestContext } from "../../core/contracts";
 import type {
+  DiscoverPort,
   ItemFailure,
   ReadPort,
   SearchPort,
   SearchQuery,
   SingleSearchResponse,
 } from "../../core/web";
-import { BrightDataGateway } from "./gateway";
+import { BrightDataGateway, pollBrightData } from "./gateway";
 
 const SEARCH_PAGE_SIZE = 10;
 const MAX_SEARCH_OFFSET = 90;
@@ -25,6 +26,18 @@ const searchEnvelopeSchema = z.object({
   organic: z.array(organicResultSchema).optional(),
   results: z.array(organicResultSchema).optional(),
 });
+const discoverTriggerSchema = z.object({ task_id: z.string().min(1) });
+const discoverResultSchema = z.object({
+  link: z.url(),
+  title: z.string().optional(),
+  description: z.string().optional(),
+  relevance_score: z.number().optional(),
+}).passthrough();
+const discoverPollSchema = z.object({
+  status: z.string().optional(),
+  results: z.array(discoverResultSchema).optional(),
+  error: z.string().optional(),
+}).passthrough();
 const activeZonesSchema = z.array(z.object({
   name: z.string().min(1).optional(),
   zone: z.string().min(1).optional(),
@@ -44,7 +57,7 @@ const activeZonesSchema = z.array(z.object({
 export function createBrightDataWebAdapter(
   gateway: BrightDataGateway,
   zones: { serp?: string; unlocker?: string },
-): { search: SearchPort; read: ReadPort } {
+): { search: SearchPort; discover: DiscoverPort; read: ReadPort } {
   const activeZones = new LRUCache<string, z.infer<typeof activeZonesSchema>>({
     max: 1_000,
     ttl: 5 * 60_000,
@@ -81,6 +94,71 @@ export function createBrightDataWebAdapter(
         };
       },
     },
+    discover: {
+      async discover(input, context) {
+        const trigger = parseDiscover(
+          discoverTriggerSchema,
+          (await gateway.requestJson({
+            method: "POST",
+            path: "/discover",
+            body: {
+              query: input.query,
+              intent: input.intent,
+              country: input.country?.toUpperCase(),
+              city: input.city,
+              language: input.language,
+              num_results: input.limit,
+              filter_keywords: input.requiredKeywords,
+              start_date: input.publishedAfter,
+              end_date: input.publishedBefore,
+              remove_duplicates: true,
+              format: "json",
+            },
+            timeoutMs: 30_000,
+          }, context)).data,
+        );
+        const completed = await pollBrightData({
+          context,
+          deadlineMs: 60_000,
+          intervalMs: 1_000,
+          load: async () => parseDiscover(
+            discoverPollSchema,
+            (await gateway.requestJson({
+              method: "GET",
+              path: "/discover",
+              query: { task_id: trigger.task_id },
+              timeoutMs: 20_000,
+            }, context)).data,
+          ),
+          state: (value) => value.status === "failed"
+            ? "failed"
+            : ["processing", "pending", "running", "queued", "starting"]
+                .includes(value.status ?? "")
+              ? "pending"
+              : "ready",
+          failed: (value) => new CapabilityError(
+            "upstream_job_failed",
+            value.error ?? "Bright Data Discover could not rank the requested sources.",
+            false,
+            "Narrow the discovery goal or constraints and retry once.",
+          ),
+          timeout: new CapabilityError(
+            "upstream_timeout",
+            "Bright Data Discover did not finish within one minute.",
+            true,
+            "Retry once with fewer requested results.",
+          ),
+        });
+        return {
+          results: (completed.results ?? []).slice(0, input.limit).map((result) => ({
+            title: result.title ?? result.link,
+            url: result.link,
+            summary: result.description ?? "",
+            relevanceScore: result.relevance_score,
+          })),
+        };
+      },
+    } satisfies DiscoverPort,
     read: {
       async read(input, context) {
         const zone = await resolveZone(
@@ -101,10 +179,12 @@ export function createBrightDataWebAdapter(
                     zone,
                     url,
                     format: "raw",
-                  data_format: "markdown",
-                },
-                timeoutMs: 30_000,
-                maxAttempts: 1,
+                    ...(input.representation === "readable"
+                      ? { data_format: "markdown" }
+                      : {}),
+                  },
+                  timeoutMs: 30_000,
+                  maxAttempts: 1,
                 },
                 context,
               );
@@ -119,6 +199,10 @@ export function createBrightDataWebAdapter(
               }
               return {
                 url,
+                representation: input.representation,
+                mediaType: input.representation === "source"
+                  ? "text/html" as const
+                  : "text/markdown" as const,
                 content,
               };
             } catch (error) {
@@ -133,6 +217,10 @@ export function createBrightDataWebAdapter(
               if (failure.code === "brightdata_connection_required") throw failure;
               return {
                 url,
+                representation: input.representation,
+                mediaType: input.representation === "source"
+                  ? "text/html" as const
+                  : "text/markdown" as const,
                 error: failureRecord(failure),
               };
             }
@@ -141,6 +229,19 @@ export function createBrightDataWebAdapter(
       },
     },
   };
+}
+
+function parseDiscover<T>(schema: z.ZodType<T>, value: unknown): T {
+  const parsed = schema.safeParse(value);
+  if (!parsed.success) {
+    throw new CapabilityError(
+      "malformed_upstream_response",
+      "Bright Data returned an unexpected Discover response.",
+      false,
+      "Retry once. If this persists, report the request ID.",
+    );
+  }
+  return parsed.data;
 }
 
 async function searchSerp(

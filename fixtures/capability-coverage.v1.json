@@ -12,26 +12,34 @@
       }
     },
     {
+      "id": "web-discovery",
+      "referenceCapability": "Intent-ranked source discovery with geo, language, keyword, and date constraints",
+      "disposition": "composed",
+      "routes": ["tool:discover_web", "adapter:brightdata-discover"],
+      "verification": {
+        "gate": "bun run check:compat && bun run check:adapters",
+        "scenario": "Trigger and poll Bright Data Discover, then return only a bounded canonical ranked source shortlist while keeping the upstream task ID private."
+      }
+    },
+    {
       "id": "web-scrape",
-      "referenceCapability": "Markdown and ordered batch scrape",
+      "referenceCapability": "Readable Markdown and ordered batch scrape",
       "disposition": "composed",
       "routes": ["tool:read_web", "resource:brightdata://web/{token}"],
       "verification": {
         "gate": "bun run check:compat",
-        "scenario": "Read two URLs as ordered Markdown and verify complete-page resources, rejection of obsolete modes, and private-network rejection."
+        "scenario": "Read two URLs as ordered Markdown and verify complete-page resources, source-representation separation, and private-network rejection."
       }
     },
     {
       "id": "raw-html-scrape",
       "referenceCapability": "Raw HTML scrape",
-      "disposition": "excluded",
-      "routes": [],
+      "disposition": "composed",
+      "routes": ["tool:read_web#source", "resource:brightdata://web/{token}"],
       "verification": {
-        "gate": "bun run check:compat && bun run check:coverage",
-        "scenario": "Reject format modes so read_web has one deterministic result contract."
-      },
-      "exclusionReason": "Raw markup adds a second result mode to the common agent-reading path without improving its web-data outcome.",
-      "userConsequence": "The base read tool returns readable Markdown rather than exact page markup."
+        "gate": "bun run check:compat && bun run check:adapters",
+        "scenario": "Request the bounded source representation and verify the complete principal-bound resource is exact HTML with text/html media type."
+      }
     },
     {
       "id": "multi-source-web-research",
@@ -149,7 +157,7 @@
       "routes": ["profile:all", "profile:web", "profile:deep-lookup", "profile:marketplace", "profile:browser"],
       "verification": {
         "gate": "bun run check:compat",
-        "scenario": "List exactly six tools in all, two in web, two in deep-lookup, two in marketplace, and four in browser."
+        "scenario": "List exactly seven tools in all, three in web, two in deep-lookup, two in marketplace, and four in browser."
       }
     },
     {

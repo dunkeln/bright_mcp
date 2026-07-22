@@ -224,7 +224,7 @@ export function registerMarketplaceTools(
             pollInterval: 500,
           });
           const controller = new AbortController();
-          tasks.bind(task.taskId, controller);
+          tasks.bind(task.taskId, controller, task.ttl);
           const abortFromRequest = () => controller.abort(extra.signal.reason);
           extra.signal.addEventListener("abort", abortFromRequest, { once: true });
           const context = requestContext(

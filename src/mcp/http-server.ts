@@ -6,6 +6,7 @@ import {
   type McpProfile,
   type createBrightMcpServer,
 } from "./server";
+import { schemaCompatibleTransport } from "./schema-transport";
 
 type McpServer = ReturnType<typeof createBrightMcpServer>;
 
@@ -168,21 +169,23 @@ export function startHttpServer(options: {
           );
         }
         const server = options.createServer(requestPrincipal, profile);
-        const transport = new WebStandardStreamableHTTPServerTransport({
-          sessionIdGenerator: () => crypto.randomUUID(),
-          enableJsonResponse: true,
-          onsessioninitialized(id) {
-            sessions.set(id, {
-              principalId: requestPrincipal,
-              profile,
-              server,
-              transport,
-            });
-          },
-          onsessionclosed(id) {
-            sessions.delete(id);
-          },
-        });
+        const transport = schemaCompatibleTransport(
+          new WebStandardStreamableHTTPServerTransport({
+            sessionIdGenerator: () => crypto.randomUUID(),
+            enableJsonResponse: true,
+            onsessioninitialized(id) {
+              sessions.set(id, {
+                principalId: requestPrincipal,
+                profile,
+                server,
+                transport,
+              });
+            },
+            onsessionclosed(id) {
+              sessions.delete(id);
+            },
+          }),
+        );
         session = { principalId: requestPrincipal, profile, server, transport };
         await server.connect(transport);
       }

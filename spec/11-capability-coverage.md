@@ -22,9 +22,10 @@ capability, not endpoint inventory.
 | Reference capability | V1 disposition |
 |---|---|
 | Search, batch search, engines, pagination | `search_web` |
+| Intent-ranked discovery with geo, language, keyword, and date constraints | `discover_web` |
 | Multi-source public-web research | `research_web` |
-| Markdown scrape and batch scrape | `read_web` plus complete-page resources |
-| Raw HTML scrape | excluded; the base tool returns one agent-readable format |
+| Markdown scrape and batch scrape | `read_web: readable` plus complete-page resources |
+| Raw HTML scrape | `read_web: source` plus complete-page resources |
 | Ad hoc field extraction | `extract_web` |
 | Managed structured extraction | dataset discovery and `run_dataset` |
 | Web Data collectors | dataset discovery and `run_dataset: collect` |

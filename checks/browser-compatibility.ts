@@ -13,6 +13,10 @@ import {
 } from "../src/browser/stores";
 import { createBrowserUseCases } from "../src/browser/use-cases";
 import { CapabilityError, type RequestContext } from "../src/core/contracts";
+import {
+  isPublicHttpUrl,
+  isPublicNetworkHttpUrl,
+} from "../src/core/public-url";
 import { assert } from "./compatibility-support";
 
 const probe = createProbeProvider();
@@ -27,6 +31,18 @@ const browser = createBrowserUseCases({
 });
 const alpha = requestContext("alpha");
 const beta = requestContext("beta");
+
+assert(
+  isPublicHttpUrl("https://example.com/docs?zipcode=94107#code-examples"),
+  "Public URL validation rejected harmless query or fragment names.",
+);
+assert(
+  !isPublicHttpUrl("https://example.com/callback?code=fixture") &&
+    !isPublicHttpUrl("http://192.168.1.50/") &&
+    !isPublicHttpUrl("http://staging/") &&
+    isPublicNetworkHttpUrl("https://example.com/asset?token=fixture"),
+  "Public URL validation lost its credential or private-network boundary.",
+);
 
 const first = await browser.navigate(
   {
@@ -159,10 +175,11 @@ assert(
 );
 
 const unsafeUrl =
-  "https://user:password@example.com/path?token=secret&visible=yes#private";
+  "https://user:password@example.com/path?token=secret&zipcode=94107&visible=yes#private";
 const safeUrl = redactBrowserUrl(unsafeUrl);
 assert(
-  safeUrl === "https://example.com/path?token=%5Bredacted%5D&visible=yes",
+  safeUrl ===
+    "https://example.com/path?token=%5Bredacted%5D&zipcode=94107&visible=yes",
   "Browser URL redaction exposed credentials, a secret query, or a fragment.",
 );
 const safeError = normalizeBrowserError(

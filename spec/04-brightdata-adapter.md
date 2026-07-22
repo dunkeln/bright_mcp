@@ -2,10 +2,11 @@
 
 ## Ports
 
-Base-profile use cases require four logical ports:
+Base-profile use cases require five logical ports:
 
 - Search: execute a canonical web-search request.
-- Read: execute an ordered batch of canonical Markdown page requests.
+- Discover: rank a constrained source shortlist through Bright Data Discover.
+- Read: execute an ordered batch of canonical readable Markdown or source HTML requests.
 - Dataset catalog: find directly executable dataset capabilities.
 - Dataset runner: validate and execute one described `collect` or `search` operation.
 
@@ -68,11 +69,16 @@ return the same canonical dataset result and continuation resource semantics.
 
 Supported small Marketplace lookups SHOULD use synchronous Search. Other
 Marketplace filters MUST use the asynchronous Filter snapshot path and MUST NOT
-silently inherit unsupported sort or cursor semantics.
+silently inherit unsupported sort semantics. Synchronous Search MUST retain
+`search_after` and `total_hits` internally so canonical result resources can
+continue without exposing an upstream cursor to the agent.
 
 Deep Lookup MUST back `extract_web` and `research_web` without appearing in
 dataset discovery. Preview is the default; a full run requires explicit cost
 acknowledgement and a maximum-cost cap.
+
+Bright Data Discover MUST back `discover_web`. Its trigger and polling IDs remain
+adapter-private; the canonical result contains only the ranked source shortlist.
 
 ## Error translation
 

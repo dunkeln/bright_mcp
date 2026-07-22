@@ -66,7 +66,7 @@ function DatasetWorkbenchApp() {
   const activeResize = useRef<AbortController | null>(null);
 
   const { app, isConnected, error } = useApp({
-    appInfo: { name: "bright-dataset-workbench", version: "0.2.0" },
+    appInfo: { name: "bright-dataset-workbench", version: "0.3.0" },
     capabilities: {},
     onAppCreated(createdApp) {
       createdApp.ontoolresult = (toolResult) => {

@@ -4,8 +4,8 @@ MCP primitives are selected by control semantics, not by upstream API shape.
 
 ## Model-visible tools
 
-The six tools in `03-tool-contracts.md` are the complete `/mcp` surface. Fixed
-subprofiles expose `search_web` + `read_web` at `/mcp/web`, `extract_web` +
+The seven tools in `03-tool-contracts.md` are the complete `/mcp` surface. Fixed
+subprofiles expose `search_web` + `discover_web` + `read_web` at `/mcp/web`, `extract_web` +
 `research_web` at `/mcp/deep-lookup`, and `find_datasets` + `run_dataset` at
 `/mcp/marketplace`. `/mcp/browser` exposes only the four tools in
 `09-browser-capability.md`.
@@ -23,8 +23,8 @@ The server MUST expose these application-controlled resource families:
 - `brightdata://results/{resultId}`: completed canonical result artifact backed
   by bounded local rows or lazy upstream snapshot parts.
 - Opaque page URIs returned inside result resources: bounded continuation pages.
-- `brightdata://web/{token}`: complete principal-bound Markdown behind a bounded
-  `read_web` preview.
+- `brightdata://web/{token}`: complete principal-bound Markdown or HTML behind a
+  bounded `read_web` preview.
 - `ui://bright-mcp/dataset-workbench-v2.html`: static workbench app document.
 - Opaque browser session and observation resources when the browser profile is enabled.
 

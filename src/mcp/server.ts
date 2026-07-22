@@ -25,11 +25,11 @@ export const MCP_PROFILE_PATHS: Readonly<Record<string, McpProfile>> = {
 };
 
 const instructions: Record<McpProfile, string> = {
-  all: "Choose by source certainty and output: unknown sources plus compact links or snippets -> search_web; known URLs plus readable evidence -> read_web; known URLs plus named fields -> extract_web; unknown sources plus sourced structured records -> research_web; maintained vertical data -> find_datasets then run_dataset. Do not substitute a search_web -> read_web chain when research_web matches the requested outcome.",
-  web: "Use search_web for compact discovery when sources are unknown. Answer from its summaries when they already contain the requested fact. Use read_web only when page-level text is missing or explicitly required; do not reopen a search result merely to verify its summary.",
+  all: "Choose by source certainty, discovery scope, and output: fast ordinary lookup -> search_web; intent-ranked or constrained source shortlist -> discover_web; known URLs plus readable evidence or exact source -> read_web; known URLs plus named fields -> extract_web; unknown sources plus sourced structured records -> research_web; maintained vertical data -> find_datasets then run_dataset. Do not substitute a discovery/read chain when research_web matches the requested outcome.",
+  web: "Use search_web for a fast ordinary lookup. Use discover_web when sources must be ranked against a goal or constrained. Answer from returned summaries when they contain the requested fact. Use read_web only when page-level evidence or exact HTML is required; do not reopen a result merely to verify a useful summary.",
   "deep-lookup": "Use extract_web for named fields when source URLs are known. Use research_web for sourced structured records when sources are unknown. Preview before a caller-approved paid run.",
   marketplace: "Use find_datasets only for maintained vertical data, then call run_dataset once with the returned identifier, operation, argument schema, and cost acknowledgement.",
-  browser: "Use browser_navigate to create or move a remote session, browser_observe to inspect it, browser_interact for one bounded action, and browser_close when finished.",
+  browser: "Use browser_navigate to create or move a remote session, browser_observe with accessibility to obtain snapshot-bound refs, browser_interact for one bounded ref action, observe again after page changes, and browser_close when finished.",
 };
 
 export function createBrightMcpServer(dependencies: {
@@ -55,7 +55,7 @@ export function createBrightMcpServer(dependencies: {
   const server = new McpServer(
     {
       name: "bright-mcp",
-      version: "0.2.0",
+      version: "0.3.0",
       icons: [dependencies.icon],
     },
     {

@@ -4,18 +4,18 @@ import { Check, ChevronDown, Copy, Download } from "lucide-astro";
 
 const startUrl = "#install";
 const cursorInstallUrl =
-  "cursor://anysphere.cursor-deeplink/mcp/install?name=bright&config=eyJ1cmwiOiJodHRwczovL2JyaWdodC1tY3Aub25yZW5kZXIuY29tL21jcCJ9";
+  "cursor://anysphere.cursor-deeplink/mcp/install?name=bright&config=eyJ1cmwiOiJodHRwczovL2JyaWdodC1tY3Aub25yZW5kZXIuY29tL21jcCIsImhlYWRlcnMiOnsiQXV0aG9yaXphdGlvbiI6IkJlYXJlciAke0JSSUdIVERBVEFfQVBJX0tFWX0ifX0=";
 const clients = [
   {
     name: "Codex",
     icon: "/assets/openai.svg",
-    command: "codex mcp add bright --url https://bright-mcp.onrender.com/mcp",
+    command: "codex mcp add bright --url https://bright-mcp.onrender.com/mcp --bearer-token-env-var BRIGHTDATA_API_KEY",
     action: "copy",
   },
   {
     name: "Claude Code",
     icon: "/assets/anthropic.svg",
-    command: "claude mcp add --transport http bright https://bright-mcp.onrender.com/mcp",
+    command: "claude mcp add-json bright '{\"type\":\"http\",\"url\":\"https://bright-mcp.onrender.com/mcp\",\"headers\":{\"Authorization\":\"Bearer ${BRIGHTDATA_API_KEY}\"}}'",
     action: "copy",
   },
   {
@@ -73,7 +73,7 @@ const clients = [
               href="https://docs.brightdata.com/scraping-automation/introduction"
               target="_blank"
               rel="noreferrer"
-            ><i></i>Unofficial Bright Data API integration<b>›</b></a>
+            >Unofficial BrightData API integration<b>›</b></a>
             <h1>Reliable web data when<br />agent browsing stops scaling.</h1>
             <p></p>
             <a class="button button-light" href={startUrl}>Read docs</a>
@@ -126,16 +126,14 @@ const clients = [
       <section class="section-shell" id="bench">
         <div class="bench rail gutter-left gutter-right">
           <div class="bench-heading">
-            <p class="label">Lorem ipsum</p>
-            <h2>Lorem ipsum dolor sit amet</h2>
-            <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+            <p class="label">Bright MCP</p>
+            <h2>Built to stay focused</h2>
+            <p>A compact agent surface over Bright Data's web capabilities.</p>
           </div>
           <div class="bench-results">
-            <article><small>01</small><strong>00.0</strong><p>Lorem ipsum</p></article>
-            <article><small>02</small><strong>00ms</strong><p>Dolor sit</p></article>
-            <article><small>03</small><strong>0 / 0</strong><p>Amet elit</p></article>
-            <article><small>04</small><strong>00%</strong><p>Consectetur</p></article>
-            <article><small>05</small><strong>0.00</strong><p>Adipiscing</p></article>
+            <article><strong>7</strong><p>Focused tools</p></article>
+            <article><strong>5</strong><p>Scoped endpoints</p></article>
+            <article><strong>1</strong><p>Surface</p></article>
           </div>
         </div>
       </section>
@@ -144,7 +142,7 @@ const clients = [
         <div class="cta rail gutter-left gutter-right">
           <div>
             <p class="label">Bright MCP</p>
-            <h2>Six tools. One clear path to web data.</h2>
+            <h2>Seven tools. One clear path to web data.</h2>
             <p>Discover, inspect, and run Bright Data capabilities without exposing the entire upstream API.</p>
           </div>
           <a class="button button-light" href="#overview">Get started</a>
@@ -340,14 +338,6 @@ const clients = [
     padding: 8px 12px;
   }
 
-  .announcement i {
-    background: #9ff;
-    border-radius: 50%;
-    box-shadow: 0 0 8px #8ff;
-    height: 7px;
-    width: 7px;
-  }
-
   .announcement b {
     color: #aaa;
     font-size: 18px;
@@ -508,17 +498,12 @@ const clients = [
     margin: 12px 0 0;
   }
 
-  .bench-results { display: grid; grid-template-columns: repeat(5, 1fr); }
+  .bench-results { display: grid; grid-template-columns: repeat(3, 1fr); }
   .bench-results article {
     min-height: 150px;
     padding: 26px 24px;
   }
   .bench-results article + article { border-left: 1px solid var(--line); }
-  .bench-results small {
-    color: var(--accent);
-    display: block;
-    font: 10px "SFMono-Regular", Consolas, monospace;
-  }
   .bench-results strong { display: block; font-size: 24px; margin-top: 23px; }
   .bench-results p { color: var(--muted); font-size: 12px; margin: 7px 0 0; }
 
@@ -621,10 +606,11 @@ const clients = [
     .site-header nav { display: none; }
     .hero { min-height: 520px; }
     .hero h1 { font-size: 36px; }
-    .bench-results { grid-template-columns: repeat(2, 1fr); }
-    .bench-results article { border-bottom: 1px solid var(--line); }
-    .bench-results article:nth-child(odd) { border-left: 0; }
-    .bench-results article:last-child { grid-column: 1 / -1; }
+    .bench-results { grid-template-columns: 1fr; }
+    .bench-results article + article {
+      border-left: 0;
+      border-top: 1px solid var(--line);
+    }
     .cta {
       align-items: flex-start;
       flex-direction: column;

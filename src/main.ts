@@ -28,6 +28,7 @@ import {
   type McpProfile,
 } from "./mcp/server";
 import { startHttpServer } from "./mcp/http-server";
+import { schemaCompatibleTransport } from "./mcp/schema-transport";
 import { CancellableTaskStore } from "./mcp/task-store";
 
 const transportName = process.env.MCP_TRANSPORT ?? "http";
@@ -64,7 +65,6 @@ if (publicMcpUrl) allowedOrigins.add(publicMcpUrl.origin);
 const principalId = "local";
 const resultStore = new LocalResultStore();
 const webContentStore = new LocalWebContentStore();
-const taskStore = new CancellableTaskStore();
 const credentialSource = process.env.BRIGHTDATA_CREDENTIAL_SOURCE?.trim() || "auto";
 if (!(credentialSource === "auto" || credentialSource === "keychain")) {
   throw new Error(
@@ -175,6 +175,9 @@ const createServer = (requestPrincipal: string, profile: McpProfile) => {
   const browser = profile === "browser" && browserProvider
     ? createBrowser(browserProvider)
     : undefined;
+  const tasks = profile === "all" || profile === "marketplace"
+    ? new CancellableTaskStore()
+    : undefined;
   const server = createBrightMcpServer({
     profile,
     datasets: datasetAdapter,
@@ -182,19 +185,18 @@ const createServer = (requestPrincipal: string, profile: McpProfile) => {
     browser,
     results: resultStore,
     webContent: webContentStore,
-    tasks: taskStore,
+    tasks,
     widgetHtml,
     principalId: requestPrincipal,
     icon,
   });
-  if (browser) {
-    activeBrowsers.add(browser);
-    const onclose = server.server.onclose;
-    server.server.onclose = () => {
-      onclose?.();
-      if (activeBrowsers.delete(browser)) void browser.shutdown();
-    };
-  }
+  if (browser) activeBrowsers.add(browser);
+  const onclose = server.server.onclose;
+  server.server.onclose = () => {
+    onclose?.();
+    tasks?.cleanup();
+    if (browser && activeBrowsers.delete(browser)) void browser.shutdown();
+  };
   return server;
 };
 
@@ -248,7 +250,7 @@ function brightDataBrowserProvider() {
 
 if (transportName === "stdio") {
   const server = createServer(principalId, selectedProfile);
-  await server.connect(new StdioServerTransport());
+  await server.connect(schemaCompatibleTransport(new StdioServerTransport()));
 } else if (transportName === "http") {
   const port = readPort(process.env.PORT);
   const httpServer = startHttpServer({

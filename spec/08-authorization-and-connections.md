@@ -14,6 +14,10 @@ environment-backed `Authorization: Bearer` header over HTTPS. The server MUST:
 - never persist, log, return, or place the key in model-visible content; and
 - reject deployment-global Bright Data credentials at startup.
 
+Each hosted MCP session MUST receive an isolated task store. Closing the
+session or reaching a task TTL MUST cancel any still-running upstream work
+before its task state is discarded.
+
 The bearer is the upstream Bright Data credential, not a separately issued MCP
 OAuth token. Revocation and replacement happen in the caller's Bright Data
 account and client environment.

@@ -13,14 +13,17 @@ required MCP app.
 - `browser_navigate`: accept a destination union of `{kind: "url", url}`,
   `{kind: "back"}`, or `{kind: "forward"}`. URL navigation MAY create a session;
   history navigation requires an owned existing session.
-- `browser_observe`: return one bounded typed observation: accessibility snapshot,
-  readable text, HTML, screenshot resource, or bounded network summary.
+- `browser_observe`: return one bounded typed observation: an AI accessibility
+  snapshot with snapshot-bound element refs, readable text, HTML, screenshot resource,
+  or bounded network summary.
 - `browser_interact`: perform one action from a discriminated union: click, type,
-  select, press, wait for a declared condition, or scroll.
+  select, press, wait for a declared condition, or scroll. Targeted actions MUST
+  consume a ref from the latest accessibility observation; raw selectors MUST NOT
+  be model-visible.
 - `browser_close`: idempotently close an owned session and release resources.
 
-Selectors, timeouts, observation sizes, redirects, downloads, and action counts
-MUST be bounded. Arbitrary scripts, raw CDP commands, local paths, extension
+Refs, timeouts, observation sizes, redirects, downloads, and action counts MUST
+be bounded. Arbitrary selectors, scripts, raw CDP commands, local paths, extension
 installation, and credential-bearing URLs MUST NOT be accepted.
 
 ## Port and adapter

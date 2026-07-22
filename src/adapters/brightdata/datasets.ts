@@ -12,6 +12,7 @@ import {
   deepLookupInputSchema,
   keywordCollectionInputSchema,
   marketplaceInputSchema,
+  packageCollectionInputSchema,
   urlCollectionInputSchema,
 } from "../../core/dataset-inputs";
 import type { ResultSource, ResultStore } from "../../core/results";
@@ -102,17 +103,7 @@ async function runCollector(
   context: RequestContext,
 ) {
   if (input.operation !== "collect") throw unsupported(input.datasetId, input.operation, "collect");
-  const parsed = collector.kind === "urls"
-    ? urlCollectionInputSchema.safeParse(input.arguments)
-    : keywordCollectionInputSchema.safeParse(input.arguments);
-  if (!parsed.success) throw invalidArguments(parsed.error);
-  const records = collector.kind === "urls"
-    ? (parsed.data as { urls: string[] }).urls.map((url) => ({ url }))
-    : [{
-        keyword: (parsed.data as { query: string }).query,
-        url: "https://www.amazon.com",
-        pages_to_search: (parsed.data as { pages: number }).pages,
-      }];
+  const records = collectorRecords(collector.kind, input.arguments);
   const snapshot = parse(snapshotTriggerSchema, (await gateway.requestJson({
     method: "POST",
     path: "/datasets/v3/trigger",
@@ -128,6 +119,29 @@ async function runCollector(
     snapshotId: snapshot.snapshot_id,
     metadata,
   }, context);
+}
+
+function collectorRecords(
+  kind: "urls" | "keyword" | "package",
+  value: unknown,
+) {
+  if (kind === "urls") {
+    const parsed = urlCollectionInputSchema.safeParse(value);
+    if (!parsed.success) throw invalidArguments(parsed.error);
+    return parsed.data.urls.map((url) => ({ url }));
+  }
+  if (kind === "package") {
+    const parsed = packageCollectionInputSchema.safeParse(value);
+    if (!parsed.success) throw invalidArguments(parsed.error);
+    return [{ package_name: parsed.data.packageName }];
+  }
+  const parsed = keywordCollectionInputSchema.safeParse(value);
+  if (!parsed.success) throw invalidArguments(parsed.error);
+  return [{
+    keyword: parsed.data.query,
+    url: "https://www.amazon.com",
+    pages_to_search: parsed.data.pages,
+  }];
 }
 
 async function runMarketplace(
@@ -150,29 +164,54 @@ async function runMarketplace(
   }
   const upstreamId = input.datasetId.slice("marketplace:".length);
   if (SYNC_SEARCH_DATASETS.has(upstreamId) && parsed.data.limit <= 1_000) {
-    const result = parse(synchronousSearchSchema, (await gateway.requestJson({
-      method: "POST",
-      path: `/datasets/search/${encodeURIComponent(upstreamId)}`,
-      body: {
-        filter: parsed.data.filter,
-        size: parsed.data.limit,
-        sort: parsed.data.sort,
-        search_after: parsed.data.cursor,
+    const search = async (cursor: unknown[] | undefined, requestContext: RequestContext) =>
+      parse(synchronousSearchSchema, (await gateway.requestJson({
+        method: "POST",
+        path: `/datasets/search/${encodeURIComponent(upstreamId)}`,
+        body: {
+          filter: parsed.data.filter,
+          size: parsed.data.limit,
+          sort: parsed.data.sort,
+          search_after: cursor,
+        },
+        timeoutMs: 30_000,
+      }, requestContext)).data);
+    const first = await search(undefined, context);
+    const partSize = Math.max(first.hits.length, 1);
+    const cursors = new Map<number, unknown[]>();
+    const lengths = new Map([[1, first.hits.length]]);
+    if (first.search_after) cursors.set(2, first.search_after);
+    const source: ResultSource = {
+      partSize,
+      totalRows: first.total_hits,
+      async loadPart(part, readContext) {
+        if (part === 1) return first.hits;
+        const cursor = cursors.get(part);
+        if (!cursor) return [];
+        const result = await search(cursor, readContext);
+        lengths.set(part, result.hits.length);
+        if (result.search_after) cursors.set(part + 1, result.search_after);
+        return result.hits;
       },
-      timeoutMs: 30_000,
-    }, context)).data);
-    return store.save(base(input.datasetId, title, "search", result.hits, [{
+      hasMore(nextOffset) {
+        if (nextOffset === 0) return false;
+        const part = Math.floor((nextOffset - 1) / partSize) + 1;
+        const partEnd = (part - 1) * partSize + (lengths.get(part) ?? 0);
+        return nextOffset < partEnd || cursors.has(part + 1);
+      },
+    };
+    return store.save(base(input.datasetId, title, "search", first.hits, [{
       code: "billed_operation",
       message: "Bright Data billed this Marketplace search to the caller account.",
-    }]), result.hits, context);
+    }]), source, context);
   }
 
-  if (parsed.data.sort || parsed.data.cursor) {
+  if (parsed.data.sort) {
     throw new CapabilityError(
       "operation_not_supported",
-      "Sorting and cursors are available only on synchronous Marketplace search datasets.",
+      "Sorting is available only on synchronous Marketplace search datasets.",
       false,
-      "Remove sort and cursor; the asynchronous result resource provides paging.",
+      "Remove sort; the asynchronous result resource provides paging.",
     );
   }
 

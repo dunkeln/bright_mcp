@@ -84,9 +84,11 @@ export class LocalResultStore implements ResultStore {
     }
     rows = rows.slice(partOffset, partOffset + PAGE_ROWS);
     const nextOffset = offset + rows.length;
-    const hasNext = stored.source.totalRows === undefined
-      ? rows.length === PAGE_ROWS
-      : nextOffset < stored.source.totalRows;
+    const hasNext = stored.source.hasMore
+      ? stored.source.hasMore(nextOffset)
+      : stored.source.totalRows === undefined
+        ? rows.length === PAGE_ROWS
+        : nextOffset < stored.source.totalRows;
 
     return {
       ...stored.base,
@@ -129,12 +131,27 @@ export class LocalResultStore implements ResultStore {
 export class LocalWebContentStore implements WebContentStore {
   private readonly pages = new LRUCache<
     string,
-    { owner: string; url: string; content: string }
+    {
+      owner: string;
+      url: string;
+      content: string;
+      mediaType: "text/markdown" | "text/html";
+    }
   >({ max: 500, ttl: RESULT_TTL_MS });
 
-  save(url: string, content: string, context: RequestContext) {
+  save(
+    url: string,
+    content: string,
+    mediaType: "text/markdown" | "text/html",
+    context: RequestContext,
+  ) {
     const token = crypto.randomUUID().replaceAll("-", "");
-    this.pages.set(token, { owner: context.principalId, url, content });
+    this.pages.set(token, {
+      owner: context.principalId,
+      url,
+      content,
+      mediaType,
+    });
     const bytes = new TextEncoder().encode(content);
     const truncated = bytes.byteLength > WEB_PREVIEW_BYTES;
     return {
@@ -149,7 +166,11 @@ export class LocalWebContentStore implements WebContentStore {
   read(token: string, context: RequestContext) {
     const page = this.pages.get(token);
     if (!page || page.owner !== context.principalId) throw resultNotFound();
-    return { url: page.url, content: page.content };
+    return {
+      url: page.url,
+      content: page.content,
+      mediaType: page.mediaType,
+    };
   }
 }
 

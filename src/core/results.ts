@@ -22,4 +22,5 @@ export type ResultSource = {
   totalRows?: number;
   expiresAt?: string;
   loadPart(part: number, context: RequestContext): Promise<DatasetResult["rows"]>;
+  hasMore?(nextOffset: number): boolean;
 };

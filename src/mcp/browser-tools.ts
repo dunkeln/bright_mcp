@@ -5,24 +5,27 @@ import { isPublicHttpUrl } from "../core/public-url";
 import { reply, requestContext, runTool } from "./support";
 
 const sessionId = z.string().min(1).max(100);
-const selector = z.string().trim().min(1).max(500);
+const ref = z
+  .string()
+  .regex(/^(f\d+)?e\d+$/, "Ref must come from the latest accessibility observation.")
+  .describe("Element ref from the latest accessibility observation.");
 const timeoutMs = z.number().int().min(100).max(120_000).default(30_000);
 
 const actionSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("click"), selector }),
+  z.object({ kind: z.literal("click"), ref }),
   z.object({
     kind: z.literal("type"),
-    selector,
+    ref,
     text: z.string().max(2_000),
   }),
   z.object({
     kind: z.literal("select"),
-    selector,
+    ref,
     value: z.string().max(500),
   }),
   z.object({
     kind: z.literal("press"),
-    selector: selector.optional(),
+    ref: ref.optional(),
     key: z.enum([
       "Enter",
       "Tab",
@@ -42,7 +45,7 @@ const actionSchema = z.discriminatedUnion("kind", [
   }),
   z.object({
     kind: z.literal("wait"),
-    selector,
+    ref,
     state: z.enum(["attached", "visible", "hidden"]),
   }),
   z.object({
@@ -131,7 +134,7 @@ export function registerBrowserTools(
     {
       title: "Observe remote browser",
       description:
-        "Read one bounded accessibility, text, HTML, screenshot, or network observation from an owned remote browser session.",
+        "Read one bounded accessibility, text, HTML, screenshot, or network observation from an owned remote browser session. Accessibility observations include snapshot-bound refs for browser_interact.",
       inputSchema: z.object({
         sessionId,
         kind: z.enum(["accessibility", "text", "html", "screenshot", "network"]),
@@ -183,7 +186,7 @@ export function registerBrowserTools(
     {
       title: "Interact with remote browser",
       description:
-        "Perform exactly one bounded click, type, select, key press, wait, or scroll action in an owned remote browser session.",
+        "Perform exactly one bounded click, type, select, key press, wait, or scroll action. Targeted actions use a ref from the latest accessibility observation.",
       inputSchema: z.object({
         sessionId,
         action: actionSchema,

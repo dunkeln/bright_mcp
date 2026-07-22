@@ -64,7 +64,7 @@ independently graded. A stronger judge model compares matched, anonymously
 labeled artifacts for task fulfillment, evidence grounding, information
 density, source quality, and actionability. Deterministic passes remain separate
 from judge scores. Results support claims about Acquire and Operate under this
-profile, not successful execution of all six published tools.
+profile, not successful execution of all seven published tools.
 
 ## Full tool-use benchmark (pre-routing baseline)
 

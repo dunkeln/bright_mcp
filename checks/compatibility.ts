@@ -2,16 +2,10 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { InMemoryTaskStore } from "@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js";
-import {
-  CallToolResultSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { datasetResultSchema } from "../src/core/contracts";
 import { DATASET_WORKBENCH_URI } from "../src/mcp/dataset-tools";
-import {
-  assert,
-  testEnvironment as environment,
-  waitForServer,
-} from "./compatibility-support";
+import { assert, testEnvironment as environment, waitForServer } from "./compatibility-support";
 
 const bun = process.execPath;
 const projectRoot = new URL("../", import.meta.url).pathname;
@@ -37,30 +31,25 @@ async function checkStdio() {
   await client.connect(transport);
   try {
     const tools = await client.listTools();
+    assertCompatibleToolSchemas(tools.tools);
     assert(
       tools.tools.map((tool) => tool.name).join(",") ===
-        "search_web,read_web,extract_web,research_web,find_datasets,run_dataset",
-      "The all profile must expose exactly its six routed tools.",
+        "search_web,discover_web,read_web,extract_web,research_web,find_datasets,run_dataset",
+      "The all profile must expose exactly its seven routed tools.",
     );
     assertToolAnnotations(tools.tools);
     assert(
-      tools.tools.find(({ name }) => name === "find_datasets")?.annotations
-        ?.openWorldHint === true,
+      tools.tools.find(({ name }) => name === "find_datasets")?.annotations?.openWorldHint === true,
       "find_datasets must disclose that discovery consults an external account catalog.",
     );
-    const searchProperties = tools.tools.find(({ name }) => name === "search_web")
-      ?.inputSchema.properties as Record<string, unknown> | undefined;
-    const findProperties = tools.tools.find(({ name }) => name === "find_datasets")
-      ?.inputSchema.properties as
-      | { limit?: { maximum?: number } }
-      | undefined;
-    const runArguments = (
-      tools.tools.find(({ name }) => name === "run_dataset")
-        ?.inputSchema.properties?.arguments as { anyOf?: unknown[] } | undefined
-    );
+    const searchProperties = tools.tools.find(({ name }) => name === "search_web")?.inputSchema
+      .properties as Record<string, unknown> | undefined;
+    const findProperties = tools.tools.find(({ name }) => name === "find_datasets")?.inputSchema
+      .properties as { limit?: { maximum?: number } } | undefined;
+    const runArguments = tools.tools.find(({ name }) => name === "run_dataset")?.inputSchema
+      .properties?.arguments as { anyOf?: unknown[] } | undefined;
     assert(
-      searchProperties &&
-        Object.keys(searchProperties).join(",") === "queries",
+      searchProperties && Object.keys(searchProperties).join(",") === "queries",
       "search_web exposed an execution-product mode instead of one search contract.",
     );
     assert(
@@ -68,11 +57,21 @@ async function checkStdio() {
       "find_datasets discovery breadth drifted from the bounded five-candidate contract.",
     );
     assert(
-      runArguments?.anyOf?.length === 3,
-      "run_dataset did not advertise its three maintained-data argument shapes.",
+      runArguments?.anyOf?.length === 4,
+      "run_dataset did not advertise its four maintained-data argument shapes.",
     );
-    const runDatasetMeta = tools.tools.find((tool) => tool.name === "run_dataset")
-      ?._meta as
+    assert(
+      !JSON.stringify(runArguments).includes('"cursor"'),
+      "run_dataset exposed an upstream Marketplace cursor instead of resource continuation.",
+    );
+    assert(
+      tools.tools.find(({ name }) => name === "search_web")?.description
+        ?.includes("bright_mcp_serp") &&
+        tools.tools.find(({ name }) => name === "read_web")?.description
+          ?.includes("bright_mcp_unlocker"),
+      "Web tools did not disclose first-use Bright Data zone creation.",
+    );
+    const runDatasetMeta = tools.tools.find((tool) => tool.name === "run_dataset")?._meta as
       | {
           ui?: { resourceUri?: string };
           "ui/resourceUri"?: string;
@@ -86,8 +85,17 @@ async function checkStdio() {
       "run_dataset did not advertise the versioned app resource consistently.",
     );
     await assertToolRejected(client, "search_web", { queries: [] });
-    await assertToolRejected(client, "read_web", { urls: ["file:///tmp/nope"] });
-    await assertToolRejected(client, "extract_web", { urls: ["https://example.com/"] });
+    await assertToolRejected(client, "discover_web", {
+      query: "sources",
+      publishedAfter: "2026-07-22",
+      publishedBefore: "2026-07-21",
+    });
+    await assertToolRejected(client, "read_web", {
+      urls: ["file:///tmp/nope"],
+    });
+    await assertToolRejected(client, "extract_web", {
+      urls: ["https://example.com/"],
+    });
     await assertToolRejected(client, "research_web", { query: "" });
     await assertToolRejected(client, "find_datasets", { query: "", limit: 0 });
     await assertToolRejected(client, "run_dataset", {
@@ -101,6 +109,20 @@ async function checkStdio() {
       arguments: { queries: [{ query: "Bright Data" }] },
     });
     assert(!searched.isError, "search_web failed.");
+
+    const discovered = await client.callTool({
+      name: "discover_web",
+      arguments: {
+        query: "web data platforms",
+        intent: "Find primary product documentation",
+        limit: 2,
+      },
+    });
+    assert(!discovered.isError, "discover_web failed.");
+    assert(
+      (discovered.structuredContent as { results?: unknown[] }).results?.length === 2,
+      "discover_web omitted its ranked shortlist.",
+    );
 
     const read = await client.callTool({
       name: "read_web",
@@ -121,6 +143,31 @@ async function checkStdio() {
       uri: readResult.results?.[0]?.resourceUri ?? "",
     });
     assert(webPage.contents[0]?.mimeType === "text/markdown", "read_web resource failed.");
+
+    const source = await client.callTool({
+      name: "read_web",
+      arguments: {
+        urls: ["https://example.com/source"],
+        representation: "source",
+      },
+    });
+    assert(!source.isError, "read_web source representation failed.");
+    const sourceResult = source.structuredContent as {
+      results?: Array<{ resourceUri?: string; mediaType?: string }>;
+    };
+    assert(
+      sourceResult.results?.[0]?.mediaType === "text/html",
+      "read_web source representation advertised the wrong media type.",
+    );
+    const sourcePage = await client.readResource({
+      uri: sourceResult.results?.[0]?.resourceUri ?? "",
+    });
+    assert(
+      sourcePage.contents[0]?.mimeType === "text/html" &&
+        "text" in sourcePage.contents[0] &&
+        sourcePage.contents[0].text.startsWith("<!doctype html>"),
+      "read_web source resource did not preserve HTML.",
+    );
 
     await assertToolRejected(client, "read_web", {
       urls: ["https://example.com/"],
@@ -158,8 +205,11 @@ async function checkStdio() {
     });
     assert(!found.isError, "find_datasets failed.");
     assert(
-      ((found.structuredContent as { datasets?: Array<{ operations?: unknown[] }> })
-        .datasets?.[0]?.operations?.length ?? 0) > 0,
+      ((
+        found.structuredContent as {
+          datasets?: Array<{ operations?: unknown[] }>;
+        }
+      ).datasets?.[0]?.operations?.length ?? 0) > 0,
       "find_datasets omitted its directly executable contract.",
     );
 
@@ -203,7 +253,9 @@ async function checkStdio() {
 
     const artifact = await client.readResource({ uri: result.artifact.uri });
     assert(artifact.contents.length === 1, "The result artifact was not readable.");
-    const page = await client.readResource({ uri: result.page.nextResourceUri });
+    const page = await client.readResource({
+      uri: result.page.nextResourceUri,
+    });
     assert(page.contents.length === 1, "The result page was not readable.");
 
     const collected = await client.callTool({
@@ -212,10 +264,7 @@ async function checkStdio() {
         datasetId: "ecommerce-products",
         operation: "collect",
         arguments: {
-          urls: [
-            "https://example.com/product-5",
-            "https://example.com/product-1",
-          ],
+          urls: ["https://example.com/product-5", "https://example.com/product-1"],
           acknowledgeCost: true,
         },
       },
@@ -227,8 +276,7 @@ async function checkStdio() {
     assert(
       !collected.isError &&
         collection.operation === "collect" &&
-        collection.rows?.map((row) => row.productId).join(",") ===
-          "product-5,product-1",
+        collection.rows?.map((row) => row.productId).join(",") === "product-5,product-1",
       "run_dataset collect did not preserve the requested record order.",
     );
 
@@ -268,8 +316,7 @@ async function checkBrowserProfile() {
     assertToolAnnotations(tools.tools);
     for (const name of ["browser_interact", "browser_close"]) {
       assert(
-        tools.tools.find((tool) => tool.name === name)?.annotations
-          ?.destructiveHint === true,
+        tools.tools.find((tool) => tool.name === name)?.annotations?.destructiveHint === true,
         `${name} did not disclose its destructive state changes.`,
       );
     }
@@ -284,6 +331,10 @@ async function checkBrowserProfile() {
       sessionId: "missing",
       action: { kind: "script", source: "alert(1)" },
     });
+    await assertToolRejected(client, "browser_interact", {
+      sessionId: "missing",
+      action: { kind: "click", selector: "#continue" },
+    });
     await assertToolRejected(client, "browser_close", { sessionId: "" });
 
     const navigation = await client.callTool({
@@ -296,13 +347,17 @@ async function checkBrowserProfile() {
 
     const observation = await client.callTool({
       name: "browser_observe",
-      arguments: { sessionId, kind: "text" },
+      arguments: { sessionId, kind: "accessibility" },
     });
     assert(!observation.isError, "browser_observe failed.");
+    assert(
+      (observation.structuredContent as { content?: string }).content?.includes("[ref=e1]"),
+      "Accessibility observation omitted stable interaction refs.",
+    );
 
     const interaction = await client.callTool({
       name: "browser_interact",
-      arguments: { sessionId, action: { kind: "scroll", deltaY: 200 } },
+      arguments: { sessionId, action: { kind: "click", ref: "e1" } },
     });
     assert(!interaction.isError, "browser_interact failed.");
 
@@ -317,9 +372,8 @@ async function checkBrowserProfile() {
       arguments: { sessionId, kind: "screenshot" },
     });
     assert(!screenshot.isError, "browser screenshot observation failed.");
-    const resourceUri = (
-      screenshot.structuredContent as { resource?: { uri?: string } }
-    ).resource?.uri;
+    const resourceUri = (screenshot.structuredContent as { resource?: { uri?: string } }).resource
+      ?.uri;
     assert(resourceUri, "browser screenshot omitted its resource URI.");
     const artifact = await client.readResource({ uri: resourceUri });
     assert(artifact.contents[0]?.mimeType === "image/png", "Screenshot resource failed.");
@@ -359,7 +413,10 @@ async function checkRealBrowser() {
     }),
     stderr: "pipe",
   });
-  const client = new Client({ name: "bright-real-browser-check", version: "0.1.0" });
+  const client = new Client({
+    name: "bright-real-browser-check",
+    version: "0.1.0",
+  });
   await client.connect(transport);
   let sessionId: string | undefined;
   try {
@@ -372,12 +429,24 @@ async function checkRealBrowser() {
     assert(sessionId, "Real browser navigation omitted its session ID.");
     const observation = await client.callTool({
       name: "browser_observe",
-      arguments: { sessionId, kind: "text" },
+      arguments: { sessionId, kind: "accessibility" },
     });
-    assert(!observation.isError, "Real Bright Data browser observation failed.");
+    assert(!observation.isError, "Real Bright Data AI browser observation failed.");
+    const ref = (observation.structuredContent as { content?: string }).content?.match(
+      /\[ref=((?:f\d+)?e\d+)\]/,
+    )?.[1];
+    assert(ref, "Real Bright Data AI browser observation omitted interaction refs.");
+    const interaction = await client.callTool({
+      name: "browser_interact",
+      arguments: { sessionId, action: { kind: "click", ref } },
+    });
+    assert(!interaction.isError, "Real Bright Data ref interaction failed.");
   } finally {
     if (sessionId) {
-      await client.callTool({ name: "browser_close", arguments: { sessionId } });
+      await client.callTool({
+        name: "browser_close",
+        arguments: { sessionId },
+      });
     }
     await client.close();
   }
@@ -442,14 +511,10 @@ async function checkHttp() {
     stderr: "pipe",
   });
   try {
-    await waitForServer(
-      `http://127.0.0.1:${port}/`,
-      process,
-      "The Bun HTTP server did not start.",
-    );
+    await waitForServer(`http://127.0.0.1:${port}/`, process, "The Bun HTTP server did not start.");
     const expectedProfiles = {
-      "/mcp": "search_web,read_web,extract_web,research_web,find_datasets,run_dataset",
-      "/mcp/web": "search_web,read_web",
+      "/mcp": "search_web,discover_web,read_web,extract_web,research_web,find_datasets,run_dataset",
+      "/mcp/web": "search_web,discover_web,read_web",
       "/mcp/deep-lookup": "extract_web,research_web",
       "/mcp/marketplace": "find_datasets,run_dataset",
       "/mcp/browser": "browser_navigate,browser_observe,browser_interact,browser_close",
@@ -460,12 +525,11 @@ async function checkHttp() {
         version: "0.1.0",
       });
       await profileClient.connect(
-        new StreamableHTTPClientTransport(
-          new URL(`http://127.0.0.1:${port}${path}`),
-        ),
+        new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}${path}`)),
       );
       try {
         const tools = await profileClient.listTools();
+        assertCompatibleToolSchemas(tools.tools);
         assert(
           tools.tools.map(({ name }) => name).join(",") === expected,
           `${path} exposed the wrong capability profile.`,
@@ -478,17 +542,16 @@ async function checkHttp() {
     const client = new Client({ name: "bright-http-check", version: "0.1.0" });
     let browserSessionId = "";
     await client.connect(
-      new StreamableHTTPClientTransport(
-        new URL(`http://127.0.0.1:${port}/mcp/browser`),
-      ),
+      new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp/browser`)),
     );
     try {
       const navigation = await client.callTool({
         name: "browser_navigate",
-        arguments: { destination: { kind: "url", url: "https://example.com/" } },
+        arguments: {
+          destination: { kind: "url", url: "https://example.com/" },
+        },
       });
-      browserSessionId =
-        (navigation.structuredContent as { sessionId?: string }).sessionId ?? "";
+      browserSessionId = (navigation.structuredContent as { sessionId?: string }).sessionId ?? "";
       assert(browserSessionId, "Bun HTTP browser navigation omitted its session.");
     } finally {
       await client.close();
@@ -499,9 +562,7 @@ async function checkHttp() {
       version: "0.1.0",
     });
     await replacement.connect(
-      new StreamableHTTPClientTransport(
-        new URL(`http://127.0.0.1:${port}/mcp/browser`),
-      ),
+      new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp/browser`)),
     );
     try {
       const stale = await replacement.callTool({
@@ -518,11 +579,7 @@ async function checkHttp() {
   }
 }
 
-async function assertToolRejected(
-  client: Client,
-  name: string,
-  args: Record<string, unknown>,
-) {
+async function assertToolRejected(client: Client, name: string, args: Record<string, unknown>) {
   try {
     const result = await client.callTool({ name, arguments: args });
     if (result.isError) return;
@@ -536,16 +593,26 @@ function assertToolAnnotations(
   tools: Array<{ name: string; annotations?: Record<string, unknown> }>,
 ) {
   for (const tool of tools) {
-    for (const name of [
-      "readOnlyHint",
-      "destructiveHint",
-      "idempotentHint",
-      "openWorldHint",
-    ]) {
+    for (const name of ["readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"]) {
       assert(
         typeof tool.annotations?.[name] === "boolean",
         `${tool.name} omitted the ${name} annotation.`,
       );
     }
   }
+}
+
+function assertCompatibleToolSchemas(tools: Array<{ inputSchema: object; outputSchema?: object }>) {
+  const schemas = JSON.stringify(
+    tools.map(({ inputSchema, outputSchema }) => ({
+      inputSchema,
+      outputSchema,
+    })),
+  );
+  assert(
+    !schemas.includes('"$schema"') &&
+      !schemas.includes('"definitions"') &&
+      !schemas.includes("#/definitions/"),
+    "Tool schemas exposed an incompatible JSON Schema dialect.",
+  );
 }

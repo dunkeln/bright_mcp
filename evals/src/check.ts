@@ -3,6 +3,7 @@ import { connect, safeError, serverLabel, type ServerId, writeReport } from "./m
 
 const expectedTools: Record<ServerId, string[]> = {
   bright: [
+    "discover_web",
     "extract_web",
     "find_datasets",
     "read_web",
@@ -20,7 +21,7 @@ const expectedTools: Record<ServerId, string[]> = {
 };
 
 const expectedBrightProfiles = {
-  "/mcp/web": ["read_web", "search_web"],
+  "/mcp/web": ["discover_web", "read_web", "search_web"],
   "/mcp/deep-lookup": ["extract_web", "research_web"],
   "/mcp/marketplace": ["find_datasets", "run_dataset"],
 } as const;
@@ -85,6 +86,12 @@ for (const server of ["bright", "upstream"] as const) {
         urls: ["https://example.com"],
         fields: [{ name: "title", description: "Page title" }],
         preview: true,
+      }, false);
+      await probe(checks, client, "intent-ranked source discovery is available", "discover_web", {
+        query: "Model Context Protocol specification",
+        intent: "Find the primary protocol documentation",
+        limit: 3,
+        language: "en",
       }, false);
       await probe(checks, client, "open-web research preview is available", "research_web", {
         query: "Find one official source describing the Example Domain.",

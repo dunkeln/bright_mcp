@@ -49,7 +49,7 @@ export function createFakeBrowserProvider(): BrowserProvider {
       const content = kind === "html"
         ? `<main><h1>Demo browser</h1><p>${Bun.escapeHTML(url)}</p></main>`
         : kind === "accessibility"
-          ? `- main:\n  - heading "Demo browser"\n  - paragraph "${url}"`
+          ? `- main:\n  - heading "Demo browser"\n  - link "Continue" [ref=e1]\n  - paragraph "${url}"`
           : `Demo browser\n${url}`;
       return { kind, content };
     },

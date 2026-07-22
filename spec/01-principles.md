@@ -42,15 +42,18 @@ The words MUST, MUST NOT, SHOULD, and MAY are normative.
 
 ## Falsifiable constraints
 
-- The V1 all profile exposes exactly six model-visible intent tools.
-- The web, Deep Lookup, and Marketplace profiles expose stable two-tool subsets.
+- The V1 all profile exposes exactly seven model-visible intent tools.
+- The web, Deep Lookup, and Marketplace profiles expose stable three-, two-, and
+  two-tool subsets.
 - The V1 browser profile exposes exactly four browser tools and no data tools.
 - A profile is selected by transport configuration or HTTP path; account probes
   MUST NOT mutate `tools/list` during a session.
 - Resources, tasks, or app-only implementation helpers MUST NOT become
   model-visible tools merely because a client lacks another MCP capability.
 - Any further tool MAY be added only when evaluations show that an existing contract
-  cannot express a materially distinct agent task without ambiguity.
+  cannot express a materially distinct agent task without ambiguity. `discover_web`
+  passed this gate because constrained intent ranking has different latency, billing,
+  and output semantics from both SERP lookup and structured Deep Lookup research.
 - A tool SHOULD be merged when its only differences are endpoint, dataset ID,
   defaults, or upstream response shape.
 - Tool count, schema size, invalid-call rate, selection accuracy, and calls per

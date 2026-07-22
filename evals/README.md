@@ -74,13 +74,12 @@ Profile `current-entitlements` · agent `openrouter/anthropic/claude-haiku-4.5` 
 
 Extract and Research are excluded because general Deep Lookup is unavailable for the benchmark account.
 Recurring delivery is excluded because durable scheduling is still a WIP capability.
-Current search deterministic results were regraded from stored outputs; agent and judge calls were not rerun.
 
 | Case | Pass Bright/BrightData | Recovered Bright/BrightData | Quality Bright/BrightData | Tokens Bright/BrightData | p50 latency Bright/BrightData | Calls Bright/BrightData |
 |---|---:|---:|---:|---:|---:|---:|
-| Acquire · Current search | 80% / 90% | 50% / 50% | 3.70 / 4.24 | 21579 / 13647 | 90.8s / 56.8s | 3.10 / 2.50 |
-| Acquire · Known pages | 100% / 100% | 0% / 10% | 4.68 / 4.68 | 6768 / 4851 | 15.2s / 19.6s | 1.00 / 2.10 |
-| Operate · Product snapshot | 100% / 100% | 0% / 0% | 4.04 / 3.22 | 14159 / 32359 | 15.7s / 41.4s | 2.00 / 1.00 |
+| Acquire · Current search | 90% / 90% | 0% / 10% | 4.14 / 3.86 | 14900 / 5741 | 51.5s / 15.7s | 2.50 / 1.60 |
+| Acquire · Known pages | 100% / 100% | 0% / 0% | 4.78 / 4.44 | 6822 / 4634 | 14.3s / 14.3s | 1.00 / 2.00 |
+| Operate · Product snapshot | 100% / 100% | 0% / 0% | 4.60 / 3.04 | 14292 / 26085 | 12.2s / 11.7s | 2.00 / 1.00 |
 
-A pass requires one parseable JSON payload, raw or in a single Markdown fence, with the requested output fields and provenance; brief surrounding text is ignored. Intended workflow selection, successful expected-tool execution, clean execution, and recovered errors remain separate artifact dimensions. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement for the original four-case judge run: 75%.
+A pass requires one parseable JSON payload, raw or in a single Markdown fence, with the requested output fields and provenance; brief surrounding text is ignored. Intended workflow selection, successful expected-tool execution, clean execution, and recovered errors remain separate artifact dimensions. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement: 100%.
 <!-- benchmark:end -->

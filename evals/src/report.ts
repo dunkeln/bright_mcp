@@ -69,7 +69,7 @@ const evalBlock = [
     `| ${label} | ${percent(bright.passRate)} / ${percent(upstream.passRate)} | ${percent(bright.recoveryRate)} / ${percent(upstream.recoveryRate)} | ${brightQuality.toFixed(2)} / ${upstreamQuality.toFixed(2)} | ${Math.round(bright.averageTokens)} / ${Math.round(upstream.averageTokens)} | ${seconds(bright.medianLatency)} / ${seconds(upstream.medianLatency)} | ${bright.averageTools.toFixed(2)} / ${upstream.averageTools.toFixed(2)} |`,
   ),
   "",
-  `A pass requires one parseable JSON payload, raw or in a single Markdown fence, with the requested output fields and provenance; brief surrounding text is ignored. Intended workflow selection, successful expected-tool execution, clean execution, and recovered errors remain separate artifact dimensions. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement for the original four-case judge run: ${percent(judge.sideAgreement)}.`,
+  `A pass requires one parseable JSON payload, raw or in a single Markdown fence, with the requested output fields and provenance; brief surrounding text is ignored. Intended workflow selection, successful expected-tool execution, clean execution, and recovered errors remain separate artifact dimensions. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement: ${percent(judge.sideAgreement)}.`,
 ].join("\n");
 
 const files = [

@@ -70,8 +70,8 @@ hosted authorization.
 ![Cumulative latency distribution across all benchmark runs](./assets/benchmark-latency.png)
 ![Paired horizontal bars comparing average tool calls by workflow](./assets/benchmark-complexity.png)
 
-Bright MCP: 93% pass · 4.14/5 judged quality · 14169 tokens · 19.4s p50. BrightData MCP: 97% · 4.05/5 · 16952 tokens · 37.5s p50.
-Blind preference: Bright MCP 8, BrightData MCP 7, ties 15. [Method and tables](./evals/README.md#latest-tool-use-benchmark) · current-entitlements Acquire + Operate profile · `openrouter/anthropic/claude-haiku-4.5` · 10 runs/case · 2026-07-22.
+Bright MCP: 97% pass · 4.51/5 judged quality · 12004 tokens · 14.5s p50. BrightData MCP: 97% · 3.78/5 · 12153 tokens · 13.5s p50.
+Blind preference: Bright MCP 17, BrightData MCP 3, ties 10. [Method and tables](./evals/README.md#latest-tool-use-benchmark) · current-entitlements Acquire + Operate profile · `openrouter/anthropic/claude-haiku-4.5` · 10 runs/case · 2026-07-22.
 <!-- benchmark:end -->
 
 ### WIP capabilities

@@ -39,6 +39,7 @@ for (const useCase of useCases) {
       const bytes = new TextEncoder().encode(JSON.stringify(result)).byteLength;
       const ok =
         result.isError !== true &&
+        !hasCapabilityFailure(result.structuredContent) &&
         Array.isArray(result.content) &&
         result.content.length > 0 &&
         bytes <= MAX_RESULT_BYTES;
@@ -90,6 +91,14 @@ if (failed) process.exitCode = 1;
 
 function searchTool(server: ServerId) {
   return server === "bright" ? "search_web" : "search_engine";
+}
+
+function hasCapabilityFailure(value: unknown): boolean {
+  if (Array.isArray(value)) return value.some(hasCapabilityFailure);
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return ("error" in record && record.error !== undefined) ||
+    Object.values(record).some(hasCapabilityFailure);
 }
 
 async function readPrevious(): Promise<UseCaseResult[]> {

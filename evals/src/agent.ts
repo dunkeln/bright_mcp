@@ -10,6 +10,8 @@ const model = configuredModel.startsWith("openrouter/")
   : `openrouter/${configuredModel}`;
 const runs = integer("EVAL_RUNS", 10, 1, 100);
 const concurrency = integer("EVAL_CONCURRENCY", 4, 2, 20);
+const artifactName = process.env.EVAL_ARTIFACT?.trim() || "agent";
+if (!/^[a-z0-9-]+$/.test(artifactName)) throw new Error("EVAL_ARTIFACT must contain only lowercase letters, numbers, and hyphens.");
 if (concurrency % 2) throw new Error("EVAL_CONCURRENCY must be even so Bright/BrightData runs stay paired.");
 const selectedCases = process.env.EVAL_CASE
   ? workflowCases.filter(({ id }) => id === process.env.EVAL_CASE)
@@ -22,7 +24,7 @@ const upstreamEcommerce = new URL(upstream);
 upstreamEcommerce.searchParams.set("groups", "ecommerce");
 const manager = new MCPClientManager(undefined, { defaultTimeout: 60_000 });
 
-const artifact = Bun.file(new URL("../.artifacts/agent.json", import.meta.url));
+const artifact = Bun.file(new URL(`../.artifacts/${artifactName}.json`, import.meta.url));
 const previous = (await readPrevious()).filter((result) =>
   selectedCases.some(({ id }) => id === result.caseId)
 );
@@ -30,15 +32,16 @@ const expectedRuns = selectedCases.length * 2 * runs;
 const results: AgentResult[] = previous.length === expectedRuns ? [] : previous;
 try {
   await Promise.all([
-    manager.connectToServer("bright", {
-      url: "https://bright-mcp.onrender.com/mcp",
+    ...(["web", "marketplace"] as const).map((profile) => manager.connectToServer(`bright-${profile}`, {
+      url: new URL(`/mcp/${profile}`, process.env.BRIGHT_MCP_URL?.trim() || "https://bright-mcp.onrender.com").href,
       accessToken: required("BRIGHTDATA_API_KEY"),
-    }),
+    })),
     manager.connectToServer("upstream", { url: upstream.toString() }),
     manager.connectToServer("upstream-ecommerce", { url: upstreamEcommerce.toString() }),
   ]);
   const tools = {
-    bright: await manager.getToolsForAiSdk("bright"),
+    brightWeb: await manager.getToolsForAiSdk("bright-web"),
+    brightMarketplace: await manager.getToolsForAiSdk("bright-marketplace"),
     upstream: await manager.getToolsForAiSdk("upstream"),
     upstreamEcommerce: await manager.getToolsForAiSdk("upstream-ecommerce"),
   };
@@ -61,16 +64,15 @@ try {
 
   const evaluate = async (job: Job): Promise<AgentResult> => {
     const runner = new HostRunner({
-      tools:
-        job.server === "upstream" &&
-        "upstreamProfile" in job.useCase &&
-        job.useCase.upstreamProfile === "ecommerce"
+      tools: job.server === "bright"
+        ? job.useCase.brightProfile === "web" ? tools.brightWeb : tools.brightMarketplace
+        : "upstreamProfile" in job.useCase && job.useCase.upstreamProfile === "ecommerce"
           ? tools.upstreamEcommerce
-          : tools[job.server],
+          : tools.upstream,
       model,
       apiKey,
       temperature: 0.1,
-      maxSteps: 5,
+      maxSteps: job.useCase.toolPath[job.server].length + 2,
       mcpClientManager: manager,
     });
     const startedAt = performance.now();
@@ -132,7 +134,8 @@ try {
   }
 } finally {
   await Promise.allSettled([
-    manager.disconnectServer("bright"),
+    manager.disconnectServer("bright-web"),
+    manager.disconnectServer("bright-marketplace"),
     manager.disconnectServer("upstream"),
     manager.disconnectServer("upstream-ecommerce"),
   ]);
@@ -182,6 +185,8 @@ function hasToolExecutionError(value: unknown): boolean {
   const record = value as Record<string, unknown>;
   return record.type === "error-text" ||
     record.isError === true ||
+    (typeof record.content === "string" && /^this endpoint is not supported[.!]?$/i.test(record.content.trim())) ||
+    ("error" in record && record.error !== undefined) ||
     Object.values(record).some(hasToolExecutionError);
 }
 
@@ -193,8 +198,7 @@ function successfulToolExecutions(value: unknown, tools = new Set<string>()) {
   if (!value || typeof value !== "object") return tools;
   const record = value as Record<string, unknown>;
   if (record.type === "tool-result" && typeof record.toolName === "string") {
-    const output = record.output as { value?: { isError?: boolean } } | undefined;
-    if (output?.value?.isError !== true) tools.add(record.toolName);
+    if (!hasToolExecutionError(record.output)) tools.add(record.toolName);
   }
   Object.values(record).forEach((item) => successfulToolExecutions(item, tools));
   return tools;
@@ -240,7 +244,7 @@ function resultKey(result: Pick<AgentResult, "caseId" | "server" | "run">) {
 }
 
 async function persist() {
-  await writeReport("agent", {
+  await writeReport(artifactName, {
     schemaVersion: 7,
     generatedAt: new Date().toISOString(),
     mode: "mcpjam-openrouter-tool-use",

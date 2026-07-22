@@ -26,7 +26,7 @@ export const MCP_PROFILE_PATHS: Readonly<Record<string, McpProfile>> = {
 
 const instructions: Record<McpProfile, string> = {
   all: "Choose by source certainty and output: unknown sources plus compact links or snippets -> search_web; known URLs plus readable evidence -> read_web; known URLs plus named fields -> extract_web; unknown sources plus sourced structured records -> research_web; maintained vertical data -> find_datasets then run_dataset. Do not substitute a search_web -> read_web chain when research_web matches the requested outcome.",
-  web: "Use search_web for compact discovery when sources are unknown. Use read_web for readable evidence when URLs are known. Do not read every search result unless page-level evidence is required.",
+  web: "Use search_web for compact discovery when sources are unknown. Answer from its summaries when they already contain the requested fact. Use read_web only when page-level text is missing or explicitly required; do not reopen a search result merely to verify its summary.",
   "deep-lookup": "Use extract_web for named fields when source URLs are known. Use research_web for sourced structured records when sources are unknown. Preview before a caller-approved paid run.",
   marketplace: "Use find_datasets only for maintained vertical data, then call run_dataset once with the returned identifier, operation, argument schema, and cost acknowledgement.",
   browser: "Use browser_navigate to create or move a remote session, browser_observe to inspect it, browser_interact for one bounded action, and browser_close when finished.",

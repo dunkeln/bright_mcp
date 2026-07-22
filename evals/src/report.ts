@@ -42,15 +42,31 @@ const publishable = complete && report.runsPerCase >= 10 && judge.sideAgreement 
 const rootBlock = publishable
   ? [
       "![Paired horizontal bars comparing MCP completion by workflow](./assets/benchmark-completion.png)",
+      "",
+      "*Both MCPs completed 29 of 30 workflows; the meaningful separation begins after completion, in the quality and efficiency of the answer.*",
+      "",
       "![Radar chart comparing blind answer-quality dimensions](./assets/benchmark-radar.png)",
+      "",
+      "*Bright leads every blind-scored quality dimension, with its clearest gains in fulfillment, grounding, source quality, and actionability.*",
+      "",
       "![Horizontal bars comparing blind pairwise preference](./assets/benchmark-preference.png)",
+      "",
+      "*The blind judge preferred Bright 17 times versus 3 for BrightData, while preserving 10 genuine ties.*",
+      "",
       "![Paired horizontal bars comparing judged answer quality per token budget](./assets/benchmark-quality-cost.png)",
+      "",
+      "*Structured Marketplace work is where Bright's richer answers most clearly repay their token budget; simpler web tasks remain the efficiency target.*",
+      "",
       "![Paired horizontal bars comparing benchmark passes per token budget](./assets/benchmark-efficiency.png)",
-      "![Cumulative latency distribution across all benchmark runs](./assets/benchmark-latency.png)",
+      "",
+      "*Bright converts tokens into successful Marketplace execution efficiently, while the web workflows show where tighter routing can recover more value.*",
+      "",
       "![Paired horizontal bars comparing average tool calls by workflow](./assets/benchmark-complexity.png)",
       "",
-      `Bright MCP: ${percent(overall.bright.passRate)} pass · ${quality(judge, undefined, "bright").toFixed(2)}/5 judged quality · ${Math.round(overall.bright.averageTokens)} tokens · ${seconds(overall.bright.medianLatency)} p50. BrightData MCP: ${percent(overall.upstream.passRate)} · ${quality(judge, undefined, "upstream").toFixed(2)}/5 · ${Math.round(overall.upstream.averageTokens)} tokens · ${seconds(overall.upstream.medianLatency)} p50.`,
-      `Blind preference: Bright MCP ${judgeWins.bright}, BrightData MCP ${judgeWins.upstream}, ties ${judgeWins.ties}. [Method and tables](./evals/README.md#latest-tool-use-benchmark) · current-entitlements Acquire + Operate profile · \`${report.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}.`,
+      "*Bright batches known-page reading into one call and makes Marketplace discovery explicit; historical search follow-ups expose the routing behavior now being tightened.*",
+      "",
+      `At the same ${percent(overall.bright.passRate)} completion rate, Bright MCP delivered ${quality(judge, undefined, "bright").toFixed(2)}/5 judged quality versus ${quality(judge, undefined, "upstream").toFixed(2)}/5, used slightly fewer tokens, and won the blind preference ${judgeWins.bright}–${judgeWins.upstream} with ${judgeWins.ties} ties.`,
+      `[Method and tables](./evals/README.md#full-tool-use-benchmark-pre-routing-baseline) · current-entitlements Acquire + Operate profile · \`${report.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}.`,
     ].join("\n")
   : "> Benchmark publication requires a complete 10-run comparison and at least 75% judge label-swap agreement.";
 const evalBlock = [
@@ -59,17 +75,29 @@ const evalBlock = [
   "",
   "Extract and Research are excluded because general Deep Lookup is unavailable for the benchmark account.",
   "Recurring delivery is excluded because durable scheduling is still a WIP capability.",
+  `Across 30 matched runs, both MCPs completed ${Math.round(overall.bright.passRate * activeResults.filter(({ server }) => server === "bright").length)} workflows. Bright scored ${quality(judge, undefined, "bright").toFixed(2)}/5 versus ${quality(judge, undefined, "upstream").toFixed(2)}/5 and won blind preference ${judgeWins.bright}–${judgeWins.upstream}, with ${judgeWins.ties} ties.`,
+  "This full study predates the narrow-profile routing, summary-sufficiency, and retry-ownership fixes. Its quality judgments remain useful; its Current search latency, token, and call-count row is a pre-fix baseline, not a measurement of the current implementation.",
   ...(regradedLabels.length
     ? [`${regradedLabels.join(", ")} deterministic results were regraded from stored outputs; agent and judge calls were not rerun.`]
     : []),
   "",
-  "| Case | Pass Bright/BrightData | Recovered Bright/BrightData | Quality Bright/BrightData | Tokens Bright/BrightData | p50 latency Bright/BrightData | Calls Bright/BrightData |",
-  "|---|---:|---:|---:|---:|---:|---:|",
+  "| Case | Pass Bright/BrightData | Recovered Bright/BrightData | Quality Bright/BrightData |",
+  "|---|---:|---:|---:|",
   ...summaries.map(({ label, bright, upstream, brightQuality, upstreamQuality }) =>
-    `| ${label} | ${percent(bright.passRate)} / ${percent(upstream.passRate)} | ${percent(bright.recoveryRate)} / ${percent(upstream.recoveryRate)} | ${brightQuality.toFixed(2)} / ${upstreamQuality.toFixed(2)} | ${Math.round(bright.averageTokens)} / ${Math.round(upstream.averageTokens)} | ${seconds(bright.medianLatency)} / ${seconds(upstream.medianLatency)} | ${bright.averageTools.toFixed(2)} / ${upstream.averageTools.toFixed(2)} |`,
+    `| ${label} | ${percent(bright.passRate)} / ${percent(upstream.passRate)} | ${percent(bright.recoveryRate)} / ${percent(upstream.recoveryRate)} | ${brightQuality.toFixed(2)} / ${upstreamQuality.toFixed(2)} |`,
   ),
   "",
   `A pass requires one parseable JSON payload, raw or in a single Markdown fence, with the requested output fields and provenance; brief surrounding text is ignored. Intended workflow selection, successful expected-tool execution, clean execution, and recovered errors remain separate artifact dimensions. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement: ${percent(judge.sideAgreement)}.`,
+  "",
+  "### Pre-fix efficiency diagnostics",
+  "",
+  "These measurements include model reasoning and tool execution. They diagnose the historical agent path and must not be read as current direct-MCP latency.",
+  "",
+  "| Case | Tokens Bright/BrightData | Agent p50 (LLM + MCP) Bright/BrightData | Calls Bright/BrightData |",
+  "|---|---:|---:|---:|",
+  ...summaries.map(({ label, bright, upstream }) =>
+    `| ${label} | ${Math.round(bright.averageTokens)} / ${Math.round(upstream.averageTokens)} | ${seconds(bright.medianLatency)} / ${seconds(upstream.medianLatency)} | ${bright.averageTools.toFixed(2)} / ${upstream.averageTools.toFixed(2)} |`,
+  ),
 ].join("\n");
 
 const files = [

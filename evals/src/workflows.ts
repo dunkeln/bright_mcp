@@ -9,6 +9,7 @@ export const workflowCases = [
     id: "acquire-current-search",
     pillar: "Acquire",
     shortLabel: "Current search",
+    brightProfile: "web",
     prompt:
       'Find Tesla\'s current stock price. Return one JSON object with keys "price", "currency", "asOf", and "sourceUrl". A single Markdown JSON fence and brief surrounding text are allowed.',
     toolPath: {
@@ -22,6 +23,7 @@ export const workflowCases = [
     id: "acquire-known-pages",
     pillar: "Acquire",
     shortLabel: "Known pages",
+    brightProfile: "web",
     prompt:
       'Read https://example.com and https://www.iana.org/help/example-domains in that order. Return one JSON array; each item must have "url", "title", and "summary". A single Markdown JSON fence and brief surrounding text are allowed.',
     toolPath: {
@@ -90,7 +92,8 @@ export const workflowCases = [
   {
     id: "operate-product-snapshot",
     pillar: "Operate",
-    shortLabel: "Product snapshot",
+    shortLabel: "Marketplace data retrieval",
+    brightProfile: "marketplace",
     prompt:
       'Get structured Amazon product search data for wireless earbuds from Amazon.com. Do not explain which product to use; execute the available data capability. Return one JSON object with keys "dataset", "rowCount", "fields", and "continuation". A single Markdown JSON fence and brief surrounding text are allowed.',
     upstreamProfile: "ecommerce",

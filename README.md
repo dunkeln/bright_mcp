@@ -63,20 +63,38 @@ hosted authorization.
 
 <!-- benchmark:start -->
 ![Paired horizontal bars comparing MCP completion by workflow](./assets/benchmark-completion.png)
+
+*Both MCPs completed 29 of 30 workflows; the meaningful separation begins after completion, in the quality and efficiency of the answer.*
+
 ![Radar chart comparing blind answer-quality dimensions](./assets/benchmark-radar.png)
+
+*Bright leads every blind-scored quality dimension, with its clearest gains in fulfillment, grounding, source quality, and actionability.*
+
 ![Horizontal bars comparing blind pairwise preference](./assets/benchmark-preference.png)
+
+*The blind judge preferred Bright 17 times versus 3 for BrightData, while preserving 10 genuine ties.*
+
 ![Paired horizontal bars comparing judged answer quality per token budget](./assets/benchmark-quality-cost.png)
+
+*Structured Marketplace work is where Bright's richer answers most clearly repay their token budget; simpler web tasks remain the efficiency target.*
+
 ![Paired horizontal bars comparing benchmark passes per token budget](./assets/benchmark-efficiency.png)
-![Cumulative latency distribution across all benchmark runs](./assets/benchmark-latency.png)
+
+*Bright converts tokens into successful Marketplace execution efficiently, while the web workflows show where tighter routing can recover more value.*
+
 ![Paired horizontal bars comparing average tool calls by workflow](./assets/benchmark-complexity.png)
 
-Bright MCP: 97% pass · 4.51/5 judged quality · 12004 tokens · 14.5s p50. BrightData MCP: 97% · 3.78/5 · 12153 tokens · 13.5s p50.
-Blind preference: Bright MCP 17, BrightData MCP 3, ties 10. [Method and tables](./evals/README.md#latest-tool-use-benchmark) · current-entitlements Acquire + Operate profile · `openrouter/anthropic/claude-haiku-4.5` · 10 runs/case · 2026-07-22.
+*Bright batches known-page reading into one call and makes Marketplace discovery explicit; historical search follow-ups expose the routing behavior now being tightened.*
+
+At the same 97% completion rate, Bright MCP delivered 4.51/5 judged quality versus 3.78/5, used slightly fewer tokens, and won the blind preference 17–3 with 10 ties.
+[Method and tables](./evals/README.md#full-tool-use-benchmark-pre-routing-baseline) · current-entitlements Acquire + Operate profile · `openrouter/anthropic/claude-haiku-4.5` · 10 runs/case · 2026-07-22.
 <!-- benchmark:end -->
 
 ### WIP capabilities
 
 Recurring delivery is intentionally excluded from the current benchmark score. Bright MCP can discover and run datasets, but it cannot yet create a durable refresh schedule; the case returns when it can execute delivery instead of only describing that boundary.
+
+### A/B
 
 | Dimension | BrightData MCP | Bright MCP |
 |---|---:|---:|

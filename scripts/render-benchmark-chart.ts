@@ -13,7 +13,6 @@ const judgeFile = Bun.file(new URL("../evals/.artifacts/judge.json", import.meta
 if (!(await judgeFile.exists())) process.exit(0);
 const judge = await judgeFile.json() as JudgeReport;
 const activeCaseIds = new Set<string>(workflowCases.map(({ id }) => id));
-const activeResults = report.results.filter(({ caseId }) => activeCaseIds.has(caseId));
 const activeJudgments = judge.judgments.filter(({ pairId }) => activeCaseIds.has(pairId.split(":")[0]!));
 const tasks = workflowCases.map(({ id, shortLabel }) => ({
   label: shortLabel,
@@ -27,7 +26,7 @@ const tasks = workflowCases.map(({ id, shortLabel }) => ({
 const complete = workflowCases.every(({ id }) => (["bright", "upstream"] as const).every((server) => report.results.filter((result) => result.caseId === id && result.server === server).length === report.runsPerCase)) && activeJudgments.length === workflowCases.length * report.runsPerCase;
 if (mode !== "--preview" && !complete) process.exit(0);
 
-const charts = ["completion", "preference", "radar", "quality-cost", "efficiency", "latency", "complexity"] as const;
+const charts = ["completion", "preference", "radar", "quality-cost", "efficiency", "complexity"] as const;
 const temporaryDirectory = await mkdtemp(join(tmpdir(), "bright-benchmark-"));
 try {
   const assets = await buildAppAssets({
@@ -55,10 +54,6 @@ try {
         bright: dimension(judge, key, "bright"),
       })),
     },
-    latency: {
-      brightData: activeResults.filter(({ server }) => server === "upstream").map(({ latencyMs }) => latencyMs),
-      bright: activeResults.filter(({ server }) => server === "bright").map(({ latencyMs }) => latencyMs),
-    },
   };
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body><div id="root"></div><script>window.benchmark=${safeJson(data)}</script><script type="module">${javascript.replaceAll("</script", "<\\/script")}</script></body></html>`;
   const browser = await chromium.launch({ executablePath: await browserPath(), headless: true });
@@ -82,7 +77,7 @@ try {
   await rm(temporaryDirectory, { recursive: true, force: true });
 }
 
-type Result = { caseId: string; server: "bright" | "upstream"; passed: boolean; tokenCount: number; latencyMs: number; toolsCalled: string[] };
+type Result = { caseId: string; server: "bright" | "upstream"; passed: boolean; tokenCount: number; toolsCalled: string[] };
 type Report = { model: string; runsPerCase: number; results: Result[] };
 type Dimension = "taskFulfillment" | "evidenceGrounding" | "informationDensity" | "sourceQuality" | "actionability";
 type JudgeReport = { model: string; runsPerCase: number; rubric: Dimension[]; judgments: Array<{ pairId: string; scores: Record<"bright" | "upstream", Record<Dimension, number>>; winner: "bright" | "upstream" | "tie" }> };

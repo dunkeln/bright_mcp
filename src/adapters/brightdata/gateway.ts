@@ -74,7 +74,8 @@ export class BrightDataGateway {
     }
     const fetcher = this.options.fetch ?? fetch;
 
-    for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const maxAttempts = request.maxAttempts ?? 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
         const timeout = AbortSignal.timeout(request.timeoutMs ?? 15_000);
         const signal = context.signal
@@ -94,7 +95,7 @@ export class BrightDataGateway {
 
         if (!response.ok) {
           const upstreamRequestId = response.headers.get("x-request-id") ?? undefined;
-          if (RETRYABLE_STATUS.has(response.status) && attempt < 3) {
+          if (RETRYABLE_STATUS.has(response.status) && attempt < maxAttempts) {
             await response.body?.cancel();
             await this.retryDelay(
               attempt,
@@ -133,7 +134,7 @@ export class BrightDataGateway {
         };
       } catch (error) {
         const capabilityError = translateNetworkError(error, context.signal);
-        const shouldRetry = capabilityError.retryable && attempt < 3;
+        const shouldRetry = capabilityError.retryable && attempt < maxAttempts;
         if (shouldRetry) {
           await this.retryDelay(attempt, context.signal);
           continue;
@@ -207,6 +208,7 @@ type GatewayRequest = {
   body?: unknown;
   timeoutMs?: number;
   maxResponseBytes?: number;
+  maxAttempts?: number;
 };
 
 async function readBoundedText(response: Response, maxBytes: number) {

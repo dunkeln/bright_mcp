@@ -23,7 +23,6 @@ declare global {
       tasks: TaskDatum[];
       quality: { dimensions: QualityDimension[] };
       preference: { brightData: number; bright: number; ties: number };
-      latency: { brightData: number[]; bright: number[] };
     };
   }
 }
@@ -32,7 +31,7 @@ const colors = { brightData: "#a371f7", bright: "#438cf5" } as const;
 const plot = { left: 210, right: 1080, top: 34, bottom: 430 };
 
 function BenchmarkCharts() {
-  const { tasks, latency, model, judgeModel, quality, preference, runsPerCase } = window.benchmark;
+  const { tasks, model, judgeModel, quality, preference, runsPerCase } = window.benchmark;
   useEffect(() => {
     let frames = 0;
     const ready = () => {
@@ -68,9 +67,6 @@ function BenchmarkCharts() {
           domain={efficiencyDomain(tasks)}
           format={(value) => value.toFixed(1)}
         />
-      </Chart>
-      <Chart id="benchmark-latency" title="How often each MCP finishes quickly" subtitle="Cumulative share of all runs by end-to-end latency" meta={`${latency.bright.length + latency.brightData.length} live runs`}>
-        <Latency values={latency} />
       </Chart>
       <Chart id="benchmark-complexity" title="How much tool work each workflow takes" subtitle="Average MCP tool calls per run" meta={meta(model, runsPerCase)}>
         <PairedBars tasks={tasks} value={(datum) => datum.averageTools} domain={Math.max(...tasks.flatMap(({ bright, brightData }) => [bright.averageTools, brightData.averageTools]), 1)} format={(value) => value.toFixed(1)} />
@@ -179,21 +175,6 @@ function Preference({ values }: { values: { brightData: number; bright: number; 
       <text x={Math.min(x(row.value) + 12, 1070)} y={104 + index * 105} className="value">{row.value} · {total ? Math.round(row.value / total * 100) : 0}%</text>
     </g>)}
   </svg>;
-}
-
-function Latency({ values }: { values: { brightData: number[]; bright: number[] } }) {
-  const max = Math.max(...values.brightData, ...values.bright);
-  const x = (milliseconds: number) => 85 + (milliseconds / max) * 980;
-  const y = (rate: number) => 420 - rate * 3.75;
-  const path = (items: number[]) => items.toSorted((a, b) => a - b).map((item, index) => `${index ? "L" : "M"}${x(item)},${y(((index + 1) / items.length) * 100)}`).join(" ");
-  return (
-    <svg viewBox="0 0 1120 460" role="img" className="h-full w-full">
-      {[0, 0.5, 1].map((tick) => <g key={tick}><line x1="85" x2="1065" y1={y(tick * 100)} y2={y(tick * 100)} stroke="#30363d" /><text x="70" y={y(tick * 100) + 5} textAnchor="end" className="axis">{tick * 100}%</text></g>)}
-      {[0, 0.25, 0.5, 0.75, 1].map((tick) => <text key={tick} x={x(max * tick)} y="454" textAnchor="middle" className="axis">{Math.round(max * tick / 1000)}s</text>)}
-      <path d={path(values.brightData)} fill="none" stroke={colors.brightData} strokeWidth="4" />
-      <path d={path(values.bright)} fill="none" stroke={colors.bright} strokeWidth="4" />
-    </svg>
-  );
 }
 
 function Patterns() {

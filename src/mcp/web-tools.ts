@@ -59,7 +59,7 @@ export function registerWebTools(
     {
       title: "Search web",
       description:
-        "Find current public-web sources when the relevant pages are not yet known. Submit one to five related queries together. Results contain compact titles, URLs, and summaries; use read_web only for selected pages whose exact text is needed. Use a returned cursor only to continue that query. Do not repeat unchanged queries that already returned useful results, and do not use this tool for known URLs, ad hoc extraction, or structured dataset records.",
+        "Find current public-web sources when the relevant pages are not yet known. Submit one to five related queries together. Results contain compact titles, URLs, and summaries; answer from them when they already contain the requested fact. Use read_web only when page-level text is missing or explicitly required, not merely to verify a useful summary. Use a returned cursor only to continue that query. Do not repeat unchanged queries, and do not use this tool for known URLs, ad hoc extraction, or structured dataset records.",
       inputSchema: searchInputSchema,
       outputSchema: {
         searches: z.array(z.object({

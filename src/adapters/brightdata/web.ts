@@ -101,13 +101,22 @@ export function createBrightDataWebAdapter(
                     zone,
                     url,
                     format: "raw",
-                    data_format: "markdown",
-                  },
-                  timeoutMs: 30_000,
+                  data_format: "markdown",
+                },
+                timeoutMs: 30_000,
+                maxAttempts: 1,
                 },
                 context,
               );
               const content = unwrapBody(response.data);
+              if (/^this endpoint is not supported[.!]?$/i.test(content.trim())) {
+                throw new CapabilityError(
+                  "unsupported_upstream_endpoint",
+                  "Bright Data could not read this URL with the configured Web Unlocker.",
+                  false,
+                  "Use the search result summary or verify the account's Web Unlocker zone.",
+                );
+              }
               return {
                 url,
                 content,
@@ -154,10 +163,11 @@ async function searchSerp(
         data_format: "parsed_light",
       },
       timeoutMs: 20_000,
+      maxAttempts: 1,
     },
     context,
   );
-  const parsed = searchEnvelopeSchema.safeParse(response.data);
+  const parsed = searchEnvelopeSchema.safeParse(unwrapJsonBody(response.data));
   if (!parsed.success || (!parsed.data.organic && !parsed.data.results)) {
     throw malformedSearch();
   }
@@ -296,6 +306,17 @@ function unwrapBody(value: string) {
   try {
     const parsed = JSON.parse(value) as { body?: unknown };
     return typeof parsed.body === "string" ? parsed.body : value;
+  } catch {
+    return value;
+  }
+}
+
+function unwrapJsonBody(value: unknown) {
+  if (!value || typeof value !== "object" || !("body" in value)) return value;
+  const body = (value as { body?: unknown }).body;
+  if (typeof body !== "string") return body;
+  try {
+    return JSON.parse(body);
   } catch {
     return value;
   }

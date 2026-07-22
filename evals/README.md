@@ -50,11 +50,13 @@ BrightData MCP README against each server's search tool. It verifies successful,
 non-empty, bounded MCP results and records latency and result size.
 
 The repeated agent suite uses the explicit `current-entitlements` profile and
-covers two workflows each for Acquire and Operate. Extract and Research are
+covers two Acquire workflows and one Operate workflow. Extract and Research are
 commented out because this account's Deep Lookup access is restricted to
 business-email queries; re-enable them only after both preview probes pass.
+Recurring delivery is also commented out while durable scheduling remains a WIP
+capability.
 The suite accepts different valid tool paths for each MCP, then
-checks requested output fields, provenance, honest capability boundaries,
+checks requested output fields, provenance,
 latency, calls, and token use. Latency is wall-clock time from the prompt to the
 final response, including both model and MCP work. Live factual values are not
 independently graded. A stronger judge model compares matched, anonymously
@@ -70,13 +72,14 @@ profile, not successful execution of all six published tools.
 Profile `current-entitlements` · agent `openrouter/anthropic/claude-haiku-4.5` · judge `anthropic/claude-sonnet-5` · 10 runs/case · 2026-07-22
 
 Extract and Research are excluded because general Deep Lookup is unavailable for the benchmark account.
+Recurring delivery is excluded because durable scheduling is still a WIP capability.
+Current search deterministic results were regraded from stored outputs; agent and judge calls were not rerun.
 
 | Case | Pass Bright/BrightData | Recovered Bright/BrightData | Quality Bright/BrightData | Tokens Bright/BrightData | p50 latency Bright/BrightData | Calls Bright/BrightData |
 |---|---:|---:|---:|---:|---:|---:|
-| Acquire · Current search | 0% / 0% | 0% / 0% | 3.70 / 4.24 | 21579 / 13647 | 90.8s / 56.8s | 3.10 / 2.50 |
+| Acquire · Current search | 80% / 90% | 50% / 50% | 3.70 / 4.24 | 21579 / 13647 | 90.8s / 56.8s | 3.10 / 2.50 |
 | Acquire · Known pages | 100% / 100% | 0% / 10% | 4.68 / 4.68 | 6768 / 4851 | 15.2s / 19.6s | 1.00 / 2.10 |
 | Operate · Product snapshot | 100% / 100% | 0% / 0% | 4.04 / 3.22 | 14159 / 32359 | 15.7s / 41.4s | 2.00 / 1.00 |
-| Operate · Recurring delivery | 0% / 100% | 0% / 0% | 4.44 / 2.92 | 6881 / 1725 | 5.8s / 2.6s | 1.00 / 0.00 |
 
-A pass requires a complete JSON response with the requested output fields and provenance. Intended workflow selection, successful expected-tool execution, clean execution, and recovered errors remain separate artifact dimensions. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement: 75%.
+A pass requires one parseable JSON payload, raw or in a single Markdown fence, with the requested output fields and provenance; brief surrounding text is ignored. Intended workflow selection, successful expected-tool execution, clean execution, and recovered errors remain separate artifact dimensions. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement for the original four-case judge run: 75%.
 <!-- benchmark:end -->

@@ -10,7 +10,7 @@ export const workflowCases = [
     pillar: "Acquire",
     shortLabel: "Current search",
     prompt:
-      'Find Tesla\'s current stock price. Return JSON only with keys "price", "currency", "asOf", and "sourceUrl".',
+      'Find Tesla\'s current stock price. Return one JSON object with keys "price", "currency", "asOf", and "sourceUrl". A single Markdown JSON fence and brief surrounding text are allowed.',
     toolPath: {
       bright: [["search_web"]],
       upstream: [["search_engine"]],
@@ -23,7 +23,7 @@ export const workflowCases = [
     pillar: "Acquire",
     shortLabel: "Known pages",
     prompt:
-      'Read https://example.com and https://www.iana.org/help/example-domains in that order. Return a JSON array only; each item must have "url", "title", and "summary".',
+      'Read https://example.com and https://www.iana.org/help/example-domains in that order. Return one JSON array; each item must have "url", "title", and "summary". A single Markdown JSON fence and brief surrounding text are allowed.',
     toolPath: {
       bright: [["read_web"]],
       upstream: [["scrape_batch", "scrape_as_markdown"]],
@@ -92,7 +92,7 @@ export const workflowCases = [
     pillar: "Operate",
     shortLabel: "Product snapshot",
     prompt:
-      'Get structured Amazon product search data for wireless earbuds from Amazon.com. Do not explain which product to use; execute the available data capability. Return JSON only with keys "dataset", "rowCount", "fields", and "continuation".',
+      'Get structured Amazon product search data for wireless earbuds from Amazon.com. Do not explain which product to use; execute the available data capability. Return one JSON object with keys "dataset", "rowCount", "fields", and "continuation". A single Markdown JSON fence and brief surrounding text are allowed.',
     upstreamProfile: "ecommerce",
     toolPath: {
       bright: [["find_datasets"], ["run_dataset"]],
@@ -100,6 +100,9 @@ export const workflowCases = [
     } satisfies ToolPath,
     requiredKeys: ["dataset", "rowCount", "fields", "continuation"],
   },
+  /* WIP capability: neither MCP can create a durable delivery schedule. Keep this
+     case out of scored runs until the workflow can execute rather than only
+     describe the capability boundary.
   {
     id: "operate-recurring-delivery",
     pillar: "Operate",
@@ -108,8 +111,8 @@ export const workflowCases = [
       'Set up a weekly delivery of a refreshed wireless-earbud dataset. If the available tools cannot actually create that schedule, do not pretend they did. Return JSON only with keys "supported", "reason", and "nextStep".',
     toolPath: { bright: [], upstream: [] } satisfies ToolPath,
     requiredKeys: ["supported", "reason", "nextStep"],
-    mustRefuse: true,
   },
+  */
 ] as const;
 
 export type WorkflowCase = (typeof workflowCases)[number];

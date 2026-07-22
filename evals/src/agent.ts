@@ -1,4 +1,5 @@
 import { HostRunner, MCPClientManager } from "@mcpjam/sdk";
+import { validatesOutcome } from "./grading";
 import { safeError, serverLabel, type ServerId, writeReport } from "./mcp";
 import { benchmarkProfile, workflowCases } from "./workflows";
 
@@ -22,7 +23,9 @@ upstreamEcommerce.searchParams.set("groups", "ecommerce");
 const manager = new MCPClientManager(undefined, { defaultTimeout: 60_000 });
 
 const artifact = Bun.file(new URL("../.artifacts/agent.json", import.meta.url));
-const previous = await readPrevious();
+const previous = (await readPrevious()).filter((result) =>
+  selectedCases.some(({ id }) => id === result.caseId)
+);
 const expectedRuns = selectedCases.length * 2 * runs;
 const results: AgentResult[] = previous.length === expectedRuns ? [] : previous;
 try {
@@ -171,40 +174,6 @@ function followsPath(called: string[], path: readonly (readonly string[])[]) {
     position = found + 1;
     return true;
   });
-}
-
-function validatesOutcome(
-  text: string,
-  useCase: (typeof workflowCases)[number],
-) {
-  const value = parseJsonResponse(text);
-  if (value === undefined) return false;
-  const records = Array.isArray(value) ? value : [value];
-  const fieldsPresent = records.length > 0 && records.every((record) =>
-    record !== null && typeof record === "object" &&
-    useCase.requiredKeys.every((key) => key in record)
-  );
-  const minimumUrls = "minimumUrls" in useCase ? useCase.minimumUrls : 0;
-  const urls = new Set(JSON.stringify(value).match(/https?:\\?\/\\?\/[^\s"'<>]+/g) ?? []);
-  const refusalValid =
-    !("mustRefuse" in useCase) ||
-    records.some((record) =>
-      record !== null && typeof record === "object" &&
-      "supported" in record && record.supported === false
-    );
-  return fieldsPresent && urls.size >= minimumUrls && refusalValid;
-}
-
-function parseJsonResponse(text: string) {
-  const trimmed = text.trim();
-  const candidate = trimmed.startsWith("```")
-    ? trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")
-    : trimmed;
-  try {
-    return JSON.parse(candidate) as unknown;
-  } catch {
-    return undefined;
-  }
 }
 
 function hasToolExecutionError(value: unknown): boolean {

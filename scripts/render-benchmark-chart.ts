@@ -12,6 +12,9 @@ const report = (await Bun.file(new URL("../evals/.artifacts/agent.json", import.
 const judgeFile = Bun.file(new URL("../evals/.artifacts/judge.json", import.meta.url));
 if (!(await judgeFile.exists())) process.exit(0);
 const judge = await judgeFile.json() as JudgeReport;
+const activeCaseIds = new Set<string>(workflowCases.map(({ id }) => id));
+const activeResults = report.results.filter(({ caseId }) => activeCaseIds.has(caseId));
+const activeJudgments = judge.judgments.filter(({ pairId }) => activeCaseIds.has(pairId.split(":")[0]!));
 const tasks = workflowCases.map(({ id, shortLabel }) => ({
   label: shortLabel,
   brightData: summarize(report.results.filter((result) => result.caseId === id && result.server === "upstream")),
@@ -21,7 +24,7 @@ const tasks = workflowCases.map(({ id, shortLabel }) => ({
     bright: quality(judge, id, "bright"),
   },
 }));
-const complete = workflowCases.every(({ id }) => (["bright", "upstream"] as const).every((server) => report.results.filter((result) => result.caseId === id && result.server === server).length === report.runsPerCase)) && judge.judgments.length === workflowCases.length * report.runsPerCase;
+const complete = workflowCases.every(({ id }) => (["bright", "upstream"] as const).every((server) => report.results.filter((result) => result.caseId === id && result.server === server).length === report.runsPerCase)) && activeJudgments.length === workflowCases.length * report.runsPerCase;
 if (mode !== "--preview" && !complete) process.exit(0);
 
 const charts = ["completion", "preference", "radar", "quality-cost", "efficiency", "latency", "complexity"] as const;
@@ -40,9 +43,9 @@ try {
     runsPerCase: report.runsPerCase,
     judgeModel: judge.model,
     preference: {
-      brightData: judge.judgments.filter(({ winner }) => winner === "upstream").length,
-      bright: judge.judgments.filter(({ winner }) => winner === "bright").length,
-      ties: judge.judgments.filter(({ winner }) => winner === "tie").length,
+      brightData: activeJudgments.filter(({ winner }) => winner === "upstream").length,
+      bright: activeJudgments.filter(({ winner }) => winner === "bright").length,
+      ties: activeJudgments.filter(({ winner }) => winner === "tie").length,
     },
     tasks,
     quality: {
@@ -53,8 +56,8 @@ try {
       })),
     },
     latency: {
-      brightData: report.results.filter(({ server }) => server === "upstream").map(({ latencyMs }) => latencyMs),
-      bright: report.results.filter(({ server }) => server === "bright").map(({ latencyMs }) => latencyMs),
+      brightData: activeResults.filter(({ server }) => server === "upstream").map(({ latencyMs }) => latencyMs),
+      bright: activeResults.filter(({ server }) => server === "bright").map(({ latencyMs }) => latencyMs),
     },
   };
   const html = `<!doctype html><html><head><meta charset="utf-8"><style>${css}</style></head><body><div id="root"></div><script>window.benchmark=${safeJson(data)}</script><script type="module">${javascript.replaceAll("</script", "<\\/script")}</script></body></html>`;
@@ -93,7 +96,7 @@ function summarize(results: Result[]) {
 }
 function average(values: number[]) { return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0; }
 function quality(report: JudgeReport, caseId: string, server: "bright" | "upstream") { return average(report.judgments.filter(({ pairId }) => pairId.startsWith(`${caseId}:`)).flatMap(({ scores }) => Object.values(scores[server]))); }
-function dimension(report: JudgeReport, key: Dimension, server: "bright" | "upstream") { return average(report.judgments.map(({ scores }) => scores[server][key])); }
+function dimension(report: JudgeReport, key: Dimension, server: "bright" | "upstream") { return average(report.judgments.filter(({ pairId }) => activeCaseIds.has(pairId.split(":")[0]!)).map(({ scores }) => scores[server][key])); }
 function dimensionLabel(value: Dimension) { return value.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase()); }
 function safeJson(value: unknown) { return JSON.stringify(value).replaceAll("<", "\\u003c"); }
 function previewPath(directory: string | undefined, chart: string) {

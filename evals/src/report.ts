@@ -10,6 +10,13 @@ const report = (await Bun.file(new URL("../.artifacts/agent.json", import.meta.u
 const judge = (await Bun.file(new URL("../.artifacts/judge.json", import.meta.url)).json()) as JudgeReport;
 validate(report);
 validateJudge(judge, report);
+const activeCaseIds = new Set<string>(workflowCases.map(({ id }) => id));
+const activeResults = report.results.filter(({ caseId }) => activeCaseIds.has(caseId));
+const activeJudgments = judge.judgments.filter(({ pairId }) => activeCaseIds.has(pairId.split(":")[0]!));
+const regradedLabels = (report.regradedCases ?? []).flatMap((id) => {
+  const useCase = workflowCases.find((candidate) => candidate.id === id);
+  return useCase ? [useCase.shortLabel] : [];
+});
 
 const allSummaries = workflowCases.map((useCase) => ({
   label: `${useCase.pillar} · ${useCase.shortLabel}`,
@@ -20,13 +27,13 @@ const allSummaries = workflowCases.map((useCase) => ({
 }));
 const summaries = allSummaries.filter(({ bright, upstream }) => bright.runs || upstream.runs);
 const overall = {
-  bright: summarize(report.results.filter(({ server }) => server === "bright")),
-  upstream: summarize(report.results.filter(({ server }) => server === "upstream")),
+  bright: summarize(activeResults.filter(({ server }) => server === "bright")),
+  upstream: summarize(activeResults.filter(({ server }) => server === "upstream")),
 };
 const judgeWins = {
-  bright: judge.judgments.filter(({ winner }) => winner === "bright").length,
-  upstream: judge.judgments.filter(({ winner }) => winner === "upstream").length,
-  ties: judge.judgments.filter(({ winner }) => winner === "tie").length,
+  bright: activeJudgments.filter(({ winner }) => winner === "bright").length,
+  upstream: activeJudgments.filter(({ winner }) => winner === "upstream").length,
+  ties: activeJudgments.filter(({ winner }) => winner === "tie").length,
 };
 const complete = allSummaries.every(
   ({ bright, upstream }) => bright.runs === report.runsPerCase && upstream.runs === report.runsPerCase,
@@ -37,7 +44,7 @@ const rootBlock = publishable
       "![Paired horizontal bars comparing MCP completion by workflow](./assets/benchmark-completion.png)",
       "![Radar chart comparing blind answer-quality dimensions](./assets/benchmark-radar.png)",
       "![Horizontal bars comparing blind pairwise preference](./assets/benchmark-preference.png)",
-      "![Scatter plot comparing judged answer quality with token use](./assets/benchmark-quality-cost.png)",
+      "![Paired horizontal bars comparing judged answer quality per token budget](./assets/benchmark-quality-cost.png)",
       "![Paired horizontal bars comparing benchmark passes per token budget](./assets/benchmark-efficiency.png)",
       "![Cumulative latency distribution across all benchmark runs](./assets/benchmark-latency.png)",
       "![Paired horizontal bars comparing average tool calls by workflow](./assets/benchmark-complexity.png)",
@@ -51,6 +58,10 @@ const evalBlock = [
   `Profile \`${report.profile}\` · agent \`${report.model}\` · judge \`${judge.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}`,
   "",
   "Extract and Research are excluded because general Deep Lookup is unavailable for the benchmark account.",
+  "Recurring delivery is excluded because durable scheduling is still a WIP capability.",
+  ...(regradedLabels.length
+    ? [`${regradedLabels.join(", ")} deterministic results were regraded from stored outputs; agent and judge calls were not rerun.`]
+    : []),
   "",
   "| Case | Pass Bright/BrightData | Recovered Bright/BrightData | Quality Bright/BrightData | Tokens Bright/BrightData | p50 latency Bright/BrightData | Calls Bright/BrightData |",
   "|---|---:|---:|---:|---:|---:|---:|",
@@ -58,7 +69,7 @@ const evalBlock = [
     `| ${label} | ${percent(bright.passRate)} / ${percent(upstream.passRate)} | ${percent(bright.recoveryRate)} / ${percent(upstream.recoveryRate)} | ${brightQuality.toFixed(2)} / ${upstreamQuality.toFixed(2)} | ${Math.round(bright.averageTokens)} / ${Math.round(upstream.averageTokens)} | ${seconds(bright.medianLatency)} / ${seconds(upstream.medianLatency)} | ${bright.averageTools.toFixed(2)} / ${upstream.averageTools.toFixed(2)} |`,
   ),
   "",
-  `A pass requires a complete JSON response with the requested output fields and provenance. Intended workflow selection, successful expected-tool execution, clean execution, and recovered errors remain separate artifact dimensions. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement: ${percent(judge.sideAgreement)}.`,
+  `A pass requires one parseable JSON payload, raw or in a single Markdown fence, with the requested output fields and provenance; brief surrounding text is ignored. Intended workflow selection, successful expected-tool execution, clean execution, and recovered errors remain separate artifact dimensions. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement for the original four-case judge run: ${percent(judge.sideAgreement)}.`,
 ].join("\n");
 
 const files = [
@@ -96,6 +107,7 @@ type Report = {
   generatedAt: string;
   model: string;
   runsPerCase: number;
+  regradedCases?: string[];
   results: Result[];
 };
 type Scores = Record<"taskFulfillment" | "evidenceGrounding" | "informationDensity" | "sourceQuality" | "actionability", number>;
@@ -128,12 +140,16 @@ function validateJudge(value: JudgeReport, agent: Report) {
     value.agentGeneratedAt !== agent.generatedAt ||
     value.runsPerCase !== agent.runsPerCase ||
     !Array.isArray(value.judgments) ||
-    value.judgments.length !== workflowCases.length * agent.runsPerCase
+    workflowCases.some(({ id }) =>
+      value.judgments.filter(({ pairId }) => pairId.startsWith(`${id}:`)).length !== agent.runsPerCase
+    )
   ) throw new Error("Invalid or incomplete judge report.");
 }
 
 function quality(value: JudgeReport, caseId: string | undefined, server: "bright" | "upstream") {
-  const judgments = caseId ? value.judgments.filter(({ pairId }) => pairId.startsWith(`${caseId}:`)) : value.judgments;
+  const judgments = value.judgments.filter(({ pairId }) =>
+    caseId ? pairId.startsWith(`${caseId}:`) : activeCaseIds.has(pairId.split(":")[0]!)
+  );
   return average(judgments.flatMap(({ scores }) => Object.values(scores[server])));
 }
 

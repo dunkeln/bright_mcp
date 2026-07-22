@@ -1,0 +1,37 @@
+{
+  "name": "bright",
+  "version": "0.3.0",
+  "description": "Agent-oriented Bright Data web intelligence, research, extraction, and dataset workflows over MCP.",
+  "author": {
+    "name": "dunkeln",
+    "url": "https://github.com/dunkeln"
+  },
+  "homepage": "https://bright-mcp.vercel.app",
+  "repository": "https://github.com/dunkeln/bright_mcp",
+  "license": "MIT",
+  "keywords": ["bright-data", "mcp", "web-search", "research", "datasets"],
+  "skills": "./skills/",
+  "mcpServers": {
+    "bright": {
+      "type": "http",
+      "url": "https://bright-mcp.onrender.com/mcp",
+      "bearer_token_env_var": "BRIGHTDATA_API_KEY"
+    }
+  },
+  "interface": {
+    "displayName": "Bright",
+    "shortDescription": "Search, research, extract, and inspect web data",
+    "longDescription": "Use seven agent-oriented Bright Data tools for live search, source discovery, exact reading, structured extraction, research, and Marketplace datasets, with an interactive dataset workbench where supported.",
+    "developerName": "dunkeln",
+    "category": "Developer Tools",
+    "capabilities": ["Web search", "Research", "Structured data", "Interactive results"],
+    "websiteURL": "https://bright-mcp.vercel.app",
+    "defaultPrompt": [
+      "Research this question with current sources.",
+      "Extract a structured table from these pages.",
+      "Find the right maintained dataset for this task."
+    ],
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "bright",
+  "interface": {
+    "displayName": "Bright"
+  },
+  "plugins": [
+    {
+      "name": "bright",
+      "source": {
+        "source": "url",
+        "url": "https://github.com/dunkeln/bright_mcp.git",
+        "ref": "main"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

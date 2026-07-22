@@ -1,0 +1,26 @@
+{
+  "name": "bright",
+  "displayName": "Bright",
+  "version": "0.3.0",
+  "description": "Agent-oriented Bright Data web intelligence, research, extraction, and dataset workflows over MCP.",
+  "author": {
+    "name": "dunkeln"
+  },
+  "homepage": "https://bright-mcp.vercel.app",
+  "repository": "https://github.com/dunkeln/bright_mcp",
+  "license": "MIT",
+  "logo": "assets/icon.png",
+  "keywords": ["bright-data", "mcp", "web-search", "research", "datasets"],
+  "category": "developer-tools",
+  "tags": ["web-intelligence", "extraction", "research"],
+  "skills": "./skills/",
+  "mcpServers": {
+    "bright": {
+      "type": "http",
+      "url": "https://bright-mcp.onrender.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:BRIGHTDATA_API_KEY}"
+      }
+    }
+  }
+}

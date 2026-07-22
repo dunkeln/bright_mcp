@@ -1,10 +1,10 @@
 ---
 import HeroDither from "../components/HeroDither";
-import { Check, ChevronDown, Copy, Download } from "lucide-astro";
+import { Check, ChevronDown, Copy, Download, Github } from "lucide-astro";
 
-const startUrl = "#install";
+const repoUrl = "https://github.com/dunkeln/bright_mcp";
 const cursorInstallUrl =
-  "cursor://anysphere.cursor-deeplink/mcp/install?name=bright&config=eyJ1cmwiOiJodHRwczovL2JyaWdodC1tY3Aub25yZW5kZXIuY29tL21jcCIsImhlYWRlcnMiOnsiQXV0aG9yaXphdGlvbiI6IkJlYXJlciAke0JSSUdIVERBVEFfQVBJX0tFWX0ifX0=";
+  "cursor://anysphere.cursor-deeplink/mcp/install?name=bright&config=eyJ1cmwiOiJodHRwczovL2JyaWdodC1tY3Aub25yZW5kZXIuY29tL21jcCIsImhlYWRlcnMiOnsiQXV0aG9yaXphdGlvbiI6IkJlYXJlciAke2VudjpCUklHSFREQVRBX0FQSV9LRVl9In19";
 const clients = [
   {
     name: "Codex",
@@ -15,7 +15,7 @@ const clients = [
   {
     name: "Claude Code",
     icon: "/assets/anthropic.svg",
-    command: "claude mcp add-json bright '{\"type\":\"http\",\"url\":\"https://bright-mcp.onrender.com/mcp\",\"headers\":{\"Authorization\":\"Bearer ${BRIGHTDATA_API_KEY}\"}}'",
+    command: 'claude mcp add --transport http bright https://bright-mcp.onrender.com/mcp --header "Authorization: Bearer ${BRIGHTDATA_API_KEY}"',
     action: "copy",
   },
   {
@@ -24,6 +24,18 @@ const clients = [
     command: "Install Bright MCP in Cursor",
     action: "open",
     href: cursorInstallUrl,
+  },
+];
+const plugins = [
+  {
+    name: "Codex Plugin",
+    icon: "/assets/openai.svg",
+    command: "codex plugin marketplace add dunkeln/bright_mcp --ref main\ncodex plugin add bright@bright",
+  },
+  {
+    name: "Claude Plugin",
+    icon: "/assets/anthropic.svg",
+    command: "claude plugin marketplace add dunkeln/bright_mcp\nclaude plugin install bright@bright",
   },
 ];
 ---
@@ -58,7 +70,9 @@ const clients = [
           <a href="#bench">Bench</a>
           <a href="#start">Docs</a>
         </nav>
-        <a class="button button-light header-button" href={startUrl}>Read docs</a>
+        <a class="button button-light github-button header-button" href={repoUrl} target="_blank" rel="noreferrer" aria-label="View Bright MCP on GitHub">
+          <Github aria-hidden="true" />
+        </a>
       </div>
     </header>
 
@@ -76,7 +90,9 @@ const clients = [
             >Unofficial BrightData API integration<b>›</b></a>
             <h1>Reliable web data when<br />agent browsing stops scaling.</h1>
             <p></p>
-            <a class="button button-light" href={startUrl}>Read docs</a>
+            <a class="button button-light github-button" href={repoUrl} target="_blank" rel="noreferrer" aria-label="View Bright MCP on GitHub">
+              <Github aria-hidden="true" />
+            </a>
           </div>
         </div>
       </section>
@@ -84,7 +100,7 @@ const clients = [
       <section class="section-shell" id="install">
         <div class="command-intro dot-grid rail gutter-left gutter-right">
           <p class="label">Install</p>
-          <h2>Connect Bright MCP to your agent</h2>
+          <h2>Connect Bright to your agent</h2>
           <div class="install-command">
             <details class="client-picker">
               <summary>
@@ -115,6 +131,22 @@ const clients = [
               <Check class="check-icon" aria-hidden="true" />
               <Download class="install-icon" aria-hidden="true" />
             </button>
+          </div>
+          <div class="plugin-install">
+            <p>Install plugin</p>
+            <div class="plugin-actions">
+              {plugins.map((plugin) => (
+                <button
+                  class="plugin-copy"
+                  type="button"
+                  data-command={plugin.command}
+                  aria-label={`Copy ${plugin.name} install command`}
+                >
+                  <img class="client-icon" src={plugin.icon} alt="" />
+                  <Check class="check-icon" aria-hidden="true" />
+                </button>
+              ))}
+            </div>
           </div>
           <p class="meta">
             Open source <span>·</span> MIT licensed <span>|</span>
@@ -204,6 +236,19 @@ const clients = [
     copy.classList.add("copied");
     copy.setAttribute("aria-label", "Copied");
   });
+
+  document.querySelectorAll<HTMLButtonElement>(".plugin-copy").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const label = button.getAttribute("aria-label") ?? "Copy plugin install command";
+      await navigator.clipboard.writeText(button.dataset.command ?? "");
+      button.classList.add("copied");
+      button.setAttribute("aria-label", "Copied");
+      window.setTimeout(() => {
+        button.classList.remove("copied");
+        button.setAttribute("aria-label", label);
+      }, 1600);
+    });
+  });
 </script>
 
 <style>
@@ -286,6 +331,8 @@ const clients = [
 
   .button-light { background: #f4f4f4; color: #171717; }
   .button-light:hover { background: white; }
+  .github-button { align-items: center; height: 42px; padding: 0; width: 42px; }
+  .github-button :global(svg) { height: 20px; stroke-width: 1.8; width: 20px; }
 
   .hero {
     align-items: center;
@@ -474,6 +521,36 @@ const clients = [
     text-align: left;
     white-space: nowrap;
   }
+
+  .plugin-install { margin-top: 22px; }
+  .plugin-install > p {
+    color: var(--muted);
+    font: 11px "SFMono-Regular", Consolas, monospace;
+    margin: 0 0 9px;
+    text-align: left;
+    text-transform: uppercase;
+  }
+  .plugin-actions { display: flex; gap: 10px; }
+  .plugin-copy {
+    align-items: center;
+    background: #202020;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    color: inherit;
+    cursor: pointer;
+    display: flex;
+    height: 46px;
+    justify-content: center;
+    padding: 0;
+    width: 46px;
+  }
+  .plugin-copy:hover { border-color: #ffffff2c; }
+  .plugin-copy:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .plugin-copy :global(svg) { height: 21px; stroke-width: 1.8; width: 21px; }
+  .plugin-copy :global(.check-icon) { color: #9fc4a7; display: none; }
+  .plugin-copy.copied .client-icon { display: none; }
+  .plugin-copy.copied :global(.check-icon) { display: block; }
+  .plugin-copy .client-icon[src$="openai.svg"] { filter: invert(1); }
 
   .meta { align-items: center; color: #9d9d9d; display: flex; font-size: 13px; margin: 24px 0 0; }
   .meta span { margin: 0 8px; }

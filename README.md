@@ -17,6 +17,26 @@ use stable three- or two-tool surfaces at `/mcp/web`, `/mcp/deep-lookup`, or
 
 ## Install
 
+Set `BRIGHTDATA_API_KEY` in the client environment first.
+
+### Plugin
+
+Codex:
+
+```bash
+codex plugin marketplace add dunkeln/bright_mcp --ref main
+codex plugin add bright@bright
+```
+
+Claude Code:
+
+```bash
+claude plugin marketplace add dunkeln/bright_mcp
+claude plugin install bright@bright
+```
+
+### MCP
+
 Codex:
 
 ```bash
@@ -27,11 +47,24 @@ codex mcp add bright --url https://bright-mcp.onrender.com/mcp \
 Claude Code:
 
 ```bash
-claude mcp add-json bright \
-  '{"type":"http","url":"https://bright-mcp.onrender.com/mcp","headers":{"Authorization":"Bearer ${BRIGHTDATA_API_KEY}"}}'
+claude mcp add --transport http bright https://bright-mcp.onrender.com/mcp \
+  --header "Authorization: Bearer ${BRIGHTDATA_API_KEY}"
 ```
 
-Set `BRIGHTDATA_API_KEY` in the client environment first. The key is forwarded
+Cursor (`~/.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "bright": {
+      "url": "https://bright-mcp.onrender.com/mcp",
+      "headers": { "Authorization": "Bearer ${env:BRIGHTDATA_API_KEY}" }
+    }
+  }
+}
+```
+
+The key is forwarded
 over HTTPS and kept only in a bounded in-memory cache; Bright MCP does not
 persist it. Available live capabilities follow the products enabled on that
 Bright Data account.

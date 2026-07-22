@@ -1,0 +1,16 @@
+{
+  "name": "bright",
+  "owner": {
+    "name": "dunkeln"
+  },
+  "metadata": {
+    "description": "Bright web intelligence and structured data tools for AI agents."
+  },
+  "plugins": [
+    {
+      "name": "bright",
+      "source": ".",
+      "description": "Search, read, extract, research, and run maintained Bright Data datasets."
+    }
+  ]
+}

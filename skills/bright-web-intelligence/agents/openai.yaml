@@ -1,0 +1,15 @@
+interface:
+  display_name: "Bright Web Intelligence"
+  short_description: "Search, extract, research, and inspect web data"
+  default_prompt: "Use $bright-web-intelligence to research this request with the narrowest suitable Bright MCP workflow."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "bright"
+      description: "Bright MCP web intelligence and dataset tools"
+      transport: "streamable_http"
+      url: "https://bright-mcp.onrender.com/mcp"
+
+policy:
+  allow_implicit_invocation: true

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "bright",
+  "description": "Bright web intelligence and structured data tools for AI agents.",
+  "owner": {
+    "name": "dunkeln",
+    "url": "https://github.com/dunkeln"
+  },
+  "plugins": [
+    {
+      "name": "bright",
+      "description": "Search, read, extract, research, and run maintained Bright Data datasets.",
+      "source": "./",
+      "category": "development"
+    }
+  ]
+}

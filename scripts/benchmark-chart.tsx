@@ -53,8 +53,13 @@ function BenchmarkCharts() {
       <Chart id="benchmark-radar" title="How the answers compare" subtitle="Blind judge scores · every spoke uses the same 1–5 scale" meta={judgeModel}>
         <Radar dimensions={quality.dimensions} />
       </Chart>
-      <Chart id="benchmark-quality-cost" title="Answer quality versus token use" subtitle="Each point is one workflow · better answers rise, leaner answers move left" meta={`${judgeModel} judge`}>
-        <QualityCost tasks={tasks} />
+      <Chart id="benchmark-quality-cost" title="How much answer quality each token budget buys" subtitle="Blind-judge points per 10k tokens · higher is better" meta={`${judgeModel} judge`}>
+        <PairedBars
+          tasks={tasks}
+          value={(datum, task, server) => datum.averageTokens ? task.quality[server] * 10_000 / datum.averageTokens : 0}
+          domain={qualityEfficiencyDomain(tasks)}
+          format={(value) => value.toFixed(1)}
+        />
       </Chart>
       <Chart id="benchmark-efficiency" title="How many passing runs each token budget buys" subtitle="Benchmark passes per 10k total tokens · higher is better" meta={meta(model, runsPerCase)}>
         <PairedBars
@@ -99,7 +104,7 @@ function Legend() {
   );
 }
 
-function PairedBars({ tasks, value, domain, format }: { tasks: TaskDatum[]; value: (datum: ServerDatum) => number; domain: number; format: (value: number) => string }) {
+function PairedBars({ tasks, value, domain, format }: { tasks: TaskDatum[]; value: (datum: ServerDatum, task: TaskDatum, server: "bright" | "brightData") => number; domain: number; format: (value: number) => string }) {
   const x = (number: number) => plot.left + (number / domain) * (plot.right - plot.left);
   return (
     <svg viewBox="0 0 1120 460" role="img" className="h-full w-full">
@@ -107,8 +112,8 @@ function PairedBars({ tasks, value, domain, format }: { tasks: TaskDatum[]; valu
       {[0, 0.25, 0.5, 0.75, 1].map((tick) => <g key={tick}><line x1={x(domain * tick)} x2={x(domain * tick)} y1={plot.top} y2={plot.bottom} stroke="#30363d" /><text x={x(domain * tick)} y="454" textAnchor="middle" className="axis">{format(domain * tick)}</text></g>)}
       {tasks.map((task, index) => {
         const y = 56 + index * 48;
-        const bright = value(task.bright);
-        const brightData = value(task.brightData);
+        const bright = value(task.bright, task, "bright");
+        const brightData = value(task.brightData, task, "brightData");
         return <g key={task.label}>
           <text x="0" y={y + 5} className="label">{task.label}</text>
           <rect x={plot.left} y={y - 12} width={Math.max(1, x(bright) - plot.left)} height="10" fill="url(#blue-dither)" />
@@ -176,22 +181,6 @@ function Preference({ values }: { values: { brightData: number; bright: number; 
   </svg>;
 }
 
-function QualityCost({ tasks }: { tasks: TaskDatum[] }) {
-  const maxTokens = Math.max(...tasks.flatMap(({ bright, brightData }) => [bright.averageTokens, brightData.averageTokens]), 1);
-  const x = (tokens: number) => 90 + (tokens / maxTokens) * 690;
-  const y = (quality: number) => 420 - ((quality - 1) / 4) * 370;
-  return <svg viewBox="0 0 1120 460" role="img" className="h-full w-full">
-    <Patterns />
-    {[1, 2, 3, 4, 5].map((tick) => <g key={tick}><line x1="90" x2="780" y1={y(tick)} y2={y(tick)} stroke="#30363d" /><text x="75" y={y(tick) + 5} textAnchor="end" className="axis">{tick}</text></g>)}
-    {[0, 0.25, 0.5, 0.75, 1].map((tick) => <text key={tick} x={x(maxTokens * tick)} y="454" textAnchor="middle" className="axis">{Math.round(maxTokens * tick / 1000)}k</text>)}
-    {(["brightData", "bright"] as const).flatMap((server) => tasks.map((task, index) => <g key={`${server}-${task.label}`}>
-      <circle cx={x(task[server].averageTokens)} cy={y(task.quality[server])} r="10" fill={`url(#${server === "bright" ? "blue" : "purple"}-dither)`} stroke={colors[server]} />
-      <text x={x(task[server].averageTokens)} y={y(task.quality[server]) + 4} textAnchor="middle" className="point-number">{index + 1}</text>
-    </g>))}
-    {tasks.map((task, index) => <g key={task.label}><text x="835" y={70 + index * 42} className="point-number">{index + 1}</text><text x="860" y={70 + index * 42} className="label">{task.label}</text></g>)}
-  </svg>;
-}
-
 function Latency({ values }: { values: { brightData: number[]; bright: number[] } }) {
   const max = Math.max(...values.brightData, ...values.bright);
   const x = (milliseconds: number) => 85 + (milliseconds / max) * 980;
@@ -220,6 +209,13 @@ function meta(model: string, runs: number) {
 
 function efficiencyDomain(tasks: TaskDatum[]) {
   const maximum = Math.max(...tasks.flatMap(({ bright, brightData }) => [bright, brightData]).map((datum) => datum.averageTokens ? datum.passRate * 10_000 / datum.averageTokens : 0));
+  return Math.ceil(maximum * 2) / 2;
+}
+
+function qualityEfficiencyDomain(tasks: TaskDatum[]) {
+  const maximum = Math.max(...tasks.flatMap((task) => (["bright", "brightData"] as const).map((server) =>
+    task[server].averageTokens ? task.quality[server] * 10_000 / task[server].averageTokens : 0
+  )));
   return Math.ceil(maximum * 2) / 2;
 }
 

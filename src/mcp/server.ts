@@ -25,10 +25,10 @@ export const MCP_PROFILE_PATHS: Readonly<Record<string, McpProfile>> = {
 };
 
 const instructions: Record<McpProfile, string> = {
-  all: "Choose tools by intent: search_web locates unknown pages; read_web retrieves exact known-page evidence; extract_web creates fields from known URLs; research_web investigates an objective; find_datasets discovers maintained structured capabilities; run_dataset executes one returned contract.",
-  web: "Use search_web to locate unknown pages and read_web to retrieve exact known-page evidence. Do not read every search result unless the task requires page-level evidence.",
-  "deep-lookup": "Use extract_web when source URLs are known and research_web when an open-ended objective requires sourced structured records. Preview before a caller-approved paid run.",
-  marketplace: "Use find_datasets to discover an account-visible maintained capability, then call run_dataset once with the returned identifier, operation, schema, and cost acknowledgement.",
+  all: "Choose by source certainty and output: unknown sources plus compact links or snippets -> search_web; known URLs plus readable evidence -> read_web; known URLs plus named fields -> extract_web; unknown sources plus sourced structured records -> research_web; maintained vertical data -> find_datasets then run_dataset. Do not substitute a search_web -> read_web chain when research_web matches the requested outcome.",
+  web: "Use search_web for compact discovery when sources are unknown. Use read_web for readable evidence when URLs are known. Do not read every search result unless page-level evidence is required.",
+  "deep-lookup": "Use extract_web for named fields when source URLs are known. Use research_web for sourced structured records when sources are unknown. Preview before a caller-approved paid run.",
+  marketplace: "Use find_datasets only for maintained vertical data, then call run_dataset once with the returned identifier, operation, argument schema, and cost acknowledgement.",
   browser: "Use browser_navigate to create or move a remote session, browser_observe to inspect it, browser_interact for one bounded action, and browser_close when finished.",
 };
 

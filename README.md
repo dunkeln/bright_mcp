@@ -46,6 +46,16 @@ Choose the narrowest surface your account and workflow need:
 | `/mcp/marketplace` | `find_datasets`, `run_dataset` | Account-visible Marketplace datasets | Bearer API key |
 | `/mcp/browser` | Four `browser_*` tools | Scraping Browser | HTTP Basic with Browser API username/password |
 
+Choose among the six data tools by intent:
+
+| Sources | Needed result | Tool |
+|---|---|---|
+| Unknown | Compact links and summaries | `search_web` |
+| Known URLs | Readable page evidence | `read_web` |
+| Known URLs | Temporary named fields | `extract_web` |
+| Unknown | Sourced structured records | `research_web` |
+| Maintained vertical data | Typed records | `find_datasets` then `run_dataset` |
+
 See [SETUP.md](./SETUP.md) for local development, credentials, live checks, and
 hosted authorization.
 
@@ -70,7 +80,7 @@ Recurring delivery is intentionally excluded from the current benchmark score. B
 
 | Dimension | BrightData MCP | Bright MCP |
 |---|---:|---:|
-| Model-visible tools | 60+ maximum | 6 base / 10 browser |
+| Model-visible tools | 60+ maximum | 6 data / 4 browser |
 | Browser tools | 14 | 4 |
 | Dataset tools | One per dataset | Discovery + execution |
 | Dataset catalog | Tool inventory grows with products | Caller-scoped catalog behind discovery |

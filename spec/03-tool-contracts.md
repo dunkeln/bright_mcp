@@ -4,6 +4,23 @@ The V1 all profile MUST expose exactly these six model-visible tools. All tools 
 annotations describing read-only, destructive, idempotent, and open-world
 behavior accurately.
 
+## Selection rule
+
+Tool choice MUST follow source certainty and requested output rather than the
+upstream product or endpoint:
+
+| Sources | Requested output | Contract |
+|---|---|---|
+| Unknown | Compact links and summaries | `search_web` |
+| Known URLs | Readable page evidence | `read_web` |
+| Known URLs | Temporary named fields | `extract_web` |
+| Unknown | Sourced structured records | `research_web` |
+| Maintained vertical capability | Typed records | `find_datasets` then `run_dataset` |
+
+Batch size, upstream asynchrony, and result presentation MUST NOT create another
+tool. A `search_web` then `read_web` workflow MUST NOT silently replace
+`research_web` when the requested outcome is multi-source structured records.
+
 ## `search_web`
 
 Purpose: find current web resources for one or more related research angles.
@@ -58,7 +75,7 @@ Purpose: turn an open-ended objective into a sourced structured table.
 
 Purpose: find Bright Data datasets relevant to an agent's stated task.
 
-- Input: non-empty natural-language `query`; optional result limit of 1–10.
+- Input: non-empty natural-language `query`; optional result limit of 1–5.
 - Output: ranked executable definitions with stable ID, title, description,
   supported operations, an input JSON Schema for each operation, and documented
   limits and examples.
@@ -91,6 +108,7 @@ DatasetResult {
   dataset: { id, title }
   operation: collect | search
   columns: [{ key, label, type? }]
+  profiles: [{ columnKey, label, kind, populated, missing, distinct, buckets, stats }]
   rows: [JSON object]
   rowRefs: [opaque string]
   page: { nextResourceUri?, truncated, totalRows? }

@@ -43,8 +43,17 @@ async function checkStdio() {
       "The all profile must expose exactly its six routed tools.",
     );
     assertToolAnnotations(tools.tools);
+    assert(
+      tools.tools.find(({ name }) => name === "find_datasets")?.annotations
+        ?.openWorldHint === true,
+      "find_datasets must disclose that discovery consults an external account catalog.",
+    );
     const searchProperties = tools.tools.find(({ name }) => name === "search_web")
       ?.inputSchema.properties as Record<string, unknown> | undefined;
+    const findProperties = tools.tools.find(({ name }) => name === "find_datasets")
+      ?.inputSchema.properties as
+      | { limit?: { maximum?: number } }
+      | undefined;
     const runArguments = (
       tools.tools.find(({ name }) => name === "run_dataset")
         ?.inputSchema.properties?.arguments as { anyOf?: unknown[] } | undefined
@@ -53,6 +62,10 @@ async function checkStdio() {
       searchProperties &&
         Object.keys(searchProperties).join(",") === "queries",
       "search_web exposed an execution-product mode instead of one search contract.",
+    );
+    assert(
+      findProperties?.limit?.maximum === 5,
+      "find_datasets discovery breadth drifted from the bounded five-candidate contract.",
     );
     assert(
       runArguments?.anyOf?.length === 3,

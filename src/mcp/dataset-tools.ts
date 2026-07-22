@@ -36,7 +36,7 @@ const annotations = {
   readOnlyHint: true,
   destructiveHint: false,
   idempotentHint: true,
-  openWorldHint: false,
+  openWorldHint: true,
 } as const;
 
 const definitionSchema = z.object({

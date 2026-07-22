@@ -1,7 +1,11 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { LRUCache } from "lru-cache";
-import type { createBrightMcpServer } from "./server";
+import {
+  MCP_PROFILE_PATHS,
+  type McpProfile,
+  type createBrightMcpServer,
+} from "./server";
 
 type McpServer = ReturnType<typeof createBrightMcpServer>;
 
@@ -9,16 +13,22 @@ export function startHttpServer(options: {
   port: number;
   publicUrl?: URL;
   allowedOrigins: Set<string>;
-  bearerCredentials?: { bind(authorization: string | null): string | undefined };
+  bearerCredentials?: {
+    bind(authorization: string | null): string | undefined;
+  };
+  browserCredentials?: {
+    bind(authorization: string | null): string | undefined;
+  };
+  browserAvailable: boolean;
   widgetHtml: string;
   localPrincipalId: string;
-  createServer(principalId?: string): McpServer;
+  createServer(principalId: string, profile: McpProfile): McpServer;
 }) {
-  const protectedMode = Boolean(options.bearerCredentials);
   const sessions = new LRUCache<
     string,
     {
       principalId: string;
+      profile: McpProfile;
       server: McpServer;
       transport: WebStandardStreamableHTTPServerTransport;
     }
@@ -49,32 +59,46 @@ export function startHttpServer(options: {
           headers: { "content-type": "text/html; charset=utf-8" },
         });
       }
-      if (request.method === "OPTIONS" && url.pathname === "/mcp") {
+      const profile = MCP_PROFILE_PATHS[url.pathname];
+      if (profile === "browser" && !options.browserAvailable) {
+        return new Response("Not found", { status: 404 });
+      }
+      if (request.method === "OPTIONS" && profile) {
         return withCors(
           new Response(null, { status: 204 }),
           request,
-          protectedMode,
+          isProtected(profile, options),
           options.allowedOrigins,
         );
       }
-      if (url.pathname !== "/mcp") {
+      if (!profile) {
         return new Response("Not found", { status: 404 });
       }
 
-      let bearerPrincipal: string | undefined;
-      if (options.bearerCredentials) {
-        bearerPrincipal = options.bearerCredentials.bind(
-          request.headers.get("authorization"),
-        );
-        if (!bearerPrincipal) {
+      const protectedMode = isProtected(profile, options);
+      let authenticatedPrincipal: string | undefined;
+      if (protectedMode) {
+        authenticatedPrincipal = (profile === "browser"
+          ? options.browserCredentials
+          : options.bearerCredentials
+        )?.bind(request.headers.get("authorization"));
+        if (!authenticatedPrincipal) {
+          const browser = profile === "browser";
           return withCors(
-            new Response("Bright Data API key required", {
-              status: 401,
-              headers: {
-                "cache-control": "no-store",
-                "www-authenticate": 'Bearer realm="Bright MCP"',
+            new Response(
+              browser
+                ? "Bright Data Browser API credentials required"
+                : "Bright Data API key required",
+              {
+                status: 401,
+                headers: {
+                  "cache-control": "no-store",
+                  "www-authenticate": browser
+                    ? 'Basic realm="Bright MCP Browser", charset="UTF-8"'
+                    : 'Bearer realm="Bright MCP"',
+                },
               },
-            }),
+            ),
             request,
             true,
             options.allowedOrigins,
@@ -103,8 +127,13 @@ export function startHttpServer(options: {
       }
       const sessionId = request.headers.get("mcp-session-id");
       let session = sessionId ? sessions.get(sessionId) : undefined;
-      const requestPrincipal = bearerPrincipal ?? options.localPrincipalId;
-      if (sessionId && (!session || session.principalId !== requestPrincipal)) {
+      const requestPrincipal = authenticatedPrincipal ?? options.localPrincipalId;
+      if (
+        sessionId &&
+        (!session ||
+          session.principalId !== requestPrincipal ||
+          session.profile !== profile)
+      ) {
         return withCors(
           Response.json(
             {
@@ -138,13 +167,14 @@ export function startHttpServer(options: {
             options.allowedOrigins,
           );
         }
-        const server = options.createServer(requestPrincipal);
+        const server = options.createServer(requestPrincipal, profile);
         const transport = new WebStandardStreamableHTTPServerTransport({
           sessionIdGenerator: () => crypto.randomUUID(),
           enableJsonResponse: true,
           onsessioninitialized(id) {
             sessions.set(id, {
               principalId: requestPrincipal,
+              profile,
               server,
               transport,
             });
@@ -153,7 +183,7 @@ export function startHttpServer(options: {
             sessions.delete(id);
           },
         });
-        session = { principalId: requestPrincipal, server, transport };
+        session = { principalId: requestPrincipal, profile, server, transport };
         await server.connect(transport);
       }
       const response = await session.transport.handleRequest(request, {
@@ -168,13 +198,27 @@ export function startHttpServer(options: {
     },
   });
 
-  console.error(`Bright MCP listening on http://localhost:${options.port}/mcp`);
+  console.error(
+    `Bright MCP listening on http://localhost:${options.port}/mcp{/web,/deep-lookup,/marketplace,/browser}`,
+  );
   return {
     close() {
       sessions.clear();
       httpServer.stop(true);
     },
   };
+}
+
+function isProtected(
+  profile: McpProfile,
+  options: {
+    bearerCredentials?: unknown;
+    browserCredentials?: unknown;
+  },
+) {
+  return profile === "browser"
+    ? Boolean(options.browserCredentials)
+    : Boolean(options.bearerCredentials);
 }
 
 function validateHostedEdge(

@@ -5,10 +5,15 @@
 </div>
 
 Agent-oriented Bright Data capabilities over MCP, built on Bun. The six-tool
-base profile separates search, exact reading, extraction, research, maintained
+all profile separates search, exact reading, extraction, research, maintained
 dataset discovery, and execution. It pages complete pages and upstream snapshots
 as resources and renders structured results in a
 transient React MCP workbench.
+
+The full six-tool contract remains at `/mcp`. Entitlement-aligned installs can
+use stable two-tool surfaces at `/mcp/web`, `/mcp/deep-lookup`, or
+`/mcp/marketplace`; Scraping Browser is a separate four-tool surface at
+`/mcp/browser`. Tool lists never change after initialization based on a probe.
 
 ## Install
 
@@ -30,6 +35,16 @@ Set `BRIGHTDATA_API_KEY` in the client environment first. The key is forwarded
 over HTTPS and kept only in a bounded in-memory cache; Bright MCP does not
 persist it. Available live capabilities follow the products enabled on that
 Bright Data account.
+
+Choose the narrowest surface your account and workflow need:
+
+| Endpoint | Tools | Bright Data access | Authorization |
+|---|---|---|---|
+| `/mcp` | All six data tools | SERP, Web Unlocker, Deep Lookup, Marketplace as used | Bearer API key |
+| `/mcp/web` | `search_web`, `read_web` | SERP + Web Unlocker | Bearer API key |
+| `/mcp/deep-lookup` | `extract_web`, `research_web` | General Deep Lookup | Bearer API key |
+| `/mcp/marketplace` | `find_datasets`, `run_dataset` | Account-visible Marketplace datasets | Bearer API key |
+| `/mcp/browser` | Four `browser_*` tools | Scraping Browser | HTTP Basic with Browser API username/password |
 
 See [SETUP.md](./SETUP.md) for local development, credentials, live checks, and
 hosted authorization.

@@ -19,8 +19,14 @@ import {
   macOsKeychainCredential,
   staticCredential,
 } from "./connections/credentials";
-import { staticBrowserCredential } from "./connections/browser-credentials";
-import { createBrightMcpServer } from "./mcp/server";
+import {
+  createBasicBrowserCredentialProvider,
+  staticBrowserCredential,
+} from "./connections/browser-credentials";
+import {
+  createBrightMcpServer,
+  type McpProfile,
+} from "./mcp/server";
 import { startHttpServer } from "./mcp/http-server";
 import { CancellableTaskStore } from "./mcp/task-store";
 
@@ -44,6 +50,9 @@ if (hosted && publicMcpUrl?.protocol !== "https:") {
 }
 const bearerCredentials = hosted
   ? createBearerCredentialProvider()
+  : undefined;
+const browserCredentials = hosted
+  ? createBasicBrowserCredentialProvider()
   : undefined;
 const allowedOrigins = new Set(
   (process.env.MCP_ALLOWED_ORIGINS ?? "")
@@ -126,9 +135,23 @@ if (
 if (browserProfile === "fixture" && !testFixtures) {
   throw new Error("The fixture browser profile is test-only.");
 }
-const browserProvider = browserProfile === "disabled"
-  ? undefined
-  : createBrowserProvider(browserProfile);
+const selectedProfile = transportName === "stdio"
+  ? readProfile(process.env.MCP_PROFILE)
+  : "all";
+const browserProvider = hosted
+  ? createBrightDataBrowserProvider(browserCredentials!.credentials)
+  : browserProfile === "disabled"
+    ? undefined
+    : createBrowserProvider(browserProfile);
+if (
+  transportName === "stdio" &&
+  selectedProfile === "browser" &&
+  !browserProvider
+) {
+  throw new Error(
+    "The browser MCP profile requires MCP_BROWSER_PROFILE=brightdata and Browser API credentials.",
+  );
+}
 const widgetFile = Bun.file(
   new URL("../dist/dataset-table.html", import.meta.url),
 );
@@ -148,9 +171,12 @@ const icon = {
   sizes: ["1254x1254"],
 };
 const activeBrowsers = new Set<BrowserUseCases>();
-const createServer = (requestPrincipal = principalId) => {
-  const browser = browserProvider ? createBrowser(browserProvider) : undefined;
+const createServer = (requestPrincipal: string, profile: McpProfile) => {
+  const browser = profile === "browser" && browserProvider
+    ? createBrowser(browserProvider)
+    : undefined;
   const server = createBrightMcpServer({
+    profile,
     datasets: datasetAdapter,
     web: webAdapter,
     browser,
@@ -221,7 +247,7 @@ function brightDataBrowserProvider() {
 }
 
 if (transportName === "stdio") {
-  const server = createServer();
+  const server = createServer(principalId, selectedProfile);
   await server.connect(new StdioServerTransport());
 } else if (transportName === "http") {
   const port = readPort(process.env.PORT);
@@ -230,6 +256,8 @@ if (transportName === "stdio") {
     publicUrl: publicMcpUrl,
     allowedOrigins,
     bearerCredentials,
+    browserCredentials,
+    browserAvailable: Boolean(browserProvider),
     widgetHtml,
     localPrincipalId: principalId,
     createServer,
@@ -252,4 +280,18 @@ function configuredUrl(name: string, value: string | undefined) {
   } catch {
     throw new Error(`${name} must be an absolute URL.`);
   }
+}
+
+function readProfile(value: string | undefined): McpProfile {
+  const profile = value?.trim() || "all";
+  if (
+    profile === "all" ||
+    profile === "web" ||
+    profile === "deep-lookup" ||
+    profile === "marketplace" ||
+    profile === "browser"
+  ) return profile;
+  throw new Error(
+    'MCP_PROFILE must be "all", "web", "deep-lookup", "marketplace", or "browser".',
+  );
 }

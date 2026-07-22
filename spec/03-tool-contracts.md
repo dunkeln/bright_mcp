@@ -1,6 +1,6 @@
 # V1 agent contracts
 
-The V1 base profile MUST expose exactly these six model-visible tools. All tools MUST provide MCP
+The V1 all profile MUST expose exactly these six model-visible tools. All tools MUST provide MCP
 annotations describing read-only, destructive, idempotent, and open-world
 behavior accurately.
 
@@ -124,5 +124,7 @@ headers, or unbounded upstream response bodies.
 - No `show_tables` or other presentation-only tool.
 - No generic untyped action dispatcher.
 
-The opt-in browser profile is specified separately in
+The same contracts are grouped at `/mcp/web`, `/mcp/deep-lookup`, and
+`/mcp/marketplace`; grouping MUST NOT change their schemas or execution meaning.
+The browser profile is specified separately in
 `09-browser-capability.md`; it MUST NOT alter these six contracts.

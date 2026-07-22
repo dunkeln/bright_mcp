@@ -42,9 +42,11 @@ The words MUST, MUST NOT, SHOULD, and MAY are normative.
 
 ## Falsifiable constraints
 
-- The V1 base profile exposes exactly six model-visible intent tools.
-- The opt-in V1 browser profile adds exactly four browser tools and no other
-  model-visible surface.
+- The V1 all profile exposes exactly six model-visible intent tools.
+- The web, Deep Lookup, and Marketplace profiles expose stable two-tool subsets.
+- The V1 browser profile exposes exactly four browser tools and no data tools.
+- A profile is selected by transport configuration or HTTP path; account probes
+  MUST NOT mutate `tools/list` during a session.
 - Resources, tasks, or app-only implementation helpers MUST NOT become
   model-visible tools merely because a client lacks another MCP capability.
 - Any further tool MAY be added only when evaluations show that an existing contract

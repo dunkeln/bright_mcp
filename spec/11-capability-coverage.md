@@ -34,7 +34,7 @@ capability, not endpoint inventory.
 | Result paging and complete artifacts | MCP resources |
 | Dataset result tables | optional table MCP app |
 | Browser navigation, history, observation, actions | four browser-profile tools |
-| Tool groups and Pro mode | deployment capability profiles |
+| Tool groups and Pro mode | fixed all, web, Deep Lookup, Marketplace, and browser profiles |
 | Session statistics | internalized observability |
 | Credential and zone setup | connection and Bright Data adapter boundaries |
 

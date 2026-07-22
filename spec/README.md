@@ -27,9 +27,11 @@ plane for collection, scraping, proxying, discovery, and browser services.
 
 ## V1 scope
 
-- A base profile of six model-visible tools: `search_web`, `read_web`,
+- An all-capabilities profile of six model-visible tools: `search_web`, `read_web`,
   `extract_web`, `research_web`, `find_datasets`, and `run_dataset`.
-- An opt-in browser profile adding `browser_navigate`, `browser_observe`,
+- Fixed web, Deep Lookup, and Marketplace profiles exposing the corresponding
+  two-tool pairs without runtime tool-list mutation.
+- A separate browser profile exposing `browser_navigate`, `browser_observe`,
   `browser_interact`, and `browser_close` for Bright Data Scraping Browser.
 - A table MCP app attached to `run_dataset`; it is not a separate tool.
 - Complete-page and completed-result resources, with optional task-backed

@@ -34,8 +34,9 @@
   malformed response, quota, and authentication failures.
 - A boundary check MUST demonstrate an upstream shape change is isolated to the
   adapter when canonical meaning is unchanged.
-- MCP smoke checks MUST list exactly six base tools and exactly ten tools when
-  the browser profile is enabled, then complete each representative workflow.
+- MCP smoke checks MUST list exactly six all-profile tools, two tools in each
+  data subprofile, and four browser-profile tools, then complete each
+  representative workflow.
 - Protocol checks MUST cover `run_dataset` with and without task support,
   authorized result-resource paging, and a host without app support.
 - Coverage checks MUST exercise ordered Markdown scraping, dataset collection,
@@ -58,7 +59,8 @@
    same core/adapter boundaries.
 7. Add the opt-in browser profile through a fake provider, then Bright Data CDP.
 8. Add hosted caller-funded Bearer authorization as a deployment slice.
-9. Expand the catalog as data; do not expand either profile's tool surface.
+9. Separate stable profiles by capability and credential without dynamic tool lists.
+10. Expand the catalog as data; do not expand the declared tool surfaces.
 
 Each slice MUST run end to end before the next begins. Full upstream parity is
 not a release gate.
@@ -85,7 +87,7 @@ poll duration, result size, and tool-selection evaluation outcomes.
 
 ## Tool-surface change gate
 
-Adding a tool beyond the declared six-tool base or ten-tool browser profile
+Adding a tool beyond the declared six-tool all profile or four-tool browser profile
 requires recorded evidence of recurring selection, validation, permission,
 state, or outcome ambiguity that cannot be resolved by a typed field or
 discovery result. Removal or merging requires equivalent completion evidence.

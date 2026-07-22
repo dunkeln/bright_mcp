@@ -4,9 +4,17 @@ MCP primitives are selected by control semantics, not by upstream API shape.
 
 ## Model-visible tools
 
-The six tools in `03-tool-contracts.md` are the complete base surface. The
-browser profile adds only the four tools in `09-browser-capability.md`.
+The six tools in `03-tool-contracts.md` are the complete `/mcp` surface. Fixed
+subprofiles expose `search_web` + `read_web` at `/mcp/web`, `extract_web` +
+`research_web` at `/mcp/deep-lookup`, and `find_datasets` + `run_dataset` at
+`/mcp/marketplace`. `/mcp/browser` exposes only the four tools in
+`09-browser-capability.md`.
 Presentation, polling, paging, and connection setup MUST NOT create tools.
+
+Profiles MUST be selected before MCP initialization. Sessions MUST be bound to
+both principal and profile, and a session ID from one path MUST be rejected on
+another. Upstream entitlement failures remain authoritative at execution time;
+network probes MUST NOT make a session's tool list unstable.
 
 ## Resources
 
@@ -54,6 +62,6 @@ result ownership, or artifact lifetime.
 ## Capability fallback rule
 
 Every optional primitive MUST have one declared fallback. Lack of task or app
-support may reduce durability or presentation quality, but MUST NOT make any of
-the six base workflows unavailable. Disabling the browser profile removes its
-four tools as one coherent capability rather than leaving partial browser state.
+support may reduce durability or presentation quality, but MUST NOT change a
+selected profile's tool contract. Disabling local browser composition removes
+its endpoint as one coherent capability rather than leaving partial state.

@@ -4,8 +4,9 @@
 
 The browser profile controls Bright Data Scraping Browser: a remote Chromium
 session reached over CDP/WebSocket. It MUST NOT launch or expose a local browser.
-The profile is opt-in because it adds state, cost, open-world mutation, and four
-model-visible tools. It has no required MCP app.
+The profile is separate because it has a different credential, state, cost,
+open-world mutation, and four-tool contract. It has no data tools and no
+required MCP app.
 
 ## Tool surface
 

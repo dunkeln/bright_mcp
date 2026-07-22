@@ -40,7 +40,7 @@ async function checkStdio() {
     assert(
       tools.tools.map((tool) => tool.name).join(",") ===
         "search_web,read_web,extract_web,research_web,find_datasets,run_dataset",
-      "The base profile must expose exactly its six routed tools.",
+      "The all profile must expose exactly its six routed tools.",
     );
     assertToolAnnotations(tools.tools);
     const searchProperties = tools.tools.find(({ name }) => name === "search_web")
@@ -236,7 +236,11 @@ async function checkBrowserProfile() {
     command: bun,
     args: ["run", "src/main.ts"],
     cwd: projectRoot,
-    env: environment({ MCP_TRANSPORT: "stdio", MCP_BROWSER_PROFILE: "fixture" }),
+    env: environment({
+      MCP_TRANSPORT: "stdio",
+      MCP_PROFILE: "browser",
+      MCP_BROWSER_PROFILE: "fixture",
+    }),
     stderr: "pipe",
   });
   const client = new Client({ name: "bright-browser-check", version: "0.1.0" });
@@ -245,8 +249,8 @@ async function checkBrowserProfile() {
     const tools = await client.listTools();
     assert(
       tools.tools.map((tool) => tool.name).join(",") ===
-        "search_web,read_web,extract_web,research_web,find_datasets,run_dataset,browser_navigate,browser_observe,browser_interact,browser_close",
-      "The browser profile must expose exactly ten tools.",
+        "browser_navigate,browser_observe,browser_interact,browser_close",
+      "The browser profile must expose exactly its four browser tools.",
     );
     assertToolAnnotations(tools.tools);
     for (const name of ["browser_interact", "browser_close"]) {
@@ -335,6 +339,7 @@ async function checkRealBrowser() {
     cwd: projectRoot,
     env: environment({
       MCP_TRANSPORT: "stdio",
+      MCP_PROFILE: "browser",
       MCP_BROWSER_PROFILE: "brightdata",
       BRIGHTDATA_BROWSER_USERNAME: username,
       BRIGHTDATA_BROWSER_PASSWORD: password,
@@ -429,16 +434,42 @@ async function checkHttp() {
       process,
       "The Bun HTTP server did not start.",
     );
+    const expectedProfiles = {
+      "/mcp": "search_web,read_web,extract_web,research_web,find_datasets,run_dataset",
+      "/mcp/web": "search_web,read_web",
+      "/mcp/deep-lookup": "extract_web,research_web",
+      "/mcp/marketplace": "find_datasets,run_dataset",
+      "/mcp/browser": "browser_navigate,browser_observe,browser_interact,browser_close",
+    } as const;
+    for (const [path, expected] of Object.entries(expectedProfiles)) {
+      const profileClient = new Client({
+        name: `bright-http-${path.slice(5) || "all"}-check`,
+        version: "0.1.0",
+      });
+      await profileClient.connect(
+        new StreamableHTTPClientTransport(
+          new URL(`http://127.0.0.1:${port}${path}`),
+        ),
+      );
+      try {
+        const tools = await profileClient.listTools();
+        assert(
+          tools.tools.map(({ name }) => name).join(",") === expected,
+          `${path} exposed the wrong capability profile.`,
+        );
+      } finally {
+        await profileClient.close();
+      }
+    }
+
     const client = new Client({ name: "bright-http-check", version: "0.1.0" });
     let browserSessionId = "";
     await client.connect(
       new StreamableHTTPClientTransport(
-        new URL(`http://127.0.0.1:${port}/mcp`),
+        new URL(`http://127.0.0.1:${port}/mcp/browser`),
       ),
     );
     try {
-      const tools = await client.listTools();
-      assert(tools.tools.length === 10, "Bun HTTP did not expose the browser profile.");
       const navigation = await client.callTool({
         name: "browser_navigate",
         arguments: { destination: { kind: "url", url: "https://example.com/" } },
@@ -456,7 +487,7 @@ async function checkHttp() {
     });
     await replacement.connect(
       new StreamableHTTPClientTransport(
-        new URL(`http://127.0.0.1:${port}/mcp`),
+        new URL(`http://127.0.0.1:${port}/mcp/browser`),
       ),
     );
     try {

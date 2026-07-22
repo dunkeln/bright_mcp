@@ -13,8 +13,9 @@ bun run check:coverage
 MCP_TRANSPORT=stdio bun run start
 ```
 
-Local development uses stdio with your local credential. Hosted HTTP serves
-`/mcp` and requires `MCP_PUBLIC_URL` plus a caller-provided Bearer key.
+Local development uses stdio with your local credential. Hosted HTTP serves the
+fixed capability endpoints under `/mcp` and requires `MCP_PUBLIC_URL` plus
+caller-provided credentials.
 
 ## Develop the MCP App
 
@@ -84,12 +85,18 @@ navigation check, also set `BRIGHTDATA_BROWSER_CHECK=1`, then run:
 bun run check:compat
 ```
 
+For stdio, select one stable surface with
+`MCP_PROFILE=all|web|deep-lookup|marketplace|browser`. The default is `all`;
+`browser` also requires `MCP_BROWSER_PROFILE=brightdata`.
+
 ## Hosted authorization
 
-Set `MCP_PUBLIC_URL=https://<host>/mcp`. Clients send
-their Bright Data API key as a Bearer token from their own environment. The
-server uses its hash as the session identity, keeps the key only in bounded
-memory for at most one hour, and never stores it or includes it in MCP
-content. Hosted mode requires HTTPS, rejects deployment-global credentials, and
-requires the Bearer key on every MCP request. Set `MCP_ALLOWED_ORIGINS` to a
+Set `MCP_PUBLIC_URL=https://<host>/mcp`. `/mcp`, `/mcp/web`,
+`/mcp/deep-lookup`, and `/mcp/marketplace` accept the caller's Bright Data API key
+as a Bearer token. `/mcp/browser` accepts the caller's Scraping Browser username
+and password through standard HTTP Basic authorization. The server uses a hash
+as the session identity, keeps credentials only in bounded memory for at most
+one hour, and never stores them or includes them in MCP content. Hosted mode
+requires HTTPS, rejects deployment-global credentials, and requires the
+surface's authorization on every MCP request. Set `MCP_ALLOWED_ORIGINS` to a
 comma-separated browser-origin allowlist when needed.

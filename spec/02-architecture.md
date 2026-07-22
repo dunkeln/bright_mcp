@@ -25,6 +25,8 @@ MUST NOT become core domain models.
 
 - Registers tools and resources, converts MCP input to use-case input, and maps
   canonical results to MCP content and `structuredContent`.
+- Selects a startup-fixed or path-fixed capability profile before registration;
+  it does not mutate tool inventory from runtime entitlement probes.
 - Negotiates optional task and app capabilities without changing use-case
   meaning.
 - Contains no credential collection, polling, or upstream response parsing.
@@ -35,6 +37,7 @@ MUST NOT become core domain models.
 - Resolves local credentials from explicit environment or Keychain input.
 - Keeps Bright Data credentials out of use-case input,
   tool schemas, canonical results, resources, and app payloads.
+- Separates API-key principals from Scraping Browser username/password principals.
 
 ### Core
 

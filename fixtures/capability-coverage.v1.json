@@ -146,10 +146,10 @@
       "id": "capability-profiles",
       "referenceCapability": "Tool groups and Pro mode",
       "disposition": "composed",
-      "routes": ["profile:base", "profile:browser"],
+      "routes": ["profile:all", "profile:web", "profile:deep-lookup", "profile:marketplace", "profile:browser"],
       "verification": {
         "gate": "bun run check:compat",
-        "scenario": "List exactly six tools in the base profile and exactly ten in the opt-in browser profile."
+        "scenario": "List exactly six tools in all, two in web, two in deep-lookup, two in marketplace, and four in browser."
       }
     },
     {

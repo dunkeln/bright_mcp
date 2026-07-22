@@ -39,42 +39,56 @@ const fixture = fixtureSchema.parse(
     new URL("../fixtures/capability-coverage.v1.json", import.meta.url),
   ).json(),
 );
-const transport = new StdioClientTransport({
-  command: process.execPath,
-  args: ["run", "src/main.ts"],
-  cwd: projectRoot,
-  env: testEnvironment({ MCP_TRANSPORT: "stdio", MCP_BROWSER_PROFILE: "fixture" }),
-  stderr: "pipe",
-});
-const client = new Client({ name: "bright-coverage-check", version: "0.1.0" });
-await client.connect(transport);
+const surfaces = await Promise.all([collectSurface("all"), collectSurface("browser")]);
+const toolNames = new Set(surfaces.flatMap(({ tools }) => tools));
+const resourceUris = new Set(surfaces.flatMap(({ resources }) => resources));
 
-try {
-  const [tools, resources, templates] = await Promise.all([
-    client.listTools(),
-    client.listResources(),
-    client.listResourceTemplates(),
-  ]);
-  const toolNames = new Set(tools.tools.map((tool) => tool.name));
-  const resourceUris = new Set([
-    ...resources.resources.map((resource) => resource.uri),
-    ...templates.resourceTemplates.map((template) => template.uriTemplate),
-  ]);
-
-  for (const capability of fixture.capabilities) {
-    for (const route of capability.routes) {
-      if (route.startsWith("tool:")) {
-        const name = route.slice("tool:".length).split("#", 1)[0]!;
-        assert(toolNames.has(name), `${capability.id} references missing tool ${name}.`);
-      }
-      if (route.startsWith("resource:")) {
-        const uri = route.slice("resource:".length);
-        assert(resourceUris.has(uri), `${capability.id} references missing resource ${uri}.`);
-      }
+for (const capability of fixture.capabilities) {
+  for (const route of capability.routes) {
+    if (route.startsWith("tool:")) {
+      const name = route.slice("tool:".length).split("#", 1)[0]!;
+      assert(toolNames.has(name), `${capability.id} references missing tool ${name}.`);
+    }
+    if (route.startsWith("resource:")) {
+      const uri = route.slice("resource:".length);
+      assert(resourceUris.has(uri), `${capability.id} references missing resource ${uri}.`);
     }
   }
-} finally {
-  await client.close();
 }
 
 console.log(`Coverage fixture v${fixture.schemaVersion} passed for ${fixture.capabilities.length} capabilities.`);
+
+async function collectSurface(profile: "all" | "browser") {
+  const transport = new StdioClientTransport({
+    command: process.execPath,
+    args: ["run", "src/main.ts"],
+    cwd: projectRoot,
+    env: testEnvironment({
+      MCP_TRANSPORT: "stdio",
+      MCP_PROFILE: profile,
+      MCP_BROWSER_PROFILE: "fixture",
+    }),
+    stderr: "pipe",
+  });
+  const client = new Client({
+    name: `bright-${profile}-coverage-check`,
+    version: "0.1.0",
+  });
+  await client.connect(transport);
+  try {
+    const [tools, resources, templates] = await Promise.all([
+      client.listTools(),
+      client.listResources(),
+      client.listResourceTemplates(),
+    ]);
+    return {
+      tools: tools.tools.map(({ name }) => name),
+      resources: [
+        ...resources.resources.map(({ uri }) => uri),
+        ...templates.resourceTemplates.map(({ uriTemplate }) => uriTemplate),
+      ],
+    };
+  } finally {
+    await client.close();
+  }
+}

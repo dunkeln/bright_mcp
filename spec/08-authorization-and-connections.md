@@ -18,6 +18,13 @@ The bearer is the upstream Bright Data credential, not a separately issued MCP
 OAuth token. Revocation and replacement happen in the caller's Bright Data
 account and client environment.
 
+The hosted browser profile is a distinct credential boundary. `/mcp/browser`
+MUST accept caller-owned Scraping Browser username/password through HTTPS Basic
+authorization, bind sessions and artifacts to a namespaced digest of both
+values, retain the raw pair only in bounded memory for at most one hour, and
+never accept the regular API key as a substitute. Data profiles MUST NOT accept
+Browser API credentials.
+
 ## Local stdio
 
 Stdio resolves the Bright Data key from macOS Keychain or explicit environment

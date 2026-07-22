@@ -114,7 +114,7 @@ type DatasetToolDependencies = {
   principalId: string;
 };
 
-export function registerDatasetTools(
+export function registerDeepLookupTools(
   server: McpServer,
   dependencies: DatasetToolDependencies,
 ) {
@@ -171,7 +171,12 @@ export function registerDatasetTools(
       requestContext(dependencies.principalId, extra.signal, extra.authInfo),
     ),
   );
+}
 
+export function registerMarketplaceTools(
+  server: McpServer,
+  dependencies: DatasetToolDependencies,
+) {
   server.registerTool(
     "find_datasets",
     {
@@ -291,6 +296,12 @@ export function registerDatasetTools(
     });
   }
 
+}
+
+export function registerDatasetResources(
+  server: McpServer,
+  dependencies: Pick<DatasetToolDependencies, "results" | "widgetHtml" | "principalId">,
+) {
   server.registerResource(
     "dataset-result",
     new ResourceTemplate("brightdata://results/{resultId}", { list: undefined }),

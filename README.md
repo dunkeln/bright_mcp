@@ -37,7 +37,16 @@ hosted authorization.
 ## Benchmarks
 
 <!-- benchmark:start -->
-> Benchmark refresh pending for the six-tool intent surface.
+![Paired horizontal bars comparing MCP completion by workflow](./assets/benchmark-completion.png)
+![Radar chart comparing blind answer-quality dimensions](./assets/benchmark-radar.png)
+![Horizontal bars comparing blind pairwise preference](./assets/benchmark-preference.png)
+![Scatter plot comparing judged answer quality with token use](./assets/benchmark-quality-cost.png)
+![Paired horizontal bars comparing benchmark passes per token budget](./assets/benchmark-efficiency.png)
+![Cumulative latency distribution across all benchmark runs](./assets/benchmark-latency.png)
+![Paired horizontal bars comparing average tool calls by workflow](./assets/benchmark-complexity.png)
+
+Bright MCP: 50% pass · 4.21/5 judged quality · 12347 tokens · 14.9s p50. BrightData MCP: 75% · 3.77/5 · 13145 tokens · 27.8s p50.
+Blind preference: Bright MCP 18, BrightData MCP 7, ties 15. [Method and tables](./evals/README.md#latest-tool-use-benchmark) · current-entitlements Acquire + Operate profile · `openrouter/anthropic/claude-haiku-4.5` · 10 runs/case · 2026-07-22.
 <!-- benchmark:end -->
 
 | Dimension | BrightData MCP | Bright MCP |

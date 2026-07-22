@@ -66,5 +66,17 @@ profile, not successful execution of all six published tools.
 ## Latest tool-use benchmark
 
 <!-- benchmark:start -->
-> Benchmark refresh pending for the current-entitlements Acquire + Operate surface.
+
+Profile `current-entitlements` · agent `openrouter/anthropic/claude-haiku-4.5` · judge `anthropic/claude-sonnet-5` · 10 runs/case · 2026-07-22
+
+Extract and Research are excluded because general Deep Lookup is unavailable for the benchmark account.
+
+| Case | Pass Bright/BrightData | Recovered Bright/BrightData | Quality Bright/BrightData | Tokens Bright/BrightData | p50 latency Bright/BrightData | Calls Bright/BrightData |
+|---|---:|---:|---:|---:|---:|---:|
+| Acquire · Current search | 0% / 0% | 0% / 0% | 3.70 / 4.24 | 21579 / 13647 | 90.8s / 56.8s | 3.10 / 2.50 |
+| Acquire · Known pages | 100% / 100% | 0% / 10% | 4.68 / 4.68 | 6768 / 4851 | 15.2s / 19.6s | 1.00 / 2.10 |
+| Operate · Product snapshot | 100% / 100% | 0% / 0% | 4.04 / 3.22 | 14159 / 32359 | 15.7s / 41.4s | 2.00 / 1.00 |
+| Operate · Recurring delivery | 0% / 100% | 0% / 0% | 4.44 / 2.92 | 6881 / 1725 | 5.8s / 2.6s | 1.00 / 0.00 |
+
+A pass requires a complete JSON response with the requested output fields and provenance. Intended workflow selection, successful expected-tool execution, clean execution, and recovered errors remain separate artifact dimensions. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement: 75%.
 <!-- benchmark:end -->

@@ -64,7 +64,6 @@ export const datasetRunArgumentsSchema = z.union([
   urlCollectionInputSchema,
   keywordCollectionInputSchema,
   marketplaceInputSchema,
-  deepLookupInputSchema,
 ]);
 
 export const datasetRunInputSchema = z.discriminatedUnion("operation", [
@@ -76,8 +75,13 @@ export const datasetRunInputSchema = z.discriminatedUnion("operation", [
   z.object({
     datasetId: datasetIdSchema,
     operation: z.literal("search"),
-    arguments: z.union([marketplaceInputSchema, deepLookupInputSchema]),
+    arguments: marketplaceInputSchema,
   }).strict(),
 ]);
 
 export type DatasetRunInput = z.infer<typeof datasetRunInputSchema>;
+export type DatasetExecutionInput = DatasetRunInput | {
+  datasetId: "deep-web-research";
+  operation: "search";
+  arguments: z.infer<typeof deepLookupInputSchema>;
+};

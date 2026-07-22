@@ -13,7 +13,7 @@ import {
 } from "./browser/stores";
 import { createBrowserUseCases } from "./browser/use-cases";
 import type { BrowserUseCases } from "./browser/use-cases";
-import { LocalResultStore } from "./adapters/result-store";
+import { LocalResultStore, LocalWebContentStore } from "./adapters/result-store";
 import {
   createBearerCredentialProvider,
   macOsKeychainCredential,
@@ -54,6 +54,7 @@ const allowedOrigins = new Set(
 if (publicMcpUrl) allowedOrigins.add(publicMcpUrl.origin);
 const principalId = "local";
 const resultStore = new LocalResultStore();
+const webContentStore = new LocalWebContentStore();
 const taskStore = new CancellableTaskStore();
 const credentialSource = process.env.BRIGHTDATA_CREDENTIAL_SOURCE?.trim() || "auto";
 if (!(credentialSource === "auto" || credentialSource === "keychain")) {
@@ -154,6 +155,7 @@ const createServer = (requestPrincipal = principalId) => {
     web: webAdapter,
     browser,
     results: resultStore,
+    webContent: webContentStore,
     tasks: taskStore,
     widgetHtml,
     principalId: requestPrincipal,

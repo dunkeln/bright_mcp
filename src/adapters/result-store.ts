@@ -7,10 +7,12 @@ import {
 } from "../core/contracts";
 import { profileDataset } from "../core/profiles";
 import type { ResultSource, ResultStore } from "../core/results";
+import type { WebContentStore } from "../core/web";
 
 const PAGE_ROWS = 8;
 const PROFILE_ROWS = 1_000;
 const RESULT_TTL_MS = 15 * 60 * 1000;
+const WEB_PREVIEW_BYTES = 40_000;
 
 type StoredResult = {
   owner: string;
@@ -124,6 +126,33 @@ export class LocalResultStore implements ResultStore {
   }
 }
 
+export class LocalWebContentStore implements WebContentStore {
+  private readonly pages = new LRUCache<
+    string,
+    { owner: string; url: string; content: string }
+  >({ max: 500, ttl: RESULT_TTL_MS });
+
+  save(url: string, content: string, context: RequestContext) {
+    const token = crypto.randomUUID().replaceAll("-", "");
+    this.pages.set(token, { owner: context.principalId, url, content });
+    const bytes = new TextEncoder().encode(content);
+    const truncated = bytes.byteLength > WEB_PREVIEW_BYTES;
+    return {
+      content: truncated
+        ? new TextDecoder().decode(bytes.slice(0, WEB_PREVIEW_BYTES))
+        : content,
+      resourceUri: `brightdata://web/${token}`,
+      truncated,
+    };
+  }
+
+  read(token: string, context: RequestContext) {
+    const page = this.pages.get(token);
+    if (!page || page.owner !== context.principalId) throw resultNotFound();
+    return { url: page.url, content: page.content };
+  }
+}
+
 function arraySource(rows: DatasetResult["rows"]): ResultSource {
   return {
     partSize: Math.max(rows.length, 1),
@@ -139,6 +168,6 @@ function resultNotFound() {
     "result_not_found",
     "This result was not found or has expired.",
     false,
-    "Run the dataset again to create a fresh result.",
+    "Repeat the originating tool call to create a fresh transient result.",
   );
 }

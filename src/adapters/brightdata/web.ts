@@ -3,7 +3,7 @@ import { z } from "zod";
 import { CapabilityError, type RequestContext } from "../../core/contracts";
 import type {
   ItemFailure,
-  ScrapePort,
+  ReadPort,
   SearchPort,
   SearchQuery,
   SingleSearchResponse,
@@ -12,9 +12,8 @@ import { BrightDataGateway } from "./gateway";
 
 const SEARCH_PAGE_SIZE = 10;
 const MAX_SEARCH_OFFSET = 90;
-const MAX_SCRAPE_BYTES = 100_000;
 const organicResultSchema = z.object({
-  title: z.string(),
+  title: z.string().optional(),
   link: z.url().optional(),
   url: z.url().optional(),
   description: z.string().optional(),
@@ -45,7 +44,7 @@ const activeZonesSchema = z.array(z.object({
 export function createBrightDataWebAdapter(
   gateway: BrightDataGateway,
   zones: { serp?: string; unlocker?: string },
-): { search: SearchPort; scrape: ScrapePort } {
+): { search: SearchPort; read: ReadPort } {
   const activeZones = new LRUCache<string, z.infer<typeof activeZonesSchema>>({
     max: 1_000,
     ttl: 5 * 60_000,
@@ -82,8 +81,8 @@ export function createBrightDataWebAdapter(
         };
       },
     },
-    scrape: {
-      async scrape(input, context) {
+    read: {
+      async read(input, context) {
         const zone = await resolveZone(
           gateway,
           activeZones,
@@ -109,11 +108,9 @@ export function createBrightDataWebAdapter(
                 context,
               );
               const content = unwrapBody(response.data);
-              const bounded = boundText(content);
               return {
                 url,
-                content: bounded.content,
-                truncated: bounded.truncated || undefined,
+                content,
               };
             } catch (error) {
               const failure = error instanceof CapabilityError
@@ -168,7 +165,7 @@ async function searchSerp(
     .filter((item) => !item.type || item.type === "organic")
     .flatMap((item) => {
       const url = item.link ?? item.url;
-      return url
+      return url && item.title
         ? [{ title: item.title, url, summary: item.description ?? item.snippet ?? "" }]
         : [];
     })
@@ -202,7 +199,7 @@ async function resolveZone(
   }
   const zone = zones.find((candidate) =>
     kind === "serp"
-      ? candidate.plan?.serp === true || /serp|unblocker|unlocker/i.test(candidate.type)
+      ? candidate.plan?.serp === true || /serp/i.test(candidate.type)
       : /unblocker|unlocker/i.test(candidate.type) && candidate.plan?.serp !== true,
   )?.name;
   if (zone) return zone;
@@ -302,17 +299,6 @@ function unwrapBody(value: string) {
   } catch {
     return value;
   }
-}
-
-function boundText(value: string) {
-  const bytes = new TextEncoder().encode(value);
-  if (bytes.byteLength <= MAX_SCRAPE_BYTES) {
-    return { content: value, truncated: false };
-  }
-  return {
-    content: new TextDecoder().decode(bytes.slice(0, MAX_SCRAPE_BYTES)),
-    truncated: true,
-  };
 }
 
 function malformedSearch() {

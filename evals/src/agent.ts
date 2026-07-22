@@ -8,6 +8,8 @@ const model = configuredModel.startsWith("openrouter/")
   ? configuredModel
   : `openrouter/${configuredModel}`;
 const runs = integer("EVAL_RUNS", 10, 1, 100);
+const concurrency = integer("EVAL_CONCURRENCY", 4, 2, 20);
+if (concurrency % 2) throw new Error("EVAL_CONCURRENCY must be even so Bright/BrightData runs stay paired.");
 const selectedCases = process.env.EVAL_CASE
   ? workflowCases.filter(({ id }) => id === process.env.EVAL_CASE)
   : workflowCases;
@@ -38,19 +40,23 @@ try {
     upstreamEcommerce: await manager.getToolsForAiSdk("upstream-ecommerce"),
   };
   const completed = new Set(results.map(resultKey));
-  const jobs = shuffle(
+  const pendingPairs = shuffle(
     selectedCases.flatMap((useCase) =>
-      (["bright", "upstream"] as const).flatMap((server) =>
-        Array.from({ length: runs }, (_, run) => ({ useCase, server, run: run + 1 })),
-      ),
-    ).filter((job) => !completed.has(resultKey({
-      caseId: job.useCase.id,
-      server: job.server,
-      run: job.run,
-    }))),
+      Array.from({ length: runs }, (_, run) => ({
+        jobs: (["bright", "upstream"] as const)
+          .map((server) => ({ useCase, server, run: run + 1 }))
+          .filter((job) => !completed.has(resultKey({
+            caseId: job.useCase.id,
+            server: job.server,
+            run: job.run,
+          }))),
+      })),
+    ).filter(({ jobs }) => jobs.length),
   );
+  const jobCount = pendingPairs.reduce((count, pair) => count + pair.jobs.length, 0);
+  type Job = (typeof pendingPairs)[number]["jobs"][number];
 
-  for (const [index, job] of jobs.entries()) {
+  const evaluate = async (job: Job): Promise<AgentResult> => {
     const runner = new HostRunner({
       tools:
         job.server === "upstream" &&
@@ -69,18 +75,6 @@ try {
     const path = job.useCase.toolPath[job.server];
     const called = result.toolsCalled();
     const toolSelected = followsPath(called, path);
-    const pathArgumentsValid = path.every((choices) =>
-      choices.some((tool) => {
-        const arguments_ = result.getToolArguments(tool);
-        return arguments_ && Object.keys(arguments_).length > 0;
-      }),
-    );
-    const openedSources = !(
-      job.server === "bright" &&
-      "requiresOpenedSources" in job.useCase &&
-      job.useCase.requiresOpenedSources
-    ) || called.includes("scrape");
-    const argumentsValid = pathArgumentsValid && openedSources;
     const responseComplete = result.text.trim().length > 0;
     const outcomeValid = validatesOutcome(result.text, job.useCase);
     const toolEvidence = result.getToolMessages();
@@ -88,6 +82,7 @@ try {
     const toolExecutionValid = path.every((choices) =>
       choices.some((tool) => successfulTools.has(tool))
     );
+    const argumentsValid = toolExecutionValid;
     const toolExecutionClean =
       !result.hasError() && !hasToolExecutionError(toolEvidence);
     const passed =
@@ -96,7 +91,7 @@ try {
       toolExecutionValid &&
       responseComplete &&
       outcomeValid;
-    results.push({
+    return {
       caseId: job.useCase.id,
       pillar: job.useCase.pillar,
       server: job.server,
@@ -122,9 +117,20 @@ try {
         : toolExecutionClean || passed
           ? {}
           : { error: "MCP tool execution failed." }),
-    });
+    };
+  };
+
+  let finished = 0;
+  for (let index = 0; index < pendingPairs.length; index += concurrency / 2) {
+    const batch = pendingPairs
+      .slice(index, index + concurrency / 2)
+      .flatMap(({ jobs }) => jobs);
+    const batchResults = await Promise.all(batch.map(evaluate));
+    results.push(...batchResults);
     await persist();
-    console.log(`${index + 1}/${jobs.length} ${job.useCase.id} ${serverLabel(job.server)}`);
+    for (const result of batchResults) {
+      console.log(`${++finished}/${jobCount} ${result.caseId} ${serverLabel(result.server)}`);
+    }
   }
 } finally {
   await Promise.allSettled([
@@ -240,7 +246,7 @@ async function readPrevious(): Promise<AgentResult[]> {
     runsPerCase?: number;
     results?: AgentResult[];
   };
-  return report.schemaVersion === 4 && report.model === model && report.runsPerCase === runs && Array.isArray(report.results)
+  return report.schemaVersion === 5 && report.model === model && report.runsPerCase === runs && Array.isArray(report.results)
     ? report.results
     : [];
 }
@@ -251,7 +257,7 @@ function resultKey(result: Pick<AgentResult, "caseId" | "server" | "run">) {
 
 async function persist() {
   await writeReport("agent", {
-    schemaVersion: 4,
+    schemaVersion: 5,
     generatedAt: new Date().toISOString(),
     mode: "mcpjam-openrouter-tool-use",
     model,

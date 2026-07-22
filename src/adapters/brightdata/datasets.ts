@@ -392,7 +392,7 @@ async function finishDeepRequest(gateway: BrightDataGateway, id: string, context
       ? "ready"
       : value.status === "failed" ? "failed" : "pending",
     failed: () => new CapabilityError("upstream_job_failed", "Deep Lookup research failed."),
-    timeout: new CapabilityError("upstream_timeout", "Deep Lookup research timed out.", true, "Retrieve it later through a task-capable host."),
+    timeout: new CapabilityError("upstream_timeout", "Deep Lookup research timed out.", true, "Retry once with a narrower objective or smaller result limit."),
   });
 }
 
@@ -473,7 +473,7 @@ function invalidArguments(error: z.ZodError) {
     "invalid_dataset_arguments",
     z.prettifyError(error),
     false,
-    "Use the input contract returned by find_datasets or describe_dataset.",
+    "Use the operation and input schema returned by find_datasets.",
   );
 }
 

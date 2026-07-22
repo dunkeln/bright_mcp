@@ -2,7 +2,14 @@ import type { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { connect, safeError, serverLabel, type ServerId, writeReport } from "./mcp";
 
 const expectedTools: Record<ServerId, string[]> = {
-  bright: ["describe_dataset", "find_datasets", "run_dataset", "scrape", "search_web"],
+  bright: [
+    "extract_web",
+    "find_datasets",
+    "read_web",
+    "research_web",
+    "run_dataset",
+    "search_web",
+  ],
   upstream: [
     "ask_brightdata_assistant",
     "scrape_as_markdown",

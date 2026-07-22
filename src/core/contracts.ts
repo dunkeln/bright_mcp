@@ -95,15 +95,6 @@ export type DatasetResultBase = Omit<
   "profiles" | "rows" | "rowRefs" | "page" | "artifact"
 >;
 
-export type DatasetSummary = {
-  id: string;
-  title: string;
-  summary: string;
-  requiredInputs: string[];
-  operation?: DatasetOperation;
-  example?: JsonObject;
-};
-
 export type DatasetDefinition = {
   id: string;
   title: string;

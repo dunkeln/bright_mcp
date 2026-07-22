@@ -5,8 +5,8 @@
 Base-profile use cases require four logical ports:
 
 - Search: execute a canonical web-search request.
-- Scrape: execute an ordered batch of canonical scrape requests.
-- Dataset catalog: find and describe dataset capabilities.
+- Read: execute an ordered batch of canonical Markdown page requests.
+- Dataset catalog: find directly executable dataset capabilities.
 - Dataset runner: validate and execute one described `collect` or `search` operation.
 
 Ports MAY be structural types or documented function signatures. They MUST NOT
@@ -69,8 +69,9 @@ Supported small Marketplace lookups SHOULD use synchronous Search. Other
 Marketplace filters MUST use the asynchronous Filter snapshot path and MUST NOT
 silently inherit unsupported sort or cursor semantics.
 
-Deep Lookup MUST appear as a virtual dataset. Preview is the default; a full run
-requires explicit cost acknowledgement and a maximum-cost cap.
+Deep Lookup MUST back `extract_web` and `research_web` without appearing in
+dataset discovery. Preview is the default; a full run requires explicit cost
+acknowledgement and a maximum-cost cap.
 
 ## Error translation
 

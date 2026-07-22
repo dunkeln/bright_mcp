@@ -39,8 +39,8 @@ async function checkStdio() {
     const tools = await client.listTools();
     assert(
       tools.tools.map((tool) => tool.name).join(",") ===
-        "search_web,scrape,find_datasets,describe_dataset,run_dataset",
-      "The base profile must expose exactly its five routed tools.",
+        "search_web,read_web,extract_web,research_web,find_datasets,run_dataset",
+      "The base profile must expose exactly its six routed tools.",
     );
     assertToolAnnotations(tools.tools);
     const searchProperties = tools.tools.find(({ name }) => name === "search_web")
@@ -55,8 +55,8 @@ async function checkStdio() {
       "search_web exposed an execution-product mode instead of one search contract.",
     );
     assert(
-      runArguments?.anyOf?.length === 4,
-      "run_dataset did not advertise its four supported workflow argument shapes.",
+      runArguments?.anyOf?.length === 3,
+      "run_dataset did not advertise its three maintained-data argument shapes.",
     );
     const runDatasetMeta = tools.tools.find((tool) => tool.name === "run_dataset")
       ?._meta as
@@ -73,9 +73,10 @@ async function checkStdio() {
       "run_dataset did not advertise the versioned app resource consistently.",
     );
     await assertToolRejected(client, "search_web", { queries: [] });
-    await assertToolRejected(client, "scrape", { urls: ["file:///tmp/nope"] });
+    await assertToolRejected(client, "read_web", { urls: ["file:///tmp/nope"] });
+    await assertToolRejected(client, "extract_web", { urls: ["https://example.com/"] });
+    await assertToolRejected(client, "research_web", { query: "" });
     await assertToolRejected(client, "find_datasets", { query: "", limit: 0 });
-    await assertToolRejected(client, "describe_dataset", { datasetId: "" });
     await assertToolRejected(client, "run_dataset", {
       datasetId: "ecommerce-products",
       operation: "search",
@@ -88,55 +89,77 @@ async function checkStdio() {
     });
     assert(!searched.isError, "search_web failed.");
 
-    const scraped = await client.callTool({
-      name: "scrape",
+    const read = await client.callTool({
+      name: "read_web",
       arguments: {
         urls: ["https://example.com/one", "https://example.com/two"],
       },
     });
-    assert(!scraped.isError, "scrape failed.");
-    const scrapeResult = scraped.structuredContent as {
-      results?: Array<{ url?: string }>;
+    assert(!read.isError, "read_web failed.");
+    const readResult = read.structuredContent as {
+      results?: Array<{ url?: string; resourceUri?: string }>;
     };
     assert(
-      scrapeResult.results?.map((item) => item.url).join(",") ===
+      readResult.results?.map((item) => item.url).join(",") ===
         "https://example.com/one,https://example.com/two",
-      "scrape did not preserve input order.",
+      "read_web did not preserve input order.",
     );
+    const webPage = await client.readResource({
+      uri: readResult.results?.[0]?.resourceUri ?? "",
+    });
+    assert(webPage.contents[0]?.mimeType === "text/markdown", "read_web resource failed.");
 
-    await assertToolRejected(client, "scrape", {
+    await assertToolRejected(client, "read_web", {
       urls: ["https://example.com/"],
       format: "html",
     });
-    await assertToolRejected(client, "scrape", {
+    await assertToolRejected(client, "read_web", {
       urls: ["https://example.com/"],
       extraction: { instructions: "Return the page title." },
     });
 
     const privateTarget = await client.callTool({
-      name: "scrape",
+      name: "read_web",
       arguments: { urls: ["http://127.0.0.1/private"] },
     });
-    assert(privateTarget.isError, "scrape accepted a private-network URL.");
+    assert(privateTarget.isError, "read_web accepted a private-network URL.");
+
+    const extracted = await client.callTool({
+      name: "extract_web",
+      arguments: {
+        urls: ["https://example.com/"],
+        fields: [{ name: "title", description: "Page title" }],
+      },
+    });
+    assert(!extracted.isError, "extract_web failed.");
+
+    const researched = await client.callTool({
+      name: "research_web",
+      arguments: { query: "Compare public web data products", preview: true },
+    });
+    assert(!researched.isError, "research_web failed.");
 
     const found = await client.callTool({
       name: "find_datasets",
       arguments: { query: "e-commerce products" },
     });
     assert(!found.isError, "find_datasets failed.");
-
-    const described = await client.callTool({
-      name: "describe_dataset",
-      arguments: { datasetId: "ecommerce-products" },
-    });
-    assert(!described.isError, "describe_dataset failed.");
+    assert(
+      ((found.structuredContent as { datasets?: Array<{ operations?: unknown[] }> })
+        .datasets?.[0]?.operations?.length ?? 0) > 0,
+      "find_datasets omitted its directly executable contract.",
+    );
 
     const run = await client.callTool({
       name: "run_dataset",
       arguments: {
         datasetId: "ecommerce-products",
         operation: "search",
-        arguments: { query: "e", limit: 20 },
+        arguments: {
+          filter: { name: "category", operator: "=", value: "audio" },
+          limit: 20,
+          acknowledgeCost: true,
+        },
       },
     });
     assert(!run.isError, "run_dataset failed.");
@@ -222,8 +245,8 @@ async function checkBrowserProfile() {
     const tools = await client.listTools();
     assert(
       tools.tools.map((tool) => tool.name).join(",") ===
-        "search_web,scrape,find_datasets,describe_dataset,run_dataset,browser_navigate,browser_observe,browser_interact,browser_close",
-      "The browser profile must expose exactly nine tools.",
+        "search_web,read_web,extract_web,research_web,find_datasets,run_dataset,browser_navigate,browser_observe,browser_interact,browser_close",
+      "The browser profile must expose exactly ten tools.",
     );
     assertToolAnnotations(tools.tools);
     for (const name of ["browser_interact", "browser_close"]) {
@@ -362,7 +385,11 @@ async function checkTaskExecution() {
         arguments: {
           datasetId: "ecommerce-products",
           operation: "search",
-          arguments: { query: "e", limit: 5 },
+          arguments: {
+            filter: { name: "category", operator: "=", value: "audio" },
+            limit: 5,
+            acknowledgeCost: true,
+          },
         },
       },
       CallToolResultSchema,
@@ -411,7 +438,7 @@ async function checkHttp() {
     );
     try {
       const tools = await client.listTools();
-      assert(tools.tools.length === 9, "Bun HTTP did not expose the browser profile.");
+      assert(tools.tools.length === 10, "Bun HTTP did not expose the browser profile.");
       const navigation = await client.callTool({
         name: "browser_navigate",
         arguments: { destination: { kind: "url", url: "https://example.com/" } },

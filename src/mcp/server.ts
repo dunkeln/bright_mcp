@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { DatasetAdapter } from "../core/datasets";
 import type { ResultStore } from "../core/results";
-import type { WebAdapter } from "../core/web";
+import type { WebAdapter, WebContentStore } from "../core/web";
 import type { BrowserUseCases } from "../browser/use-cases";
 import { registerBrowserTools } from "./browser-tools";
 import { registerDatasetTools } from "./dataset-tools";
@@ -15,6 +15,7 @@ export function createBrightMcpServer(dependencies: {
   web: WebAdapter;
   browser?: BrowserUseCases;
   results: ResultStore;
+  webContent: WebContentStore;
   tasks?: CancellableTaskStore;
   widgetHtml: string;
   principalId: string;
@@ -27,7 +28,7 @@ export function createBrightMcpServer(dependencies: {
   const server = new McpServer(
     {
       name: "bright-mcp",
-      version: "0.1.0",
+      version: "0.2.0",
       icons: [dependencies.icon],
     },
     {
@@ -41,10 +42,15 @@ export function createBrightMcpServer(dependencies: {
           }
         : {}),
       instructions:
-        "Batch related web queries in one search_web call, then scrape only selected pages and read their Markdown to answer or extract fields. For maintained structured data, call find_datasets once, run direct candidates immediately, and use describe_dataset only when discovery omits an operation and example.",
+        "Choose tools by intent: search_web locates unknown pages; read_web retrieves exact known-page evidence; extract_web creates fields from known URLs; research_web investigates an objective; find_datasets discovers maintained structured capabilities; run_dataset executes one returned contract.",
     },
   );
-  registerWebTools(server, dependencies.web, dependencies.principalId);
+  registerWebTools(
+    server,
+    dependencies.web,
+    dependencies.webContent,
+    dependencies.principalId,
+  );
   registerDatasetTools(server, dependencies);
   if (dependencies.browser) {
     registerBrowserTools(server, dependencies.browser, dependencies.principalId);

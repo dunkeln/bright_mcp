@@ -1,4 +1,4 @@
-import type { SearchPort, ScrapePort } from "../core/web";
+import type { ReadPort, SearchPort } from "../core/web";
 
 const pages = [
   {
@@ -15,7 +15,7 @@ const pages = [
 
 export function createDemoWebAdapter(): {
   search: SearchPort;
-  scrape: ScrapePort;
+  read: ReadPort;
 } {
   return {
     search: {
@@ -30,8 +30,8 @@ export function createDemoWebAdapter(): {
         };
       },
     },
-    scrape: {
-      async scrape(input) {
+    read: {
+      async read(input) {
         return input.urls.map((url) => ({
           url,
           content: `# Demo page\n\nLocally generated preview for ${url}`,

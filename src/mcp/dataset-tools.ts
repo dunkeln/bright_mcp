@@ -19,7 +19,9 @@ import {
   jsonValueSchema,
   type RequestContext,
 } from "../core/contracts";
+import { isPublicHttpUrl } from "../core/public-url";
 import {
+  deepLookupInputSchema,
   datasetRunArgumentsSchema,
   datasetRunInputSchema,
 } from "../core/dataset-inputs";
@@ -37,15 +39,6 @@ const annotations = {
   openWorldHint: false,
 } as const;
 
-const summarySchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  summary: z.string(),
-  requiredInputs: z.array(z.string()),
-  operation: datasetOperationSchema.optional(),
-  example: z.record(z.string(), jsonValueSchema).optional(),
-});
-
 const definitionSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -60,10 +53,44 @@ const definitionSchema = z.object({
   ),
 });
 
+const extractionInputSchema = z.object({
+  urls: z.array(
+    z.url().max(500).refine(isPublicHttpUrl, "URL must be a public HTTP(S) URL."),
+  ).min(1).max(5),
+  fields: z.array(z.object({
+    name: z.string().regex(/^[A-Za-z][A-Za-z0-9_]{0,79}$/),
+    description: z.string().trim().min(1).max(300),
+  }).strict()).min(1).max(20),
+  preview: z.boolean().default(true),
+  acknowledgeCost: z.literal(true).optional(),
+  maxCostUsd: z.number().positive().max(10_000).optional(),
+}).strict().superRefine((input, context) => {
+  if (!input.preview && (input.acknowledgeCost !== true || input.maxCostUsd === undefined)) {
+    context.addIssue({
+      code: "custom",
+      message: "Full extraction requires acknowledgeCost=true and maxCostUsd.",
+    });
+  }
+  if (extractionQuery(input).length > 2_000) {
+    context.addIssue({
+      code: "custom",
+      message: "The combined URLs and field descriptions exceed the extraction objective limit.",
+    });
+  }
+});
+
+const appMeta = {
+  ui: { resourceUri: DATASET_WORKBENCH_URI, visibility: ["model", "app"] },
+  "ui/resourceUri": DATASET_WORKBENCH_URI,
+  "openai/outputTemplate": DATASET_WORKBENCH_URI,
+  "openai/toolInvocation/invoking": "Running dataset…",
+  "openai/toolInvocation/invoked": "Dataset workbench ready",
+} as const;
+
 const runDatasetConfig = {
   title: "Run dataset",
   description:
-    "Execute a structured-data capability selected through find_datasets and, when necessary, describe_dataset. Preserve the returned dataset identifier and operation exactly; choose the matching typed argument shape and use only fields from the candidate example or described schema. Use this tool for URL or keyword collection, filtered record retrieval, or research that produces a table—not for general web search or page reading. Paid operations require explicit cost acknowledgement. A successful call returns a bounded preview and a resource for additional rows; consume it instead of repeating the run.",
+    "Execute one maintained structured-data capability returned by find_datasets. Preserve its dataset identifier and operation exactly, and construct arguments from the returned schema and example. Use for purpose-built URL or keyword collectors and filtered Marketplace records—not for page reading, ad hoc fields, or open-ended research. Paid operations require explicit acknowledgement. A successful call returns a bounded preview and a resource for additional rows; consume that resource instead of repeating the run.",
   inputSchema: {
     datasetId: z.string().trim().min(1).max(120),
     operation: datasetOperationSchema,
@@ -76,13 +103,7 @@ const runDatasetConfig = {
     idempotentHint: false,
     openWorldHint: true,
   },
-  _meta: {
-    ui: { resourceUri: DATASET_WORKBENCH_URI, visibility: ["model", "app"] },
-    "ui/resourceUri": DATASET_WORKBENCH_URI,
-    "openai/outputTemplate": DATASET_WORKBENCH_URI,
-    "openai/toolInvocation/invoking": "Running dataset…",
-    "openai/toolInvocation/invoked": "Dataset workbench ready",
-  },
+  _meta: appMeta,
 } as const;
 
 type DatasetToolDependencies = {
@@ -98,16 +119,70 @@ export function registerDatasetTools(
   dependencies: DatasetToolDependencies,
 ) {
   server.registerTool(
+    "extract_web",
+    {
+      title: "Extract web fields",
+      description:
+        "Extract an ad hoc structured record from each known public URL. Supply the exact field names and meanings required in the result. Use this when the source URLs are already known and the desired schema is temporary; use read_web for exact page evidence, research_web when sources are not known, and run_dataset for a maintained extractor. Preview is the default. Full extraction is caller-funded and requires acknowledgeCost=true plus maxCostUsd.",
+      inputSchema: extractionInputSchema,
+      outputSchema: datasetResultSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+      _meta: appMeta,
+    },
+    async (input, extra) => {
+      return executeDeepLookup({
+        query: extractionQuery(input),
+        limit: input.urls.length,
+        preview: input.preview,
+        acknowledgeCost: input.acknowledgeCost,
+        maxCostUsd: input.maxCostUsd,
+      }, dependencies, requestContext(
+        dependencies.principalId,
+        extra.signal,
+        extra.authInfo,
+      ));
+    },
+  );
+
+  server.registerTool(
+    "research_web",
+    {
+      title: "Research web",
+      description:
+        "Turn an open-ended objective into a sourced structured table when the relevant pages are not known in advance. Use for multi-source comparison, entity discovery, or broad web research that should return records. Use search_web for compact source discovery, read_web for exact known-page evidence, and extract_web when URLs and fields are already known. Preview is the default. Full research is caller-funded and requires acknowledgeCost=true plus maxCostUsd.",
+      inputSchema: deepLookupInputSchema,
+      outputSchema: datasetResultSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: true,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+      _meta: appMeta,
+    },
+    async (input, extra) => executeDeepLookup(
+      input,
+      dependencies,
+      requestContext(dependencies.principalId, extra.signal, extra.authInfo),
+    ),
+  );
+
+  server.registerTool(
     "find_datasets",
     {
       title: "Find datasets",
       description:
-        "Discover executable structured-data capabilities for an objective involving records, entities, products, organizations, profiles, listings, or research tables. Search by the desired data and constraints—not by a guessed dataset identifier. Results may represent maintained Marketplace data, purpose-built collectors, or deep research. Call once and inspect each candidate's operation, required inputs, and example. If a candidate includes an operation and example, pass them directly to run_dataset; call describe_dataset only when those execution details are absent. Do not use this tool for ordinary web pages or isolated factual lookups.",
+        "Discover maintained structured-data capabilities for records, entities, products, organizations, profiles, or listings. Search by the desired data and constraints—not a guessed ID. Every candidate includes its executable operations, exact input schemas, limits, and examples; choose one and call run_dataset directly. Do not use for ordinary pages, ad hoc extraction, open-ended research, schedules, subscriptions, recurring deliveries, approvals, or exports.",
       inputSchema: {
         query: z.string().trim().min(1).max(500),
-        limit: z.number().int().min(1).max(10).default(5),
+        limit: z.number().int().min(1).max(5).default(3),
       },
-      outputSchema: { datasets: z.array(summarySchema) },
+      outputSchema: { datasets: z.array(definitionSchema) },
       annotations,
     },
     async ({ query, limit }, extra) =>
@@ -123,34 +198,8 @@ export function registerDatasetTools(
         return reply(
           structuredContent,
           structuredContent.datasets.length
-            ? `Found ${structuredContent.datasets.length} dataset candidate${structuredContent.datasets.length === 1 ? "" : "s"}. Run candidates that include an operation and example; describe only candidates that omit them.`
+            ? `Found ${structuredContent.datasets.length} executable dataset candidate${structuredContent.datasets.length === 1 ? "" : "s"}. Choose one returned operation and call run_dataset with arguments matching its schema.`
             : "No matching dataset capability was found. Try a broader task description.",
-        );
-      }),
-  );
-
-  server.registerTool(
-    "describe_dataset",
-    {
-      title: "Describe dataset",
-      description:
-        "Inspect the executable contract of one dataset candidate returned by find_datasets. Use only when discovery did not provide enough information to run the candidate safely. The result defines supported operations, exact argument schemas, limits, fields, and examples. Select one returned operation, construct arguments that conform to its schema, and then call run_dataset. This tool does not search for datasets, retrieve records, or execute work; do not call it repeatedly for an unchanged candidate.",
-      inputSchema: { datasetId: z.string().trim().min(1).max(120) },
-      outputSchema: definitionSchema,
-      annotations,
-    },
-    async ({ datasetId }, extra) =>
-      runTool(async () => {
-        const context = requestContext(
-          dependencies.principalId,
-          extra.signal,
-          extra.authInfo,
-        );
-        const structuredContent =
-          await dependencies.datasets.catalog.describe(datasetId, context);
-        return reply(
-          structuredContent,
-          `Loaded ${structuredContent.title} with ${structuredContent.operations.length} supported operation${structuredContent.operations.length === 1 ? "" : "s"}. Call run_dataset with this ID, one returned operation, and matching typed arguments.`,
         );
       }),
   );
@@ -330,36 +379,61 @@ function executeRunDataset(
         "invalid_dataset_arguments",
         `Invalid run_dataset input${issue?.path.length ? ` at ${issue.path.join(".")}` : ""}: ${issue?.message ?? "unsupported argument shape"}.`,
         false,
-        "Use the operation and matching typed argument shape returned by dataset discovery or description.",
+        "Use the operation and matching typed argument shape returned by find_datasets.",
       );
     }
     const structuredContent = await dependencies.datasets.runner.run(
       parsedInput.data,
       context,
     );
-    return {
-      structuredContent,
-      content: [
-        {
-          type: "text" as const,
-          text: `Dataset snapshot:\n${JSON.stringify({
-            dataset: structuredContent.dataset,
-            rowCount:
-              structuredContent.page.totalRows ?? structuredContent.rows.length,
-            fields: structuredContent.columns.map(({ key }) => key),
-            continuation: structuredContent.page.nextResourceUri ?? null,
-          })}`,
-        },
-        {
-          type: "resource_link" as const,
-          uri: structuredContent.artifact.uri,
-          name: `${structuredContent.dataset.title} result`,
-          description: "Completed canonical dataset result",
-          mimeType: structuredContent.artifact.mediaType,
-        },
-      ],
-    };
+    return datasetReply(structuredContent);
   }, onError);
+}
+
+function executeDeepLookup(
+  input: z.infer<typeof deepLookupInputSchema>,
+  dependencies: Pick<DatasetToolDependencies, "datasets">,
+  context: RequestContext,
+) {
+  return runTool(async () => datasetReply(await dependencies.datasets.runner.run({
+    datasetId: "deep-web-research",
+    operation: "search",
+    arguments: input,
+  }, context)));
+}
+
+function extractionQuery(input: {
+  urls: string[];
+  fields: Array<{ name: string; description: string }>;
+}) {
+  const fields = input.fields
+    .map(({ name, description }) => `${name}: ${description}`)
+    .join("\n");
+  return `Extract exactly one record per source URL. Use only these source URLs and include sourceUrl in every record.\nFields:\n${fields}\nSource URLs:\n${input.urls.join("\n")}`;
+}
+
+function datasetReply(structuredContent: z.infer<typeof datasetResultSchema>) {
+  return {
+    structuredContent,
+    content: [
+      {
+        type: "text" as const,
+        text: `Dataset snapshot:\n${JSON.stringify({
+          dataset: structuredContent.dataset,
+          rowCount: structuredContent.page.totalRows ?? structuredContent.rows.length,
+          fields: structuredContent.columns.map(({ key }) => key),
+          continuation: structuredContent.page.nextResourceUri ?? null,
+        })}`,
+      },
+      {
+        type: "resource_link" as const,
+        uri: structuredContent.artifact.uri,
+        name: `${structuredContent.dataset.title} result`,
+        description: "Completed canonical dataset result",
+        mimeType: structuredContent.artifact.mediaType,
+      },
+    ],
+  };
 }
 
 function taskTtl(requested: number | null | undefined) {

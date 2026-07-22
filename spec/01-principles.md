@@ -36,17 +36,13 @@ The words MUST, MUST NOT, SHOULD, and MAY are normative.
 ## Adaptive disclosure
 
 - Dataset selection MUST begin with discovery.
-- Discovery results MUST be concise enough to guide the next call and SHOULD
-  include a directly executable operation and example when the input is
-  unambiguous.
-- Description MUST expose the exact executable input contract.
-- Description MUST remain available for dynamic fields or ambiguous input, but
-  MUST NOT be compulsory ceremony for a self-contained discovery result.
+- Discovery results MUST include the directly executable operations, input
+  schemas, limits, and examples needed for the next call.
 - Execution MUST validate against that contract before calling upstream.
 
 ## Falsifiable constraints
 
-- The V1 base profile exposes exactly five model-visible tools.
+- The V1 base profile exposes exactly six model-visible intent tools.
 - The opt-in V1 browser profile adds exactly four browser tools and no other
   model-visible surface.
 - Resources, tasks, or app-only implementation helpers MUST NOT become

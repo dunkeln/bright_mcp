@@ -1,17 +1,16 @@
 import type {
   DatasetDefinition,
   DatasetResult,
-  DatasetSummary,
   RequestContext,
 } from "./contracts";
-import type { DatasetRunInput } from "./dataset-inputs";
+import type { DatasetExecutionInput } from "./dataset-inputs";
 
 export type DatasetCatalog = {
   find(
     query: string,
     limit: number,
     context: RequestContext,
-  ): Promise<DatasetSummary[]>;
+  ): Promise<DatasetDefinition[]>;
   describe(
     datasetId: string,
     context: RequestContext,
@@ -20,7 +19,7 @@ export type DatasetCatalog = {
 
 export type DatasetRunner = {
   run(
-    input: DatasetRunInput,
+    input: DatasetExecutionInput,
     context: RequestContext,
   ): Promise<DatasetResult>;
 };

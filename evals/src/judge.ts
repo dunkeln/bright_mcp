@@ -17,10 +17,12 @@ const apiKey = required("OPENROUTER_API_KEY");
 const judgeModel = required("OPENROUTER_JUDGE");
 const artifact = (await Bun.file(new URL("../.artifacts/agent.json", import.meta.url)).json()) as AgentReport;
 const judgeArtifact = Bun.file(new URL("../.artifacts/judge.json", import.meta.url));
-if (artifact.schemaVersion !== 4) throw new Error("Run the agent evaluation before judging it.");
+if (artifact.schemaVersion !== 5) throw new Error("Run the agent evaluation before judging it.");
 
 const expected = workflowCases.length * artifact.runsPerCase * 2;
 if (artifact.results.length !== expected) throw new Error(`Agent evaluation is incomplete (${artifact.results.length}/${expected}).`);
+const emptyResults = artifact.results.filter(({ response }) => !response.trim()).length;
+if (emptyResults) throw new Error(`Agent evaluation contains ${emptyResults} empty responses; resume the agent evaluation before judging it.`);
 
 const pairs = workflowCases.flatMap((useCase) =>
   Array.from({ length: artifact.runsPerCase }, (_, index) => {
@@ -70,7 +72,6 @@ function blind(pair: Pair, swap: boolean): BlindPair {
 async function judge(pairs: BlindPair[]): Promise<Judgment[]> {
   const body = {
     model: judgeModel,
-    temperature: 0,
     messages: [
       { role: "system", content: rubric },
       { role: "user", content: JSON.stringify(pairs.map(({ aServer: _a, bServer: _b, ...pair }) => pair)) },

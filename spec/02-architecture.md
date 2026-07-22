@@ -38,10 +38,12 @@ MUST NOT become core domain models.
 
 ### Core
 
-- Defines search, scrape, catalog discovery, dataset description, and dataset
-  execution use cases, plus browser session use cases when that profile is enabled.
-- Scrape returns ordered Markdown; ad hoc field extraction remains with the
-  calling agent and maintained structured extraction remains in dataset execution.
+- Defines source search, exact page reading, ad hoc extraction, open-ended
+  research, catalog discovery, and maintained dataset execution use cases, plus
+  browser session use cases when that profile is enabled.
+- Exact reading returns bounded Markdown previews plus complete transient
+  resources. Ad hoc extraction and research use Deep Lookup; maintained
+  structured extraction remains in dataset execution.
 - Owns canonical result and error contracts.
 - Depends only on injected ports.
 

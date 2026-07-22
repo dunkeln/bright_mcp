@@ -3,12 +3,10 @@ import { z } from "zod";
 import {
   CapabilityError,
   type DatasetDefinition,
-  type DatasetSummary,
   type JsonObject,
   type RequestContext,
 } from "../../core/contracts";
 import {
-  deepLookupInputSchema,
   keywordCollectionInputSchema,
   marketplaceInputSchema,
   urlCollectionInputSchema,
@@ -110,22 +108,19 @@ export function createBrightDataCatalog(gateway: BrightDataGateway): DatasetCata
       const available = await list(context);
       const marketplace = available.map((dataset) => ({
         score: rank(dataset.name, terms),
-        value: marketplaceSummary(dataset),
+        value: dataset,
       }));
-      const deep = {
-        score: rank("deep web research entities companies table sources", terms) +
-          (terms.some((term) => ["research", "find", "list", "table"].includes(term)) ? 2 : 0),
-        value: deepLookupSummary,
-      };
-      return [...marketplace, deep]
+      const selected = marketplace
         .filter(({ score }) => score > 0)
-        .sort((left, right) => right.score - left.score || left.value.title.localeCompare(right.value.title))
+        .sort((left, right) => right.score - left.score || left.value.name.localeCompare(right.value.name))
         .slice(0, limit)
         .map(({ value }) => value);
+      return Promise.all(selected.map(async (dataset) =>
+        marketplaceDefinition(dataset, await fields(dataset.id, context))
+      ));
     },
 
     async describe(datasetId, context) {
-      if (datasetId === deepLookupDefinition.id) return deepLookupDefinition;
       if (!datasetId.startsWith("marketplace:")) throw unknownDataset(datasetId);
       const upstreamId = datasetId.slice("marketplace:".length);
       const available = (await list(context)).find(({ id }) => id === upstreamId);
@@ -149,21 +144,6 @@ function collectorOperation(collector: NonNullable<ReturnType<typeof collectorFo
   };
 }
 
-function marketplaceSummary(dataset: z.infer<typeof datasetListSchema>[number]): DatasetSummary {
-  const collector = collectorFor(dataset.id);
-  const operation = collector && collectorOperation(collector);
-  return {
-    id: `marketplace:${dataset.id}`,
-    title: dataset.name,
-    summary: `${collector ? "Collect fresh structured records or search" : "Search"} ${dataset.size?.toLocaleString() ?? "available"} maintained marketplace records.`,
-    requiredInputs: collector
-      ? [collector.kind === "urls" ? "urls" : "query", "acknowledgeCost"]
-      : ["filter", "acknowledgeCost"],
-    operation: operation?.kind,
-    example: operation?.examples[0],
-  };
-}
-
 function marketplaceDefinition(
   dataset: z.infer<typeof datasetListSchema>[number],
   metadata: z.infer<typeof metadataSchema>,
@@ -171,12 +151,12 @@ function marketplaceDefinition(
   const collector = collectorFor(dataset.id);
   const visibleFields = Object.entries(metadata.fields)
     .filter(([, field]) => field.active !== false)
-    .slice(0, 100)
+    .slice(0, 30)
     .map(([name, field]) => `${name} (${field.type ?? "unknown"})${field.description ? `: ${field.description}` : ""}`);
   return {
     id: `marketplace:${dataset.id}`,
     title: dataset.name,
-    description: `Search maintained Bright Data marketplace records. Available fields:\n${visibleFields.join("\n")}`,
+    description: `${collector ? "Collect fresh records or search" : "Search"} ${dataset.size?.toLocaleString() ?? "available"} maintained Bright Data Marketplace records. Available fields:\n${visibleFields.join("\n")}`,
     operations: [...(collector ? [collectorOperation(collector)] : []), {
       kind: "search",
       inputSchema: z.toJSONSchema(marketplaceInputSchema, { target: "draft-7" }) as JsonObject,
@@ -194,30 +174,6 @@ function marketplaceDefinition(
     }],
   };
 }
-
-const deepLookupDefinition: DatasetDefinition = {
-  id: "deep-web-research",
-  title: "Deep web research",
-  description: "Turn a natural-language research objective into a sourced structured table.",
-  operations: [{
-    kind: "search",
-    inputSchema: z.toJSONSchema(deepLookupInputSchema, { target: "draft-7" }) as JsonObject,
-    limits: [
-      "Preview is the default and does not launch a full paid run.",
-      "Full runs require acknowledgeCost=true and a maxCostUsd at least as large as the computed worst-case cost.",
-    ],
-    examples: [{ query: "AI infrastructure companies founded after 2022", limit: 10, preview: true }],
-  }],
-};
-
-const deepLookupSummary: DatasetSummary = {
-  id: deepLookupDefinition.id,
-  title: deepLookupDefinition.title,
-  summary: deepLookupDefinition.description,
-  operation: "search",
-  requiredInputs: ["query"],
-  example: deepLookupDefinition.operations[0]?.examples?.[0],
-};
 
 function rank(text: string, terms: string[]) {
   const haystack = text.toLowerCase();

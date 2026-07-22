@@ -22,14 +22,14 @@ capability, not endpoint inventory.
 | Reference capability | V1 disposition |
 |---|---|
 | Search, batch search, engines, pagination | `search_web` |
-| Multi-source public-web research | batched `search_web` composed with selected `scrape` calls |
-| Markdown scrape and batch scrape | `scrape` |
+| Multi-source public-web research | `research_web` |
+| Markdown scrape and batch scrape | `read_web` plus complete-page resources |
 | Raw HTML scrape | excluded; the base tool returns one agent-readable format |
-| Ad hoc field extraction | `scrape` composed with the calling agent |
+| Ad hoc field extraction | `extract_web` |
 | Managed structured extraction | dataset discovery and `run_dataset` |
-| Web Data collectors | dataset discovery, description, `run_dataset: collect` |
-| Dataset fields and filtered record search | description, `run_dataset: search` |
-| Deep Lookup question-to-table research | virtual dataset through discovery and `run_dataset: search` |
+| Web Data collectors | dataset discovery and `run_dataset: collect` |
+| Dataset fields and filtered record search | discovery and `run_dataset: search` |
+| Deep Lookup question-to-table research | `research_web` |
 | Trigger, poll, status, cancellation | adapter plus optional MCP task |
 | Result paging and complete artifacts | MCP resources |
 | Dataset result tables | optional table MCP app |

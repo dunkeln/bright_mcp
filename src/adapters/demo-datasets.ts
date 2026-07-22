@@ -3,11 +3,11 @@ import {
   CapabilityError,
   type DatasetDefinition,
   type DatasetResultBase,
-  type DatasetSummary,
 } from "../core/contracts";
 import type { DatasetCatalog, DatasetRunner } from "../core/datasets";
 import {
   deepLookupInputSchema,
+  marketplaceInputSchema,
   urlCollectionInputSchema,
 } from "../core/dataset-inputs";
 import type { ResultStore } from "../core/results";
@@ -29,9 +29,13 @@ const definition: DatasetDefinition = {
     },
     {
       kind: "search",
-      inputSchema: z.toJSONSchema(deepLookupInputSchema, { target: "draft-7" }),
+      inputSchema: z.toJSONSchema(marketplaceInputSchema, { target: "draft-7" }),
       limits: ["Returns at most 20 rows in this demo dataset."],
-      examples: [{ query: "wireless audio", limit: 8, preview: true }],
+      examples: [{
+        filter: { name: "category", operator: "=", value: "audio" },
+        limit: 8,
+        acknowledgeCost: true,
+      }],
     },
   ],
 };
@@ -63,22 +67,13 @@ export function createDemoDatasetAdapter(resultStore: ResultStore): {
   catalog: DatasetCatalog;
   runner: DatasetRunner;
 } {
-  const summary: DatasetSummary = {
-    id: definition.id,
-    title: definition.title,
-    summary: definition.description,
-    requiredInputs: ["query"],
-    operation: "search",
-    example: { query: "wireless audio", limit: 8, preview: true },
-  };
-
   return {
     catalog: {
       async find(query, limit) {
         const terms = query.toLowerCase().split(/\s+/);
-        const searchable = `${summary.title} ${summary.summary}`.toLowerCase();
+        const searchable = `${definition.title} ${definition.description}`.toLowerCase();
         return terms.some((term) => searchable.includes(term))
-          ? [summary].slice(0, limit)
+          ? [definition].slice(0, limit)
           : [];
       },
       async describe(datasetId) {
@@ -90,11 +85,26 @@ export function createDemoDatasetAdapter(resultStore: ResultStore): {
     },
     runner: {
       async run(input, context) {
+        if (input.datasetId === "deep-web-research") {
+          const request = parseInput(deepLookupInputSchema, input.arguments);
+          const result: DatasetResultBase = {
+            schemaVersion: 1,
+            resultId: `result_${crypto.randomUUID()}`,
+            dataset: { id: input.datasetId, title: "Deep web research" },
+            operation: "search",
+            columns: [
+              { key: "finding", label: "Finding", type: "string" },
+              { key: "sourceUrl", label: "Source URL", type: "string" },
+            ],
+          };
+          const sourceUrl = request.query.match(/https?:\/\/[^\s,]+/)?.[0] ?? "https://example.com/";
+          return resultStore.save(result, [{ finding: request.query, sourceUrl }], context);
+        }
         if (input.datasetId !== definition.id) {
           throw unknownDataset(input.datasetId);
         }
         const matches = input.operation === "search"
-          ? searchRows(parseInput(deepLookupInputSchema, input.arguments))
+          ? rows.slice(0, parseInput(marketplaceInputSchema, input.arguments).limit)
           : collectRows(parseInput(urlCollectionInputSchema, input.arguments));
 
         const base: DatasetResultBase = {
@@ -117,16 +127,6 @@ export function createDemoDatasetAdapter(resultStore: ResultStore): {
   };
 }
 
-function searchRows(input: z.infer<typeof deepLookupInputSchema>) {
-  const query = input.query.toLowerCase();
-  return rows
-    .filter(
-      (row) =>
-        `${row.title} ${row.category}`.toLowerCase().includes(query),
-    )
-    .slice(0, input.limit);
-}
-
 function collectRows(input: z.infer<typeof urlCollectionInputSchema>) {
   const byId = new Map(rows.map((row) => [row.productId, row]));
   return input.urls.flatMap((url) => {
@@ -143,7 +143,7 @@ function parseInput<T>(schema: z.ZodType<T>, input: unknown): T {
       "invalid_dataset_arguments",
       z.prettifyError(parsed.error),
       false,
-      "Call describe_dataset and match the returned input schema.",
+      "Use the operation and input schema returned by find_datasets.",
     );
   }
   return parsed.data;

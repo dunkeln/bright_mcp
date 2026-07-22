@@ -36,10 +36,9 @@ export type ItemFailure = {
   nextAction?: string;
 };
 
-export type ScrapeItem = {
+export type ReadItem = {
   url: string;
   content?: string;
-  truncated?: boolean;
   error?: ItemFailure;
 };
 
@@ -47,14 +46,23 @@ export type SearchPort = {
   search(input: SearchRequest, context: RequestContext): Promise<SearchResponse>;
 };
 
-export type ScrapePort = {
-  scrape(
+export type ReadPort = {
+  read(
     input: { urls: string[] },
     context: RequestContext,
-  ): Promise<ScrapeItem[]>;
+  ): Promise<ReadItem[]>;
+};
+
+export type WebContentStore = {
+  save(
+    url: string,
+    content: string,
+    context: RequestContext,
+  ): { content: string; resourceUri: string; truncated: boolean };
+  read(token: string, context: RequestContext): { url: string; content: string };
 };
 
 export type WebAdapter = {
   search: SearchPort;
-  scrape: ScrapePort;
+  read: ReadPort;
 };

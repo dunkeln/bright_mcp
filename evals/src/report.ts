@@ -107,7 +107,7 @@ type JudgeReport = {
 };
 function validate(value: Report) {
   if (
-    value.schemaVersion !== 4 ||
+    value.schemaVersion !== 5 ||
     !value.model ||
     !Number.isInteger(value.runsPerCase) ||
     !Array.isArray(value.results)

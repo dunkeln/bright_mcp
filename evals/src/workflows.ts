@@ -23,7 +23,7 @@ export const workflowCases = [
     prompt:
       'Read https://example.com and https://www.iana.org/help/example-domains in that order. Return a JSON array only; each item must have "url", "title", and "summary".',
     toolPath: {
-      bright: [["scrape"]],
+      bright: [["read_web"]],
       upstream: [["scrape_batch", "scrape_as_markdown"]],
     } satisfies ToolPath,
     requiredKeys: ["url", "title", "summary"],
@@ -36,7 +36,7 @@ export const workflowCases = [
     prompt:
       'Read https://www.npmjs.com/package/express and extract one record. Return JSON only with keys "name", "version", "license", and "sourceUrl".',
     toolPath: {
-      bright: [["scrape"]],
+      bright: [["extract_web"]],
       upstream: [["scrape_as_markdown"]],
     } satisfies ToolPath,
     requiredKeys: ["name", "version", "license", "sourceUrl"],
@@ -49,7 +49,7 @@ export const workflowCases = [
     prompt:
       'Read https://pypi.org/project/langchain-brightdata/ and extract one record. Return JSON only with keys "name", "version", "summary", and "sourceUrl".',
     toolPath: {
-      bright: [["scrape"]],
+      bright: [["extract_web"]],
       upstream: [["scrape_as_markdown"]],
     } satisfies ToolPath,
     requiredKeys: ["name", "version", "summary", "sourceUrl"],
@@ -62,10 +62,9 @@ export const workflowCases = [
     prompt:
       'Research three highly rated ramen restaurants in Tokyo using at least two sources, and open the relevant pages before answering. Return a JSON array only; each item must have "restaurant", "rating", "area", and "sourceUrl".',
     toolPath: {
-      bright: [["search_web"]],
+      bright: [["research_web"]],
       upstream: [["search_engine"], ["scrape_as_markdown", "scrape_batch"]],
     } satisfies ToolPath,
-    requiresOpenedSources: true,
     requiredKeys: ["restaurant", "rating", "area", "sourceUrl"],
     minimumUrls: 2,
   },
@@ -76,10 +75,9 @@ export const workflowCases = [
     prompt:
       'Research this week\'s major movie releases and today\'s leading topic on X using at least three sources, and open the relevant pages before answering. Return a JSON array only; each item must have "topic", "finding", "asOf", and "sourceUrl".',
     toolPath: {
-      bright: [["search_web"]],
+      bright: [["research_web"]],
       upstream: [["search_engine"], ["scrape_as_markdown", "scrape_batch"]],
     } satisfies ToolPath,
-    requiresOpenedSources: true,
     requiredKeys: ["topic", "finding", "asOf", "sourceUrl"],
     minimumUrls: 3,
   },

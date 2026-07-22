@@ -15,10 +15,10 @@
       "id": "web-scrape",
       "referenceCapability": "Markdown and ordered batch scrape",
       "disposition": "composed",
-      "routes": ["tool:scrape"],
+      "routes": ["tool:read_web", "resource:brightdata://web/{token}"],
       "verification": {
         "gate": "bun run check:compat",
-        "scenario": "Scrape two URLs to Markdown and verify input ordering, rejection of obsolete modes, and private-network rejection."
+        "scenario": "Read two URLs as ordered Markdown and verify complete-page resources, rejection of obsolete modes, and private-network rejection."
       }
     },
     {
@@ -28,56 +28,56 @@
       "routes": [],
       "verification": {
         "gate": "bun run check:compat && bun run check:coverage",
-        "scenario": "Reject format modes so scrape has one deterministic result contract."
+        "scenario": "Reject format modes so read_web has one deterministic result contract."
       },
       "exclusionReason": "Raw markup adds a second result mode to the common agent-reading path without improving its web-data outcome.",
-      "userConsequence": "The base scrape tool returns readable Markdown rather than exact page markup."
+      "userConsequence": "The base read tool returns readable Markdown rather than exact page markup."
     },
     {
       "id": "multi-source-web-research",
       "referenceCapability": "Multi-source public-web research",
       "disposition": "composed",
-      "routes": ["tool:search_web", "tool:scrape"],
+      "routes": ["tool:research_web"],
       "verification": {
         "gate": "bun run check:adapters && bun run check:compat",
-        "scenario": "Batch related compact searches, retain ordered results, then scrape only selected pages."
+        "scenario": "Run one sourced Deep Lookup research objective with preview and explicit full-run cost gates."
       }
     },
     {
       "id": "structured-extraction",
       "referenceCapability": "Ad hoc field extraction from a known page",
       "disposition": "composed",
-      "routes": ["tool:scrape", "client:agent-extraction"],
+      "routes": ["tool:extract_web"],
       "verification": {
         "gate": "bun run check:compat && bun run evals",
-        "scenario": "Fetch Markdown once and let the calling agent return the requested fields; use run_dataset when a managed structured extractor exists."
+        "scenario": "Extract named fields from known URLs through the structured Deep Lookup backend; use run_dataset when a maintained extractor exists."
       }
     },
     {
       "id": "dataset-collection",
       "referenceCapability": "Web Data collectors",
       "disposition": "composed",
-      "routes": ["tool:find_datasets", "tool:describe_dataset", "tool:run_dataset#collect"],
+      "routes": ["tool:find_datasets", "tool:run_dataset#collect"],
       "verification": {
         "gate": "bun run check:compat",
-        "scenario": "Discover and describe the representative dataset, then collect known records in requested order."
+        "scenario": "Discover the representative executable contract, then collect known records in requested order."
       }
     },
     {
       "id": "dataset-record-search",
       "referenceCapability": "Dataset fields and filtered record search",
       "disposition": "composed",
-      "routes": ["tool:describe_dataset", "tool:run_dataset#search"],
+      "routes": ["tool:find_datasets", "tool:run_dataset#search"],
       "verification": {
         "gate": "bun run check:compat",
-        "scenario": "Describe the typed search schema and execute a filtered canonical result."
+        "scenario": "Discover the typed search schema and execute a filtered canonical result."
       }
     },
     {
       "id": "account-dataset-catalog",
       "referenceCapability": "Caller-scoped Marketplace catalog and field metadata",
       "disposition": "internalized",
-      "routes": ["tool:find_datasets", "tool:describe_dataset", "adapter:account-catalog"],
+      "routes": ["tool:find_datasets", "adapter:account-catalog"],
       "verification": {
         "gate": "bun run check:adapters",
         "scenario": "Search the caller's live dataset list, fetch active field metadata, merge known collection schemas into the same dataset IDs, and route record search through synchronous or filtered snapshot paths."
@@ -87,7 +87,7 @@
       "id": "deep-lookup-research",
       "referenceCapability": "Natural-language objective to sourced structured table",
       "disposition": "composed",
-      "routes": ["tool:find_datasets", "tool:run_dataset#search"],
+      "routes": ["tool:research_web"],
       "verification": {
         "gate": "bun run check:adapters",
         "scenario": "Return a Deep Lookup preview by default, reject a full run below its computed cost cap before triggering, then complete an acknowledged full run."
@@ -149,7 +149,7 @@
       "routes": ["profile:base", "profile:browser"],
       "verification": {
         "gate": "bun run check:compat",
-        "scenario": "List exactly five tools in the base profile and exactly nine in the opt-in browser profile."
+        "scenario": "List exactly six tools in the base profile and exactly ten in the opt-in browser profile."
       }
     },
     {

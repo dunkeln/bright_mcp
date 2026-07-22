@@ -4,10 +4,10 @@
   <i>unofficial iteration on BrightData API served as MCP</i>
 </div>
 
-Agent-oriented Bright Data capabilities over MCP, built on Bun. The five-tool
-base profile batches compact web search and Markdown reading,
-searches the caller's live dataset catalog, runs curated collectors and Deep
-Lookup, pages upstream snapshots as resources, and renders results in a
+Agent-oriented Bright Data capabilities over MCP, built on Bun. The six-tool
+base profile separates search, exact reading, extraction, research, maintained
+dataset discovery, and execution. It pages complete pages and upstream snapshots
+as resources and renders structured results in a
 transient React MCP workbench.
 
 ## Install
@@ -37,23 +37,16 @@ hosted authorization.
 ## Benchmarks
 
 <!-- benchmark:start -->
-![Paired horizontal bars comparing MCP completion by workflow](./assets/benchmark-completion.png)
-![Radar chart comparing MCP capability fingerprints across workflows](./assets/benchmark-radar.png)
-![Paired horizontal bars comparing benchmark passes per token budget](./assets/benchmark-efficiency.png)
-![Cumulative latency distribution across all benchmark runs](./assets/benchmark-latency.png)
-![Paired horizontal bars comparing average tool calls by workflow](./assets/benchmark-complexity.png)
-
-Bright MCP: 60% pass · 7626 tokens · 6.4s p50. BrightData MCP: 65% · 16120 tokens · 7.3s p50.
-[Method and tables](./evals/README.md#latest-tool-use-benchmark) · `openrouter/anthropic/claude-haiku-4.5` · 10 runs/case · 2026-07-21.
+> Benchmark refresh pending for the six-tool intent surface.
 <!-- benchmark:end -->
 
 | Dimension | BrightData MCP | Bright MCP |
 |---|---:|---:|
-| Model-visible tools | 60+ maximum | 5 base / 9 browser |
+| Model-visible tools | 60+ maximum | 6 base / 10 browser |
 | Browser tools | 14 | 4 |
-| Dataset tools | One per dataset | 3 composable tools |
+| Dataset tools | One per dataset | Discovery + execution |
 | Dataset catalog | Tool inventory grows with products | Caller-scoped catalog behind discovery |
-| Research | Search then agent-managed scraping | Batched compact search and ordered Markdown reading |
+| Research | Search then agent-managed scraping | Dedicated sourced research with cost gates |
 | Large results | Returned through tool calls | Lazy, principal-bound snapshot resources |
 | Runtime/toolchain | Node + npm + Vite | Bun-native |
 | Production dependencies | 7 plus UI dependencies | Roughly 6–8, profile-dependent |

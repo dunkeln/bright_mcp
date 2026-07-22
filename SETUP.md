@@ -62,9 +62,9 @@ Never commit a populated environment file. Credentials and zone names are read
 only by the composition root and never enter tool inputs or results.
 
 `search_web` uses caller-funded SERP. Dataset collection, Marketplace search/
-filter, and full Deep Lookup runs are paid on the caller's account and
-require acknowledgement in their typed inputs; Deep Lookup also requires a
-pre-trigger maximum-cost cap. Preview remains its default.
+filter, and full `extract_web` or `research_web` runs are paid on the caller's account and
+require acknowledgement in their typed inputs; full extraction and research
+also require a pre-trigger maximum-cost cap. Preview remains their default.
 
 ## Browser profile
 

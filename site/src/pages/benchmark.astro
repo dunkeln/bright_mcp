@@ -1,0 +1,39 @@
+---
+import SiteHeader from "../components/SiteHeader.astro";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <meta name="description" content="Bright MCP benchmarks." />
+    <title>Benchmarks · Bright MCP</title>
+  </head>
+  <body>
+    <SiteHeader />
+    <main class="benchmark-grid" aria-label="Benchmarks">
+      <!-- Add benchmark content here. -->
+      <h1>MCPJam benchmarks</h1>
+    </main>
+  </body>
+</html>
+
+<style>
+  :global(*) { box-sizing: border-box; }
+  :global(body) {
+    background: #141414;
+    color: #f2f2f2;
+    font-family: Inter, Arial, sans-serif;
+    margin: 0;
+  }
+  .benchmark-grid {
+    background-image: radial-gradient(#ffffff0c 1px, transparent 1px);
+    background-size: 16px 16px;
+    border-inline: 1px solid #ffffff17;
+    margin-inline: auto;
+    max-width: 1280px;
+    min-height: calc(100vh - 65px);
+    padding: clamp(32px, 5vw, 64px) clamp(20px, 4vw, 48px);
+  }
+</style>

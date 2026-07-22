@@ -6,8 +6,10 @@ if (mode !== "--write" && mode !== "--check") throw new Error("Use --write or --
 const projectRoot = new URL("../../", import.meta.url);
 const rootReadme = new URL("README.md", projectRoot);
 const evalReadme = new URL("evals/README.md", projectRoot);
-const report = (await Bun.file(new URL("../.artifacts/agent.json", import.meta.url)).json()) as Report;
-const judge = (await Bun.file(new URL("../.artifacts/judge.json", import.meta.url)).json()) as JudgeReport;
+const publishedResult = new URL("../results/published-benchmark.json", import.meta.url);
+const { report, judge } = mode === "--write"
+  ? await publishResult()
+  : await readPublishedResult();
 validate(report);
 validateJudge(judge, report);
 const activeCaseIds = new Set<string>(workflowCases.map(({ id }) => id));
@@ -41,32 +43,43 @@ const complete = allSummaries.every(
 const publishable = complete && report.runsPerCase >= 10 && judge.sideAgreement >= 0.75;
 const rootBlock = publishable
   ? [
+      "Bright MCP uses `@mcpjam/sdk` to run real-world agent workflows against its",
+      "published MCP endpoints. The suite checks task completion, tool selection,",
+      "valid arguments, provenance, latency, tool calls, token use, and answer quality.",
+      "",
       "![Paired horizontal bars comparing MCP completion by workflow](./assets/benchmark-completion.png)",
       "",
-      "*Both MCPs completed 29 of 30 workflows; the meaningful separation begins after completion, in the quality and efficiency of the answer.*",
+      `*Bright MCP completed ${passCount(activeResults, "bright")} of ${runCount(activeResults, "bright")} workflows; Bright Data MCP completed ${passCount(activeResults, "upstream")} of ${runCount(activeResults, "upstream")}.*`,
       "",
       "![Radar chart comparing blind answer-quality dimensions](./assets/benchmark-radar.png)",
       "",
-      "*Bright leads every blind-scored quality dimension, with its clearest gains in fulfillment, grounding, source quality, and actionability.*",
+      "*Blind scoring compares task fulfillment, grounding, information density, source quality, and actionability.*",
       "",
       "![Horizontal bars comparing blind pairwise preference](./assets/benchmark-preference.png)",
       "",
-      "*The blind judge preferred Bright 17 times versus 3 for BrightData, while preserving 10 genuine ties.*",
+      `*The blind judge preferred Bright MCP ${judgeWins.bright} times versus ${judgeWins.upstream} for Bright Data MCP, with ${judgeWins.ties} ties.*`,
       "",
       "![Paired horizontal bars comparing judged answer quality per token budget](./assets/benchmark-quality-cost.png)",
       "",
-      "*Structured Marketplace work is where Bright's richer answers most clearly repay their token budget; simpler web tasks remain the efficiency target.*",
+      "*Quality per token shows where richer answers repay their context cost.*",
       "",
       "![Paired horizontal bars comparing benchmark passes per token budget](./assets/benchmark-efficiency.png)",
       "",
-      "*Bright converts tokens into successful Marketplace execution efficiently, while the web workflows show where tighter routing can recover more value.*",
+      "*Passing runs per token compares workflow completion against total model context used.*",
       "",
       "![Paired horizontal bars comparing average tool calls by workflow](./assets/benchmark-complexity.png)",
       "",
-      "*Bright batches known-page reading into one call and makes Marketplace discovery explicit; historical search follow-ups expose the routing behavior now being tightened.*",
+      "*Average tool calls show the agent path each workflow required.*",
       "",
-      `At the same ${percent(overall.bright.passRate)} completion rate, Bright MCP delivered ${quality(judge, undefined, "bright").toFixed(2)}/5 judged quality versus ${quality(judge, undefined, "upstream").toFixed(2)}/5, used slightly fewer tokens, and won the blind preference ${judgeWins.bright}–${judgeWins.upstream} with ${judgeWins.ties} ties.`,
-      `[Method and tables](./evals/README.md#full-tool-use-benchmark-pre-routing-baseline) · current-entitlements Acquire + Operate profile · \`${report.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}.`,
+      `In the comparative baseline, Bright MCP completed ${passCount(activeResults, "bright")} of ${runCount(activeResults, "bright")} workflows; Bright Data MCP completed ${passCount(activeResults, "upstream")} of ${runCount(activeResults, "upstream")}.`,
+      `Bright MCP scored ${quality(judge, undefined, "bright").toFixed(2)}/5 versus ${quality(judge, undefined, "upstream").toFixed(2)}/5 in blind answer-quality grading and was`,
+      `preferred in ${judgeWins.bright} runs versus ${judgeWins.upstream}, with ${judgeWins.ties} ties.`,
+      "",
+      "This study predates the current profile routing and retry changes. Its quality",
+      "results remain useful, while its latency, call-count, and token measurements",
+      "should be treated as a historical baseline.",
+      "",
+      "[Method, scenarios, and full results](./evals/README.md#full-tool-use-benchmark-pre-routing-baseline)",
     ].join("\n")
   : "> Benchmark publication requires a complete 10-run comparison and at least 75% judge label-swap agreement.";
 const evalBlock = [
@@ -75,7 +88,7 @@ const evalBlock = [
   "",
   "Extract and Research are excluded because general Deep Lookup is unavailable for the benchmark account.",
   "Recurring delivery is excluded because durable scheduling is still a WIP capability.",
-  `Across 30 matched runs, both MCPs completed ${Math.round(overall.bright.passRate * activeResults.filter(({ server }) => server === "bright").length)} workflows. Bright scored ${quality(judge, undefined, "bright").toFixed(2)}/5 versus ${quality(judge, undefined, "upstream").toFixed(2)}/5 and won blind preference ${judgeWins.bright}–${judgeWins.upstream}, with ${judgeWins.ties} ties.`,
+  `Across ${runCount(activeResults, "bright")} matched runs, Bright completed ${passCount(activeResults, "bright")} workflows and Bright Data completed ${passCount(activeResults, "upstream")}. Bright scored ${quality(judge, undefined, "bright").toFixed(2)}/5 versus ${quality(judge, undefined, "upstream").toFixed(2)}/5 and won blind preference ${judgeWins.bright}–${judgeWins.upstream}, with ${judgeWins.ties} ties.`,
   "This full study predates the narrow-profile routing, summary-sufficiency, and retry-ownership fixes. Its quality judgments remain useful; its Current search latency, token, and call-count row is a pre-fix baseline, not a measurement of the current implementation.",
   ...(regradedLabels.length
     ? [`${regradedLabels.join(", ")} deterministic results were regraded from stored outputs; agent and judge calls were not rerun.`]
@@ -121,6 +134,7 @@ if (mode === "--write") {
 type Result = {
   caseId: string;
   server: "bright" | "upstream";
+  run: number;
   passed: boolean;
   recovered: boolean;
   toolsCalled: string[];
@@ -141,13 +155,73 @@ type Report = {
 type Scores = Record<"taskFulfillment" | "evidenceGrounding" | "informationDensity" | "sourceQuality" | "actionability", number>;
 type JudgeReport = {
   schemaVersion: number;
+  generatedAt: string;
   model: string;
   agentModel: string;
   agentGeneratedAt: string;
   runsPerCase: number;
   sideAgreement: number;
+  rubric: Array<keyof Scores>;
   judgments: Array<{ pairId: string; scores: Record<"bright" | "upstream", Scores>; winner: "bright" | "upstream" | "tie" }>;
 };
+
+type PublishedResult = {
+  schemaVersion: 1;
+  report: Report;
+  judge: JudgeReport;
+};
+
+async function publishResult(): Promise<PublishedResult> {
+  const rawReport = (await Bun.file(new URL("../.artifacts/agent.json", import.meta.url)).json()) as Report;
+  const rawJudge = (await Bun.file(new URL("../.artifacts/judge.json", import.meta.url)).json()) as JudgeReport;
+  validate(rawReport);
+  validateJudge(rawJudge, rawReport);
+  const value: PublishedResult = {
+    schemaVersion: 1,
+    report: {
+      ...rawReport,
+      results: rawReport.results.map((result) => ({
+        caseId: result.caseId,
+        server: result.server,
+        run: result.run,
+        passed: result.passed,
+        recovered: result.recovered,
+        toolsCalled: result.toolsCalled,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+        tokenCount: result.tokenCount,
+        latencyMs: result.latencyMs,
+      })).toSorted((left, right) =>
+        left.caseId.localeCompare(right.caseId) ||
+        left.server.localeCompare(right.server) ||
+        left.run - right.run
+      ),
+    },
+    judge: {
+      schemaVersion: rawJudge.schemaVersion,
+      generatedAt: rawJudge.generatedAt,
+      model: rawJudge.model,
+      agentModel: rawJudge.agentModel,
+      agentGeneratedAt: rawJudge.agentGeneratedAt,
+      runsPerCase: rawJudge.runsPerCase,
+      sideAgreement: rawJudge.sideAgreement,
+      rubric: rawJudge.rubric,
+      judgments: rawJudge.judgments.map(({ pairId, scores, winner }) => ({
+        pairId,
+        scores,
+        winner,
+      })).toSorted((left, right) => left.pairId.localeCompare(right.pairId)),
+    },
+  };
+  await Bun.write(publishedResult, `${JSON.stringify(value, null, 2)}\n`);
+  return value;
+}
+
+async function readPublishedResult(): Promise<PublishedResult> {
+  const value = await Bun.file(publishedResult).json() as PublishedResult;
+  if (value.schemaVersion !== 1) throw new Error("Invalid published benchmark result.");
+  return value;
+}
 function validate(value: Report) {
   if (
     value.schemaVersion !== 7 ||
@@ -191,6 +265,14 @@ function summarize(results: Result[]) {
     averageTokens: average(results.map(({ tokenCount }) => tokenCount)),
     medianLatency: median(results.map(({ latencyMs }) => latencyMs)),
   };
+}
+
+function passCount(results: Result[], server: Result["server"]) {
+  return results.filter((result) => result.server === server && result.passed).length;
+}
+
+function runCount(results: Result[], server: Result["server"]) {
+  return results.filter((result) => result.server === server).length;
 }
 
 function replaceBlock(markdown: string, content: string) {

@@ -36,6 +36,11 @@ Reports are written to the ignored `evals/.artifacts/` directory. Agent reports
 retain responses and tool evidence for blind judging; they never contain API
 tokens and must not be published.
 
+`bun run report:write` validates those private artifacts, publishes only the
+metrics needed by `evals/results/published-benchmark.json`, then regenerates the
+README blocks and charts from that snapshot. `bun run report:check` uses the
+committed snapshot, so publication drift can be checked without private traces.
+
 ## What is deterministic
 
 `bun run check` verifies both published servers initialize, expose their frozen
@@ -74,7 +79,7 @@ Profile `current-entitlements` · agent `openrouter/anthropic/claude-haiku-4.5` 
 
 Extract and Research are excluded because general Deep Lookup is unavailable for the benchmark account.
 Recurring delivery is excluded because durable scheduling is still a WIP capability.
-Across 30 matched runs, both MCPs completed 29 workflows. Bright scored 4.51/5 versus 3.78/5 and won blind preference 17–3, with 10 ties.
+Across 30 matched runs, Bright completed 29 workflows and Bright Data completed 29. Bright scored 4.51/5 versus 3.78/5 and won blind preference 17–3, with 10 ties.
 This full study predates the narrow-profile routing, summary-sufficiency, and retry-ownership fixes. Its quality judgments remain useful; its Current search latency, token, and call-count row is a pre-fix baseline, not a measurement of the current implementation.
 
 | Case | Pass Bright/BrightData | Recovered Bright/BrightData | Quality Bright/BrightData |

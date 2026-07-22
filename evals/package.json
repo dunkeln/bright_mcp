@@ -10,7 +10,7 @@
     "usecases": "bun run src/usecases.ts",
     "eval": "bun run check && bun run usecases && bun run agent && bun run judge",
     "report:check": "bun run src/report.ts --check && bun ../scripts/render-benchmark-chart.ts --check",
-    "report:write": "bun ../scripts/render-benchmark-chart.ts --write && bun run src/report.ts --write",
+    "report:write": "bun run src/report.ts --write && bun ../scripts/render-benchmark-chart.ts --write",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

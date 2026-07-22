@@ -8,10 +8,11 @@ import { buildAppAssets } from "./app-build";
 const mode = process.argv[2];
 if (!["--write", "--check", "--preview"].includes(mode ?? "")) throw new Error("Use --write, --check, or --preview.");
 
-const report = (await Bun.file(new URL("../evals/.artifacts/agent.json", import.meta.url)).json()) as Report;
-const judgeFile = Bun.file(new URL("../evals/.artifacts/judge.json", import.meta.url));
-if (!(await judgeFile.exists())) process.exit(0);
-const judge = await judgeFile.json() as JudgeReport;
+const published = await Bun.file(
+  new URL("../evals/results/published-benchmark.json", import.meta.url),
+).json() as { schemaVersion: number; report: Report; judge: JudgeReport };
+if (published.schemaVersion !== 1) throw new Error("Invalid published benchmark result.");
+const { report, judge } = published;
 const activeCaseIds = new Set<string>(workflowCases.map(({ id }) => id));
 const activeJudgments = judge.judgments.filter(({ pairId }) => activeCaseIds.has(pairId.split(":")[0]!));
 const tasks = workflowCases.map(({ id, shortLabel }) => ({

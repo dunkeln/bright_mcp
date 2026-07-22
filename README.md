@@ -108,56 +108,44 @@ Choose among the seven data tools by intent:
 See [SETUP.md](./SETUP.md) for local development, credentials, live checks, and
 hosted authorization.
 
-## Benchmarks
+## Evaluated with MCPJam
 
 <!-- benchmark:start -->
+Bright MCP uses `@mcpjam/sdk` to run real-world agent workflows against its
+published MCP endpoints. The suite checks task completion, tool selection,
+valid arguments, provenance, latency, tool calls, token use, and answer quality.
+
 ![Paired horizontal bars comparing MCP completion by workflow](./assets/benchmark-completion.png)
 
-*Both MCPs completed 29 of 30 workflows; the meaningful separation begins after completion, in the quality and efficiency of the answer.*
+*Bright MCP completed 29 of 30 workflows; Bright Data MCP completed 29 of 30.*
 
 ![Radar chart comparing blind answer-quality dimensions](./assets/benchmark-radar.png)
 
-*Bright leads every blind-scored quality dimension, with its clearest gains in fulfillment, grounding, source quality, and actionability.*
+*Blind scoring compares task fulfillment, grounding, information density, source quality, and actionability.*
 
 ![Horizontal bars comparing blind pairwise preference](./assets/benchmark-preference.png)
 
-*The blind judge preferred Bright 17 times versus 3 for BrightData, while preserving 10 genuine ties.*
+*The blind judge preferred Bright MCP 17 times versus 3 for Bright Data MCP, with 10 ties.*
 
 ![Paired horizontal bars comparing judged answer quality per token budget](./assets/benchmark-quality-cost.png)
 
-*Structured Marketplace work is where Bright's richer answers most clearly repay their token budget; simpler web tasks remain the efficiency target.*
+*Quality per token shows where richer answers repay their context cost.*
 
 ![Paired horizontal bars comparing benchmark passes per token budget](./assets/benchmark-efficiency.png)
 
-*Bright converts tokens into successful Marketplace execution efficiently, while the web workflows show where tighter routing can recover more value.*
+*Passing runs per token compares workflow completion against total model context used.*
 
 ![Paired horizontal bars comparing average tool calls by workflow](./assets/benchmark-complexity.png)
 
-*Bright batches known-page reading into one call and makes Marketplace discovery explicit; historical search follow-ups expose the routing behavior now being tightened.*
+*Average tool calls show the agent path each workflow required.*
 
-At the same 97% completion rate, Bright MCP delivered 4.51/5 judged quality versus 3.78/5, used slightly fewer tokens, and won the blind preference 17–3 with 10 ties.
-[Method and tables](./evals/README.md#full-tool-use-benchmark-pre-routing-baseline) · current-entitlements Acquire + Operate profile · `openrouter/anthropic/claude-haiku-4.5` · 10 runs/case · 2026-07-22.
+In the comparative baseline, Bright MCP completed 29 of 30 workflows; Bright Data MCP completed 29 of 30.
+Bright MCP scored 4.51/5 versus 3.78/5 in blind answer-quality grading and was
+preferred in 17 runs versus 3, with 10 ties.
+
+This study predates the current profile routing and retry changes. Its quality
+results remain useful, while its latency, call-count, and token measurements
+should be treated as a historical baseline.
+
+[Method, scenarios, and full results](./evals/README.md#full-tool-use-benchmark-pre-routing-baseline)
 <!-- benchmark:end -->
-
-### WIP capabilities
-
-Recurring delivery is intentionally excluded from the current benchmark score. Bright MCP can discover and run datasets, but it cannot yet create a durable refresh schedule; the case returns when it can execute delivery instead of only describing that boundary.
-
-### A/B
-
-| Dimension | BrightData MCP | Bright MCP |
-|---|---:|---:|
-| Model-visible tools | 60+ maximum | 7 data / 4 browser |
-| Browser tools | 14 | 4 |
-| Dataset tools | One per dataset | Discovery + execution |
-| Dataset catalog | Tool inventory grows with products | Caller-scoped catalog behind discovery |
-| Research | Search then agent-managed scraping | Dedicated sourced research with cost gates |
-| Large results | Returned through tool calls | Lazy, principal-bound snapshot resources |
-| Runtime/toolchain | Node + npm + Vite | Bun-native |
-| Production dependencies | 7 plus UI dependencies | Roughly 6–8, profile-dependent |
-| API-specific code | Repeated across tools | Central adapters |
-| Polling implementations | Repeated | One shared mechanism |
-| Schema definitions | Repeated per tool | Catalog/operation-driven |
-| Credentials | API key in endpoint configuration | BYOK from the client environment; never server-funded |
-| Resources/tasks | Limited | First-class |
-| Security/session controls | Relatively implicit | Explicit and bounded |

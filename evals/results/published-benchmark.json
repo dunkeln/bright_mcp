@@ -1,0 +1,1513 @@
+{
+  "schemaVersion": 1,
+  "report": {
+    "schemaVersion": 7,
+    "generatedAt": "2026-07-22T05:17:29.235Z",
+    "mode": "mcpjam-openrouter-tool-use",
+    "profile": "current-entitlements",
+    "model": "openrouter/anthropic/claude-haiku-4.5",
+    "runsPerCase": 10,
+    "grading": "End-to-end pass requires a complete response with the required outcome fields and provenance. Intended tool selection, valid execution of each expected workflow step, clean execution, and recovery are reported as separate dimensions. Factual values are not independently graded.",
+    "results": [
+      {
+        "caseId": "acquire-current-search",
+        "server": "bright",
+        "run": 1,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_web",
+          "read_web"
+        ],
+        "inputTokens": 10382,
+        "outputTokens": 289,
+        "tokenCount": 10671,
+        "latencyMs": 21217
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "bright",
+        "run": 2,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_web",
+          "search_web"
+        ],
+        "inputTokens": 9575,
+        "outputTokens": 274,
+        "tokenCount": 9849,
+        "latencyMs": 56932
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "bright",
+        "run": 3,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_web"
+        ],
+        "inputTokens": 6401,
+        "outputTokens": 196,
+        "tokenCount": 6597,
+        "latencyMs": 17667
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "bright",
+        "run": 4,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_web",
+          "read_web",
+          "read_web"
+        ],
+        "inputTokens": 14502,
+        "outputTokens": 377,
+        "tokenCount": 14879,
+        "latencyMs": 50470
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "bright",
+        "run": 5,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_web",
+          "read_web"
+        ],
+        "inputTokens": 17165,
+        "outputTokens": 280,
+        "tokenCount": 17445,
+        "latencyMs": 23129
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "bright",
+        "run": 6,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_web",
+          "read_web",
+          "read_web"
+        ],
+        "inputTokens": 14501,
+        "outputTokens": 360,
+        "tokenCount": 14861,
+        "latencyMs": 67265
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "bright",
+        "run": 7,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_web",
+          "read_web",
+          "read_web"
+        ],
+        "inputTokens": 20732,
+        "outputTokens": 359,
+        "tokenCount": 21091,
+        "latencyMs": 52499
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "bright",
+        "run": 8,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_web",
+          "read_web"
+        ],
+        "inputTokens": 25556,
+        "outputTokens": 303,
+        "tokenCount": 25859,
+        "latencyMs": 55803
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "bright",
+        "run": 9,
+        "passed": false,
+        "recovered": false,
+        "toolsCalled": [
+          "search_web",
+          "search_web",
+          "search_web",
+          "read_web",
+          "read_web"
+        ],
+        "inputTokens": 16617,
+        "outputTokens": 394,
+        "tokenCount": 17011,
+        "latencyMs": 189039
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "bright",
+        "run": 10,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_web",
+          "read_web"
+        ],
+        "inputTokens": 10426,
+        "outputTokens": 308,
+        "tokenCount": 10734,
+        "latencyMs": 18681
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "upstream",
+        "run": 1,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_engine"
+        ],
+        "inputTokens": 4302,
+        "outputTokens": 185,
+        "tokenCount": 4487,
+        "latencyMs": 35675
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "upstream",
+        "run": 2,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_engine"
+        ],
+        "inputTokens": 4279,
+        "outputTokens": 188,
+        "tokenCount": 4467,
+        "latencyMs": 16615
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "upstream",
+        "run": 3,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_engine"
+        ],
+        "inputTokens": 4272,
+        "outputTokens": 188,
+        "tokenCount": 4460,
+        "latencyMs": 5829
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "upstream",
+        "run": 4,
+        "passed": true,
+        "recovered": true,
+        "toolsCalled": [
+          "search_engine",
+          "search_engine",
+          "scrape_as_markdown"
+        ],
+        "inputTokens": 9960,
+        "outputTokens": 364,
+        "tokenCount": 10324,
+        "latencyMs": 44337
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "upstream",
+        "run": 5,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_engine"
+        ],
+        "inputTokens": 4216,
+        "outputTokens": 172,
+        "tokenCount": 4388,
+        "latencyMs": 14577
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "upstream",
+        "run": 6,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_engine"
+        ],
+        "inputTokens": 4270,
+        "outputTokens": 190,
+        "tokenCount": 4460,
+        "latencyMs": 14842
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "upstream",
+        "run": 7,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_engine"
+        ],
+        "inputTokens": 4223,
+        "outputTokens": 197,
+        "tokenCount": 4420,
+        "latencyMs": 33558
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "upstream",
+        "run": 8,
+        "passed": false,
+        "recovered": false,
+        "toolsCalled": [
+          "search_engine",
+          "search_engine",
+          "scrape_as_markdown",
+          "scrape_as_markdown",
+          "search_engine"
+        ],
+        "inputTokens": 11096,
+        "outputTokens": 385,
+        "tokenCount": 11481,
+        "latencyMs": 82609
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "upstream",
+        "run": 9,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_engine"
+        ],
+        "inputTokens": 4288,
+        "outputTokens": 190,
+        "tokenCount": 4478,
+        "latencyMs": 5369
+      },
+      {
+        "caseId": "acquire-current-search",
+        "server": "upstream",
+        "run": 10,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "search_engine"
+        ],
+        "inputTokens": 4244,
+        "outputTokens": 199,
+        "tokenCount": 4443,
+        "latencyMs": 9462
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "bright",
+        "run": 1,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "read_web"
+        ],
+        "inputTokens": 6539,
+        "outputTokens": 252,
+        "tokenCount": 6791,
+        "latencyMs": 14127
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "bright",
+        "run": 2,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "read_web"
+        ],
+        "inputTokens": 6559,
+        "outputTokens": 274,
+        "tokenCount": 6833,
+        "latencyMs": 13269
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "bright",
+        "run": 3,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "read_web"
+        ],
+        "inputTokens": 6545,
+        "outputTokens": 268,
+        "tokenCount": 6813,
+        "latencyMs": 23798
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "bright",
+        "run": 4,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "read_web"
+        ],
+        "inputTokens": 6563,
+        "outputTokens": 268,
+        "tokenCount": 6831,
+        "latencyMs": 16301
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "bright",
+        "run": 5,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "read_web"
+        ],
+        "inputTokens": 6545,
+        "outputTokens": 253,
+        "tokenCount": 6798,
+        "latencyMs": 12262
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "bright",
+        "run": 6,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "read_web"
+        ],
+        "inputTokens": 6555,
+        "outputTokens": 264,
+        "tokenCount": 6819,
+        "latencyMs": 12286
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "bright",
+        "run": 7,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "read_web"
+        ],
+        "inputTokens": 6563,
+        "outputTokens": 268,
+        "tokenCount": 6831,
+        "latencyMs": 28159
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "bright",
+        "run": 8,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "read_web"
+        ],
+        "inputTokens": 6557,
+        "outputTokens": 276,
+        "tokenCount": 6833,
+        "latencyMs": 18704
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "bright",
+        "run": 9,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "read_web"
+        ],
+        "inputTokens": 6557,
+        "outputTokens": 276,
+        "tokenCount": 6833,
+        "latencyMs": 14318
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "bright",
+        "run": 10,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "read_web"
+        ],
+        "inputTokens": 6565,
+        "outputTokens": 268,
+        "tokenCount": 6833,
+        "latencyMs": 14277
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "upstream",
+        "run": 1,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "scrape_as_markdown",
+          "scrape_as_markdown"
+        ],
+        "inputTokens": 4368,
+        "outputTokens": 309,
+        "tokenCount": 4677,
+        "latencyMs": 25902
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "upstream",
+        "run": 2,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "scrape_as_markdown",
+          "scrape_as_markdown"
+        ],
+        "inputTokens": 4331,
+        "outputTokens": 316,
+        "tokenCount": 4647,
+        "latencyMs": 20667
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "upstream",
+        "run": 3,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "scrape_as_markdown",
+          "scrape_as_markdown"
+        ],
+        "inputTokens": 4367,
+        "outputTokens": 304,
+        "tokenCount": 4671,
+        "latencyMs": 14256
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "upstream",
+        "run": 4,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "scrape_as_markdown",
+          "scrape_as_markdown"
+        ],
+        "inputTokens": 4377,
+        "outputTokens": 304,
+        "tokenCount": 4681,
+        "latencyMs": 14255
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "upstream",
+        "run": 5,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "scrape_as_markdown",
+          "scrape_as_markdown"
+        ],
+        "inputTokens": 4393,
+        "outputTokens": 309,
+        "tokenCount": 4702,
+        "latencyMs": 11205
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "upstream",
+        "run": 6,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "scrape_as_markdown",
+          "scrape_as_markdown"
+        ],
+        "inputTokens": 3850,
+        "outputTokens": 287,
+        "tokenCount": 4137,
+        "latencyMs": 8678
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "upstream",
+        "run": 7,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "scrape_as_markdown",
+          "scrape_as_markdown"
+        ],
+        "inputTokens": 4389,
+        "outputTokens": 318,
+        "tokenCount": 4707,
+        "latencyMs": 15299
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "upstream",
+        "run": 8,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "scrape_as_markdown",
+          "scrape_as_markdown"
+        ],
+        "inputTokens": 4392,
+        "outputTokens": 304,
+        "tokenCount": 4696,
+        "latencyMs": 15886
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "upstream",
+        "run": 9,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "scrape_as_markdown",
+          "scrape_as_markdown"
+        ],
+        "inputTokens": 4417,
+        "outputTokens": 306,
+        "tokenCount": 4723,
+        "latencyMs": 12525
+      },
+      {
+        "caseId": "acquire-known-pages",
+        "server": "upstream",
+        "run": 10,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "scrape_as_markdown",
+          "scrape_as_markdown"
+        ],
+        "inputTokens": 4379,
+        "outputTokens": 319,
+        "tokenCount": 4698,
+        "latencyMs": 12467
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "bright",
+        "run": 1,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "find_datasets",
+          "run_dataset"
+        ],
+        "inputTokens": 13761,
+        "outputTokens": 543,
+        "tokenCount": 14304,
+        "latencyMs": 10858
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "bright",
+        "run": 2,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "find_datasets",
+          "run_dataset"
+        ],
+        "inputTokens": 13757,
+        "outputTokens": 541,
+        "tokenCount": 14298,
+        "latencyMs": 11903
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "bright",
+        "run": 3,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "find_datasets",
+          "run_dataset"
+        ],
+        "inputTokens": 13764,
+        "outputTokens": 544,
+        "tokenCount": 14308,
+        "latencyMs": 14605
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "bright",
+        "run": 4,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "find_datasets",
+          "run_dataset"
+        ],
+        "inputTokens": 13758,
+        "outputTokens": 545,
+        "tokenCount": 14303,
+        "latencyMs": 13361
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "bright",
+        "run": 5,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "find_datasets",
+          "run_dataset"
+        ],
+        "inputTokens": 13760,
+        "outputTokens": 482,
+        "tokenCount": 14242,
+        "latencyMs": 13688
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "bright",
+        "run": 6,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "find_datasets",
+          "run_dataset"
+        ],
+        "inputTokens": 13763,
+        "outputTokens": 544,
+        "tokenCount": 14307,
+        "latencyMs": 12262
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "bright",
+        "run": 7,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "find_datasets",
+          "run_dataset"
+        ],
+        "inputTokens": 13763,
+        "outputTokens": 484,
+        "tokenCount": 14247,
+        "latencyMs": 10513
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "bright",
+        "run": 8,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "find_datasets",
+          "run_dataset"
+        ],
+        "inputTokens": 13757,
+        "outputTokens": 539,
+        "tokenCount": 14296,
+        "latencyMs": 12010
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "bright",
+        "run": 9,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "find_datasets",
+          "run_dataset"
+        ],
+        "inputTokens": 13767,
+        "outputTokens": 544,
+        "tokenCount": 14311,
+        "latencyMs": 12170
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "bright",
+        "run": 10,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "find_datasets",
+          "run_dataset"
+        ],
+        "inputTokens": 13760,
+        "outputTokens": 542,
+        "tokenCount": 14302,
+        "latencyMs": 12692
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "upstream",
+        "run": 1,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "web_data_amazon_product_search"
+        ],
+        "inputTokens": 27425,
+        "outputTokens": 316,
+        "tokenCount": 27741,
+        "latencyMs": 8899
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "upstream",
+        "run": 2,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "web_data_amazon_product_search"
+        ],
+        "inputTokens": 25320,
+        "outputTokens": 625,
+        "tokenCount": 25945,
+        "latencyMs": 11010
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "upstream",
+        "run": 3,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "web_data_amazon_product_search"
+        ],
+        "inputTokens": 24968,
+        "outputTokens": 761,
+        "tokenCount": 25729,
+        "latencyMs": 14016
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "upstream",
+        "run": 4,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "web_data_amazon_product_search"
+        ],
+        "inputTokens": 25376,
+        "outputTokens": 602,
+        "tokenCount": 25978,
+        "latencyMs": 12022
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "upstream",
+        "run": 5,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "web_data_amazon_product_search"
+        ],
+        "inputTokens": 27491,
+        "outputTokens": 731,
+        "tokenCount": 28222,
+        "latencyMs": 12483
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "upstream",
+        "run": 6,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "web_data_amazon_product_search"
+        ],
+        "inputTokens": 23794,
+        "outputTokens": 1050,
+        "tokenCount": 24844,
+        "latencyMs": 14317
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "upstream",
+        "run": 7,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "web_data_amazon_product_search"
+        ],
+        "inputTokens": 23853,
+        "outputTokens": 600,
+        "tokenCount": 24453,
+        "latencyMs": 10849
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "upstream",
+        "run": 8,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "web_data_amazon_product_search"
+        ],
+        "inputTokens": 25252,
+        "outputTokens": 678,
+        "tokenCount": 25930,
+        "latencyMs": 11363
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "upstream",
+        "run": 9,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "web_data_amazon_product_search"
+        ],
+        "inputTokens": 25289,
+        "outputTokens": 768,
+        "tokenCount": 26057,
+        "latencyMs": 11364
+      },
+      {
+        "caseId": "operate-product-snapshot",
+        "server": "upstream",
+        "run": 10,
+        "passed": true,
+        "recovered": false,
+        "toolsCalled": [
+          "web_data_amazon_product_search"
+        ],
+        "inputTokens": 25360,
+        "outputTokens": 589,
+        "tokenCount": 25949,
+        "latencyMs": 13075
+      }
+    ]
+  },
+  "judge": {
+    "schemaVersion": 2,
+    "generatedAt": "2026-07-22T05:27:49.070Z",
+    "model": "anthropic/claude-sonnet-5",
+    "agentModel": "openrouter/anthropic/claude-haiku-4.5",
+    "agentGeneratedAt": "2026-07-22T05:17:29.235Z",
+    "runsPerCase": 10,
+    "sideAgreement": 1,
+    "rubric": [
+      "taskFulfillment",
+      "evidenceGrounding",
+      "informationDensity",
+      "sourceQuality",
+      "actionability"
+    ],
+    "judgments": [
+      {
+        "pairId": "acquire-current-search:1",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 5
+          },
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 5
+          }
+        },
+        "winner": "tie"
+      },
+      {
+        "pairId": "acquire-current-search:10",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 3,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 4
+          },
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 4,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 4
+          }
+        },
+        "winner": "upstream"
+      },
+      {
+        "pairId": "acquire-current-search:2",
+        "scores": {
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 5
+          },
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 5
+          }
+        },
+        "winner": "tie"
+      },
+      {
+        "pairId": "acquire-current-search:3",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 4,
+            "evidenceGrounding": 2,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 4
+          },
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 5
+          }
+        },
+        "winner": "upstream"
+      },
+      {
+        "pairId": "acquire-current-search:4",
+        "scores": {
+          "upstream": {
+            "taskFulfillment": 4,
+            "evidenceGrounding": 2,
+            "informationDensity": 3,
+            "sourceQuality": 4,
+            "actionability": 3
+          },
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 5
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "acquire-current-search:5",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          },
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 4,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 4
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "acquire-current-search:6",
+        "scores": {
+          "upstream": {
+            "taskFulfillment": 4,
+            "evidenceGrounding": 3,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 4
+          },
+          "bright": {
+            "taskFulfillment": 4,
+            "evidenceGrounding": 4,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 4
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "acquire-current-search:7",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          },
+          "upstream": {
+            "taskFulfillment": 4,
+            "evidenceGrounding": 3,
+            "informationDensity": 4,
+            "sourceQuality": 3,
+            "actionability": 4
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "acquire-current-search:8",
+        "scores": {
+          "upstream": {
+            "taskFulfillment": 1,
+            "evidenceGrounding": 2,
+            "informationDensity": 1,
+            "sourceQuality": 2,
+            "actionability": 1
+          },
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "acquire-current-search:9",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 1,
+            "evidenceGrounding": 2,
+            "informationDensity": 1,
+            "sourceQuality": 3,
+            "actionability": 1
+          },
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 4,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 5
+          }
+        },
+        "winner": "upstream"
+      },
+      {
+        "pairId": "acquire-known-pages:1",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 5
+          },
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 5
+          }
+        },
+        "winner": "tie"
+      },
+      {
+        "pairId": "acquire-known-pages:10",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          },
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          }
+        },
+        "winner": "tie"
+      },
+      {
+        "pairId": "acquire-known-pages:2",
+        "scores": {
+          "upstream": {
+            "taskFulfillment": 3,
+            "evidenceGrounding": 2,
+            "informationDensity": 3,
+            "sourceQuality": 3,
+            "actionability": 3
+          },
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 5
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "acquire-known-pages:3",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          },
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          }
+        },
+        "winner": "tie"
+      },
+      {
+        "pairId": "acquire-known-pages:4",
+        "scores": {
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          },
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          }
+        },
+        "winner": "tie"
+      },
+      {
+        "pairId": "acquire-known-pages:5",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          },
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          }
+        },
+        "winner": "tie"
+      },
+      {
+        "pairId": "acquire-known-pages:6",
+        "scores": {
+          "upstream": {
+            "taskFulfillment": 3,
+            "evidenceGrounding": 5,
+            "informationDensity": 3,
+            "sourceQuality": 3,
+            "actionability": 3
+          },
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 5,
+            "sourceQuality": 5,
+            "actionability": 5
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "acquire-known-pages:7",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          },
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          }
+        },
+        "winner": "tie"
+      },
+      {
+        "pairId": "acquire-known-pages:8",
+        "scores": {
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          },
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          }
+        },
+        "winner": "tie"
+      },
+      {
+        "pairId": "acquire-known-pages:9",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          },
+          "upstream": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          }
+        },
+        "winner": "tie"
+      },
+      {
+        "pairId": "operate-product-snapshot:1",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 5
+          },
+          "upstream": {
+            "taskFulfillment": 3,
+            "evidenceGrounding": 2,
+            "informationDensity": 3,
+            "sourceQuality": 3,
+            "actionability": 3
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "operate-product-snapshot:10",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 4,
+            "evidenceGrounding": 5,
+            "informationDensity": 3,
+            "sourceQuality": 4,
+            "actionability": 4
+          },
+          "upstream": {
+            "taskFulfillment": 3,
+            "evidenceGrounding": 3,
+            "informationDensity": 4,
+            "sourceQuality": 3,
+            "actionability": 3
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "operate-product-snapshot:2",
+        "scores": {
+          "upstream": {
+            "taskFulfillment": 3,
+            "evidenceGrounding": 2,
+            "informationDensity": 3,
+            "sourceQuality": 3,
+            "actionability": 3
+          },
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 4,
+            "actionability": 5
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "operate-product-snapshot:3",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          },
+          "upstream": {
+            "taskFulfillment": 3,
+            "evidenceGrounding": 2,
+            "informationDensity": 3,
+            "sourceQuality": 2,
+            "actionability": 3
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "operate-product-snapshot:4",
+        "scores": {
+          "upstream": {
+            "taskFulfillment": 3,
+            "evidenceGrounding": 2,
+            "informationDensity": 3,
+            "sourceQuality": 2,
+            "actionability": 3
+          },
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "operate-product-snapshot:5",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          },
+          "upstream": {
+            "taskFulfillment": 3,
+            "evidenceGrounding": 4,
+            "informationDensity": 4,
+            "sourceQuality": 3,
+            "actionability": 3
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "operate-product-snapshot:6",
+        "scores": {
+          "upstream": {
+            "taskFulfillment": 3,
+            "evidenceGrounding": 4,
+            "informationDensity": 4,
+            "sourceQuality": 3,
+            "actionability": 3
+          },
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "operate-product-snapshot:7",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          },
+          "upstream": {
+            "taskFulfillment": 3,
+            "evidenceGrounding": 3,
+            "informationDensity": 4,
+            "sourceQuality": 3,
+            "actionability": 3
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "operate-product-snapshot:8",
+        "scores": {
+          "upstream": {
+            "taskFulfillment": 3,
+            "evidenceGrounding": 3,
+            "informationDensity": 4,
+            "sourceQuality": 3,
+            "actionability": 3
+          },
+          "bright": {
+            "taskFulfillment": 5,
+            "evidenceGrounding": 5,
+            "informationDensity": 4,
+            "sourceQuality": 5,
+            "actionability": 5
+          }
+        },
+        "winner": "bright"
+      },
+      {
+        "pairId": "operate-product-snapshot:9",
+        "scores": {
+          "bright": {
+            "taskFulfillment": 4,
+            "evidenceGrounding": 5,
+            "informationDensity": 3,
+            "sourceQuality": 4,
+            "actionability": 4
+          },
+          "upstream": {
+            "taskFulfillment": 3,
+            "evidenceGrounding": 3,
+            "informationDensity": 4,
+            "sourceQuality": 3,
+            "actionability": 3
+          }
+        },
+        "winner": "bright"
+      }
+    ]
+  }
+}

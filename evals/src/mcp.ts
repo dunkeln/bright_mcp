@@ -8,8 +8,10 @@ const endpoints: Record<ServerId, string> = {
   upstream: "https://mcp.brightdata.com/mcp",
 };
 
-export async function connect(server: ServerId) {
-  const url = new URL(endpoints[server]);
+export async function connect(server: ServerId, path = "/mcp") {
+  const url = server === "bright"
+    ? new URL(path, endpoints.bright)
+    : new URL(endpoints.upstream);
   const token = process.env.BRIGHTDATA_API_KEY;
   if (!token) throw new Error("BRIGHTDATA_API_KEY is required for published MCP checks.");
   if (server === "upstream") {

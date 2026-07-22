@@ -39,7 +39,8 @@ tokens and must not be published.
 ## What is deterministic
 
 `bun run check` verifies both published servers initialize, expose their frozen
-published tool surfaces, require a search query in their schema, and reject a missing
+published tool surfaces, verifies Bright MCP's Web, Deep Lookup, and Marketplace
+profile boundaries, requires a search query in each server's schema, and rejects a missing
 query. Before statistical runs, it also records whether Bright MCP can execute
 unbilled extraction and research previews and verifies that the maintained Amazon
 product-search collector is discoverable. Deep Lookup availability is informational;

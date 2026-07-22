@@ -19,6 +19,12 @@ const expectedTools: Record<ServerId, string[]> = {
   ],
 };
 
+const expectedBrightProfiles = {
+  "/mcp/web": ["read_web", "search_web"],
+  "/mcp/deep-lookup": ["extract_web", "research_web"],
+  "/mcp/marketplace": ["find_datasets", "run_dataset"],
+} as const;
+
 const reports = [];
 let failed = false;
 type Check = { name: string; ok: boolean; detail?: string; blocking?: false };
@@ -61,6 +67,20 @@ for (const server of ["bright", "upstream"] as const) {
       await rejects(client, searchName, {}),
     );
     if (server === "bright") {
+      for (const [path, expected] of Object.entries(expectedBrightProfiles)) {
+        const profile = await connect("bright", path);
+        try {
+          const actual = (await profile.listTools()).tools.map(({ name }) => name).toSorted();
+          record(
+            checks,
+            `${path} exposes its frozen tool surface`,
+            JSON.stringify(actual) === JSON.stringify(expected),
+            `expected ${expected.join(", ")}; received ${actual.join(", ")}`,
+          );
+        } finally {
+          await profile.close();
+        }
+      }
       await probe(checks, client, "known-URL extraction preview is available", "extract_web", {
         urls: ["https://example.com"],
         fields: [{ name: "title", description: "Page title" }],

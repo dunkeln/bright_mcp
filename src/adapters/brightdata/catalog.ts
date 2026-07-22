@@ -41,6 +41,12 @@ const metadataSchema = z.object({
 });
 
 type CollectorInputKind = "urls" | "keyword";
+type MaintainedCollector = {
+  upstreamId: string;
+  kind: CollectorInputKind;
+  title: string;
+  description: string;
+};
 
 /**
  * Trigger input shapes omitted by Bright Data's live dataset metadata.
@@ -48,7 +54,6 @@ type CollectorInputKind = "urls" | "keyword";
  */
 const collectorInputKinds = new Map<string, CollectorInputKind>([
   ["gd_l7q7dkf244hwjntr0", "urls"],
-  ["gd_lwdb4vjm1ehb499uxs", "keyword"],
   ["gd_l95fol7l1ru6rlo116", "urls"],
   ["gd_l1viktl72bvl7bjuj0", "urls"],
   ["gd_l1vikfnt1wgvvqz95w", "urls"],
@@ -59,7 +64,18 @@ const collectorInputKinds = new Map<string, CollectorInputKind>([
   ["gd_l1vijqt9jfj7olije", "urls"],
 ]);
 
+const maintainedCollectors = new Map<string, MaintainedCollector>([
+  ["gd_lwdb4vjm1ehb499uxs", {
+    upstreamId: "gd_lwdb4vjm1ehb499uxs",
+    kind: "keyword",
+    title: "Amazon product search",
+    description: "Collect fresh structured Amazon product search records by keyword.",
+  }],
+]);
+
 export function collectorFor(upstreamId: string) {
+  const maintained = maintainedCollectors.get(upstreamId);
+  if (maintained) return maintained;
   const kind = collectorInputKinds.get(upstreamId);
   return kind ? { upstreamId, kind } : undefined;
 }
@@ -105,28 +121,73 @@ export function createBrightDataCatalog(gateway: BrightDataGateway): DatasetCata
   return {
     async find(query, limit, context) {
       const terms = query.toLowerCase().split(/\W+/).filter((term) => term.length > 1);
-      const available = await list(context);
+      let available: z.infer<typeof datasetListSchema> = [];
+      try {
+        available = await list(context);
+      } catch (error) {
+        if (!(error instanceof CapabilityError) || error.code !== "upstream_capability_unavailable") {
+          throw error;
+        }
+      }
       const marketplace = available.map((dataset) => ({
         score: rank(dataset.name, terms),
-        value: dataset,
+        dataset,
       }));
-      const selected = marketplace
+      const known = [...maintainedCollectors.values()]
+        .filter(({ upstreamId }) => !available.some(({ id }) => id === upstreamId))
+        .map((collector) => ({
+          score: rank(`${collector.title} ${collector.description}`, terms),
+          collector,
+        }));
+      const selected = [...marketplace, ...known]
         .filter(({ score }) => score > 0)
-        .sort((left, right) => right.score - left.score || left.value.name.localeCompare(right.value.name))
-        .slice(0, limit)
-        .map(({ value }) => value);
-      return Promise.all(selected.map(async (dataset) =>
-        marketplaceDefinition(dataset, await fields(dataset.id, context))
-      ));
+        .sort((left, right) => right.score - left.score || candidateTitle(left).localeCompare(candidateTitle(right)))
+        .slice(0, limit);
+      return Promise.all(selected.map(async (candidate) => {
+        if ("collector" in candidate) return maintainedCollectorDefinition(candidate.collector);
+        const fallback = maintainedCollectors.get(candidate.dataset.id);
+        try {
+          return marketplaceDefinition(candidate.dataset, await fields(candidate.dataset.id, context));
+        } catch (error) {
+          if (fallback && error instanceof CapabilityError && error.code === "upstream_capability_unavailable") {
+            return maintainedCollectorDefinition(fallback);
+          }
+          throw error;
+        }
+      }));
     },
 
     async describe(datasetId, context) {
       if (!datasetId.startsWith("marketplace:")) throw unknownDataset(datasetId);
       const upstreamId = datasetId.slice("marketplace:".length);
-      const available = (await list(context)).find(({ id }) => id === upstreamId);
-      if (!available) throw unknownDataset(datasetId);
-      return marketplaceDefinition(available, await fields(upstreamId, context));
+      const maintained = maintainedCollectors.get(upstreamId);
+      try {
+        const available = (await list(context)).find(({ id }) => id === upstreamId);
+        if (!available) {
+          if (maintained) return maintainedCollectorDefinition(maintained);
+          throw unknownDataset(datasetId);
+        }
+        return marketplaceDefinition(available, await fields(upstreamId, context));
+      } catch (error) {
+        if (maintained && error instanceof CapabilityError && error.code === "upstream_capability_unavailable") {
+          return maintainedCollectorDefinition(maintained);
+        }
+        throw error;
+      }
     },
+  };
+}
+
+function candidateTitle(candidate: { dataset: { name: string } } | { collector: MaintainedCollector }) {
+  return "dataset" in candidate ? candidate.dataset.name : candidate.collector.title;
+}
+
+function maintainedCollectorDefinition(collector: MaintainedCollector): DatasetDefinition {
+  return {
+    id: `marketplace:${collector.upstreamId}`,
+    title: collector.title,
+    description: collector.description,
+    operations: [collectorOperation(collector)],
   };
 }
 

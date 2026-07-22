@@ -1,6 +1,6 @@
 import { HostRunner, MCPClientManager } from "@mcpjam/sdk";
 import { safeError, serverLabel, type ServerId, writeReport } from "./mcp";
-import { workflowCases } from "./workflows";
+import { benchmarkProfile, workflowCases } from "./workflows";
 
 const apiKey = required("OPENROUTER_API_KEY");
 const configuredModel = required("OPENROUTER_MODEL");
@@ -85,12 +85,7 @@ try {
     const argumentsValid = toolExecutionValid;
     const toolExecutionClean =
       !result.hasError() && !hasToolExecutionError(toolEvidence);
-    const passed =
-      toolSelected &&
-      argumentsValid &&
-      toolExecutionValid &&
-      responseComplete &&
-      outcomeValid;
+    const passed = responseComplete && outcomeValid;
     return {
       caseId: job.useCase.id,
       pillar: job.useCase.pillar,
@@ -182,15 +177,34 @@ function validatesOutcome(
   text: string,
   useCase: (typeof workflowCases)[number],
 ) {
-  const fieldsPresent = useCase.requiredKeys.every((key) =>
-    new RegExp(`["']${key}["']\\s*:`, "i").test(text),
+  const value = parseJsonResponse(text);
+  if (value === undefined) return false;
+  const records = Array.isArray(value) ? value : [value];
+  const fieldsPresent = records.length > 0 && records.every((record) =>
+    record !== null && typeof record === "object" &&
+    useCase.requiredKeys.every((key) => key in record)
   );
   const minimumUrls = "minimumUrls" in useCase ? useCase.minimumUrls : 0;
-  const urls = new Set(text.match(/https?:\/\/[^\s"'<>]+/g) ?? []);
+  const urls = new Set(JSON.stringify(value).match(/https?:\\?\/\\?\/[^\s"'<>]+/g) ?? []);
   const refusalValid =
     !("mustRefuse" in useCase) ||
-    /["']supported["']\s*:\s*false/i.test(text);
+    records.some((record) =>
+      record !== null && typeof record === "object" &&
+      "supported" in record && record.supported === false
+    );
   return fieldsPresent && urls.size >= minimumUrls && refusalValid;
+}
+
+function parseJsonResponse(text: string) {
+  const trimmed = text.trim();
+  const candidate = trimmed.startsWith("```")
+    ? trimmed.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "")
+    : trimmed;
+  try {
+    return JSON.parse(candidate) as unknown;
+  } catch {
+    return undefined;
+  }
 }
 
 function hasToolExecutionError(value: unknown): boolean {
@@ -242,11 +256,12 @@ async function readPrevious(): Promise<AgentResult[]> {
   if (!(await artifact.exists())) return [];
   const report = await artifact.json() as {
     schemaVersion?: number;
+    profile?: string;
     model?: string;
     runsPerCase?: number;
     results?: AgentResult[];
   };
-  return report.schemaVersion === 5 && report.model === model && report.runsPerCase === runs && Array.isArray(report.results)
+  return report.schemaVersion === 7 && report.profile === benchmarkProfile && report.model === model && report.runsPerCase === runs && Array.isArray(report.results)
     ? report.results
     : [];
 }
@@ -257,13 +272,14 @@ function resultKey(result: Pick<AgentResult, "caseId" | "server" | "run">) {
 
 async function persist() {
   await writeReport("agent", {
-    schemaVersion: 5,
+    schemaVersion: 7,
     generatedAt: new Date().toISOString(),
     mode: "mcpjam-openrouter-tool-use",
+    profile: benchmarkProfile,
     model,
     runsPerCase: runs,
     grading:
-      "Pass requires a valid tool path, populated arguments, at least one successful execution for each required workflow step, and the required outcome fields and provenance. Recovered tool errors are reported separately. Factual values are not independently graded.",
+      "End-to-end pass requires a complete response with the required outcome fields and provenance. Intended tool selection, valid execution of each expected workflow step, clean execution, and recovery are reported as separate dimensions. Factual values are not independently graded.",
     results,
   });
 }

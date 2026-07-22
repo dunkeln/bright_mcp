@@ -68,8 +68,13 @@ const clients = [
           <div class="hero-gutter-leak"><HeroDither client:load variant="gutter" /></div>
           <div class="hero-media"><HeroDither client:load /></div>
           <div class="hero-content">
-            <span class="announcement"><i></i>Web data where agent work happens<b>›</b></span>
-            <h1>From a cold start to<br />useful web data.</h1>
+            <a
+              class="announcement"
+              href="https://docs.brightdata.com/scraping-automation/introduction"
+              target="_blank"
+              rel="noreferrer"
+            ><i></i>Unofficial Bright Data API integration<b>›</b></a>
+            <h1>Reliable web data when<br />agent browsing stops scaling.</h1>
             <p></p>
             <a class="button button-light" href={startUrl}>Read docs</a>
           </div>
@@ -139,7 +144,7 @@ const clients = [
         <div class="cta rail gutter-left gutter-right">
           <div>
             <p class="label">Bright MCP</p>
-            <h2>Five tools. One clear path to web data.</h2>
+            <h2>Six tools. One clear path to web data.</h2>
             <p>Discover, inspect, and run Bright Data capabilities without exposing the entire upstream API.</p>
           </div>
           <a class="button button-light" href="#overview">Get started</a>
@@ -317,7 +322,7 @@ const clients = [
   }
 
   .hero-content {
-    max-width: 700px;
+    max-width: 820px;
     padding: 70px 24px;
     position: relative;
     z-index: 2;

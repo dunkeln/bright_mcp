@@ -40,24 +40,31 @@ tokens and must not be published.
 
 `bun run check` verifies both published servers initialize, expose their frozen
 published tool surfaces, require a search query in their schema, and reject a missing
-query. A failure means the remote contract drifted or became unavailable.
+query. Before statistical runs, it also records whether Bright MCP can execute
+unbilled extraction and research previews and verifies that the maintained Amazon
+product-search collector is discoverable. Deep Lookup availability is informational;
+marketplace discovery is blocking because the Operate workflow depends on it.
 
 `bun run usecases` directly executes the seven scenarios advertised in the
 BrightData MCP README against each server's search tool. It verifies successful,
 non-empty, bounded MCP results and records latency and result size.
 
-The repeated agent suite covers two workflows each for Acquire, Extract,
-Research, and Operate. It accepts different valid tool paths for each MCP, then
+The repeated agent suite uses the explicit `current-entitlements` profile and
+covers two workflows each for Acquire and Operate. Extract and Research are
+commented out because this account's Deep Lookup access is restricted to
+business-email queries; re-enable them only after both preview probes pass.
+The suite accepts different valid tool paths for each MCP, then
 checks requested output fields, provenance, honest capability boundaries,
 latency, calls, and token use. Latency is wall-clock time from the prompt to the
 final response, including both model and MCP work. Live factual values are not
 independently graded. A stronger judge model compares matched, anonymously
 labeled artifacts for task fulfillment, evidence grounding, information
 density, source quality, and actionability. Deterministic passes remain separate
-from judge scores.
+from judge scores. Results support claims about Acquire and Operate under this
+profile, not successful execution of all six published tools.
 
 ## Latest tool-use benchmark
 
 <!-- benchmark:start -->
-> Benchmark refresh pending for the six-tool intent surface.
+> Benchmark refresh pending for the current-entitlements Acquire + Operate surface.
 <!-- benchmark:end -->

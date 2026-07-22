@@ -94,8 +94,8 @@ export class BrightDataGateway {
 
         if (!response.ok) {
           const upstreamRequestId = response.headers.get("x-request-id") ?? undefined;
-          await response.body?.cancel();
           if (RETRYABLE_STATUS.has(response.status) && attempt < 3) {
+            await response.body?.cancel();
             await this.retryDelay(
               attempt,
               context.signal,
@@ -103,7 +103,12 @@ export class BrightDataGateway {
             );
             continue;
           }
-          throw statusError(response.status, upstreamRequestId ?? context.requestId);
+          const detail = await readBoundedText(response, 8_192).catch(() => "");
+          throw statusError(
+            response.status,
+            upstreamRequestId ?? context.requestId,
+            detail,
+          );
         }
         const text = await readBoundedText(
           response,
@@ -238,8 +243,18 @@ function responseTooLarge() {
   );
 }
 
-function statusError(status: number, requestId?: string): CapabilityError {
+function statusError(status: number, requestId?: string, responseBody = ""): CapabilityError {
   if (status === 400 || status === 422) {
+    const detail = responseBody.replace(/\s+/g, " ").trim().slice(0, 300);
+    if (detail === "Deep Lookup is for business emails only") {
+      return new CapabilityError(
+        "upstream_capability_unavailable",
+        "The configured Deep Lookup capability only supports business-email queries.",
+        false,
+        "Enable general Deep Lookup access or configure another structured extraction backend.",
+        requestId,
+      );
+    }
     return new CapabilityError(
       "upstream_rejected_input",
       "Bright Data rejected the upstream request input.",

@@ -39,10 +39,11 @@ resource URI, app payload, or log record.
   independent of endpoint paths and display names.
 - The account-scoped Marketplace list and metadata endpoints MUST supply
   discoverability and output fields, cached by caller principal.
-- A small versioned manifest MUST only identify live datasets whose Scraper API
+- A small versioned manifest MUST identify documented Scraper API datasets whose
   trigger schema is known, because Marketplace metadata does not expose those
-  input schemas. It MUST enrich the live catalog entry rather than create a
-  second collector namespace.
+  input schemas. Manifest entries MAY remain discoverable when the account's
+  Marketplace list endpoint is unavailable; execution still uses the same
+  `marketplace:` ID and lets the upstream product enforce account access.
 - Duplicate IDs or invalid schemas MUST fail startup rather than fail during an
   agent call.
 

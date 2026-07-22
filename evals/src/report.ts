@@ -1,4 +1,4 @@
-import { workflowCases } from "./workflows";
+import { benchmarkProfile, workflowCases } from "./workflows";
 
 const mode = process.argv[2];
 if (mode !== "--write" && mode !== "--check") throw new Error("Use --write or --check.");
@@ -43,12 +43,14 @@ const rootBlock = publishable
       "![Paired horizontal bars comparing average tool calls by workflow](./assets/benchmark-complexity.png)",
       "",
       `Bright MCP: ${percent(overall.bright.passRate)} pass · ${quality(judge, undefined, "bright").toFixed(2)}/5 judged quality · ${Math.round(overall.bright.averageTokens)} tokens · ${seconds(overall.bright.medianLatency)} p50. BrightData MCP: ${percent(overall.upstream.passRate)} · ${quality(judge, undefined, "upstream").toFixed(2)}/5 · ${Math.round(overall.upstream.averageTokens)} tokens · ${seconds(overall.upstream.medianLatency)} p50.`,
-      `Blind preference: Bright MCP ${judgeWins.bright}, BrightData MCP ${judgeWins.upstream}, ties ${judgeWins.ties}. [Method and tables](./evals/README.md#latest-tool-use-benchmark) · \`${report.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}.`,
+      `Blind preference: Bright MCP ${judgeWins.bright}, BrightData MCP ${judgeWins.upstream}, ties ${judgeWins.ties}. [Method and tables](./evals/README.md#latest-tool-use-benchmark) · current-entitlements Acquire + Operate profile · \`${report.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}.`,
     ].join("\n")
   : "> Benchmark publication requires a complete 10-run comparison and at least 75% judge label-swap agreement.";
 const evalBlock = [
   publishable ? "" : "> **Incomplete run:** do not use this table for public claims.\n",
-  `Agent \`${report.model}\` · judge \`${judge.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}`,
+  `Profile \`${report.profile}\` · agent \`${report.model}\` · judge \`${judge.model}\` · ${report.runsPerCase} runs/case · ${report.generatedAt.slice(0, 10)}`,
+  "",
+  "Extract and Research are excluded because general Deep Lookup is unavailable for the benchmark account.",
   "",
   "| Case | Pass Bright/BrightData | Recovered Bright/BrightData | Quality Bright/BrightData | Tokens Bright/BrightData | p50 latency Bright/BrightData | Calls Bright/BrightData |",
   "|---|---:|---:|---:|---:|---:|---:|",
@@ -56,7 +58,7 @@ const evalBlock = [
     `| ${label} | ${percent(bright.passRate)} / ${percent(upstream.passRate)} | ${percent(bright.recoveryRate)} / ${percent(upstream.recoveryRate)} | ${brightQuality.toFixed(2)} / ${upstreamQuality.toFixed(2)} | ${Math.round(bright.averageTokens)} / ${Math.round(upstream.averageTokens)} | ${seconds(bright.medianLatency)} / ${seconds(upstream.medianLatency)} | ${bright.averageTools.toFixed(2)} / ${upstream.averageTools.toFixed(2)} |`,
   ),
   "",
-  `A pass requires a valid workflow path, populated arguments, a successful execution for each required step, and requested output fields and provenance. Recovered tool errors are tracked separately. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement: ${percent(judge.sideAgreement)}.`,
+  `A pass requires a complete JSON response with the requested output fields and provenance. Intended workflow selection, successful expected-tool execution, clean execution, and recovered errors remain separate artifact dimensions. Quality is a blind 1–5 average across task fulfillment, evidence grounding, information density, source quality, and actionability. Label-swap agreement: ${percent(judge.sideAgreement)}.`,
 ].join("\n");
 
 const files = [
@@ -90,6 +92,7 @@ type Result = {
 };
 type Report = {
   schemaVersion: number;
+  profile: string;
   generatedAt: string;
   model: string;
   runsPerCase: number;
@@ -107,7 +110,8 @@ type JudgeReport = {
 };
 function validate(value: Report) {
   if (
-    value.schemaVersion !== 5 ||
+    value.schemaVersion !== 7 ||
+    value.profile !== benchmarkProfile ||
     !value.model ||
     !Number.isInteger(value.runsPerCase) ||
     !Array.isArray(value.results)

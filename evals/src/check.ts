@@ -21,9 +21,10 @@ const expectedTools: Record<ServerId, string[]> = {
 
 const reports = [];
 let failed = false;
+type Check = { name: string; ok: boolean; detail?: string; blocking?: false };
 
 for (const server of ["bright", "upstream"] as const) {
-  const checks: Array<{ name: string; ok: boolean; detail?: string }> = [];
+  const checks: Check[] = [];
   let client: Client | undefined;
   try {
     client = await connect(server);
@@ -59,18 +60,39 @@ for (const server of ["bright", "upstream"] as const) {
       "missing search query is rejected",
       await rejects(client, searchName, {}),
     );
+    if (server === "bright") {
+      await probe(checks, client, "known-URL extraction preview is available", "extract_web", {
+        urls: ["https://example.com"],
+        fields: [{ name: "title", description: "Page title" }],
+        preview: true,
+      }, false);
+      await probe(checks, client, "open-web research preview is available", "research_web", {
+        query: "Find one official source describing the Example Domain.",
+        limit: 1,
+        preview: true,
+      }, false);
+      await probe(
+        checks,
+        client,
+        "Amazon product search is discoverable",
+        "find_datasets",
+        { query: "Amazon product search", limit: 3 },
+        true,
+        (result) => JSON.stringify(result.structuredContent).includes("gd_lwdb4vjm1ehb499uxs"),
+      );
+    }
   } catch (error) {
     failed = true;
     checks.push({ name: "connect and initialize", ok: false, detail: safeError(error) });
   } finally {
     await client?.close();
   }
-  if (checks.some(({ ok }) => !ok)) failed = true;
+  if (checks.some(({ ok, blocking }) => !ok && blocking !== false)) failed = true;
   reports.push({ server, checks });
 }
 
 await writeReport("contracts", {
-  schemaVersion: 1,
+  schemaVersion: 2,
   generatedAt: new Date().toISOString(),
   mode: "published-remote-servers",
   reports,
@@ -79,19 +101,21 @@ await writeReport("contracts", {
 for (const report of reports) {
   console.log(`\n${serverLabel(report.server)}`);
   for (const check of report.checks) {
-    console.log(`${check.ok ? "PASS" : "FAIL"} ${check.name}${check.ok ? "" : ` — ${check.detail ?? ""}`}`);
+    const status = check.ok ? "PASS" : check.blocking === false ? "INFO" : "FAIL";
+    console.log(`${status} ${check.name}${check.ok ? "" : ` — ${check.detail ?? ""}`}`);
   }
 }
 
 if (failed) process.exitCode = 1;
 
 function record(
-  checks: Array<{ name: string; ok: boolean; detail?: string }>,
+  checks: Check[],
   name: string,
   ok: boolean,
   detail?: string,
+  blocking = true,
 ) {
-  checks.push({ name, ok, ...(ok || !detail ? {} : { detail }) });
+  checks.push({ name, ok, ...(ok || !detail ? {} : { detail }), ...(blocking ? {} : { blocking: false }) });
 }
 
 async function rejects(client: Client, name: string, args: Record<string, unknown>) {
@@ -100,6 +124,34 @@ async function rejects(client: Client, name: string, args: Record<string, unknow
     return result.isError === true;
   } catch {
     return true;
+  }
+}
+
+async function probe(
+  checks: Check[],
+  client: Client,
+  checkName: string,
+  toolName: string,
+  args: Record<string, unknown>,
+  blocking = true,
+  validate: (result: Awaited<ReturnType<Client["callTool"]>>) => boolean = () => true,
+) {
+  try {
+    const result = await client.callTool(
+      { name: toolName, arguments: args },
+      undefined,
+      { timeout: 120_000 },
+    );
+    const ok = result.isError !== true && validate(result);
+    record(
+      checks,
+      checkName,
+      ok,
+      ok ? undefined : safeError(JSON.stringify(result.content).slice(0, 500)),
+      blocking,
+    );
+  } catch (error) {
+    record(checks, checkName, false, safeError(error), blocking);
   }
 }
 

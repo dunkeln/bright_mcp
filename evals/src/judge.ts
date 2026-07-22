@@ -1,4 +1,4 @@
-import { workflowCases } from "./workflows";
+import { benchmarkProfile, workflowCases } from "./workflows";
 import { writeReport, type ServerId } from "./mcp";
 
 const dimensions = ["taskFulfillment", "evidenceGrounding", "informationDensity", "sourceQuality", "actionability"] as const;
@@ -17,7 +17,7 @@ const apiKey = required("OPENROUTER_API_KEY");
 const judgeModel = required("OPENROUTER_JUDGE");
 const artifact = (await Bun.file(new URL("../.artifacts/agent.json", import.meta.url)).json()) as AgentReport;
 const judgeArtifact = Bun.file(new URL("../.artifacts/judge.json", import.meta.url));
-if (artifact.schemaVersion !== 5) throw new Error("Run the agent evaluation before judging it.");
+if (artifact.schemaVersion !== 7 || artifact.profile !== benchmarkProfile) throw new Error("Run the agent evaluation before judging it.");
 
 const expected = workflowCases.length * artifact.runsPerCase * 2;
 if (artifact.results.length !== expected) throw new Error(`Agent evaluation is incomplete (${artifact.results.length}/${expected}).`);
@@ -56,7 +56,7 @@ await persist(sideAgreement);
 
 type Scores = Record<(typeof dimensions)[number], number>;
 type AgentResult = { caseId: string; server: ServerId; run: number; response: string; toolCalls: unknown[]; toolEvidence: unknown[] };
-type AgentReport = { schemaVersion: number; generatedAt: string; model: string; runsPerCase: number; results: AgentResult[] };
+type AgentReport = { schemaVersion: number; profile: string; generatedAt: string; model: string; runsPerCase: number; results: AgentResult[] };
 type Pair = { id: string; prompt: string; bright: AgentResult; upstream: AgentResult };
 type BlindPair = { pairId: string; prompt: string; aServer: ServerId; bServer: ServerId; artifactA: string; artifactB: string };
 type Judgment = { pairId: string; scores: Record<ServerId, Scores>; winner: ServerId | "tie"; confidence: number; reason: string };

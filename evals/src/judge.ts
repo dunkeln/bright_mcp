@@ -142,7 +142,7 @@ function score(value: unknown): Scores {
 }
 
 function responseSchema(pairIds: string[]) {
-  const scoreProperties = Object.fromEntries(dimensions.map((dimension) => [dimension, { type: "integer", minimum: 1, maximum: 5 }]));
+  const scoreProperties = Object.fromEntries(dimensions.map((dimension) => [dimension, { type: "integer" }]));
   const scores = { type: "object", additionalProperties: false, required: [...dimensions], properties: scoreProperties };
   return {
     type: "object", additionalProperties: false, required: ["judgments"], properties: {
@@ -151,8 +151,8 @@ function responseSchema(pairIds: string[]) {
           pairId: { type: "string", enum: pairIds },
           scores: { type: "object", additionalProperties: false, required: ["A", "B"], properties: { A: scores, B: scores } },
           winner: { type: "string", enum: ["A", "B", "tie"] },
-          confidence: { type: "number", minimum: 0, maximum: 1 },
-          reason: { type: "string", minLength: 1, maxLength: 500 },
+          confidence: { type: "number" },
+          reason: { type: "string" },
         },
       } },
     },

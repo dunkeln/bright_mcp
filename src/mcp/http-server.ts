@@ -14,11 +14,11 @@ export function startHttpServer(options: {
   port: number;
   publicUrl?: URL;
   allowedOrigins: Set<string>;
-  bearerCredentials?: {
-    bind(authorization: string | null): string | undefined;
-  };
-  browserCredentials?: {
-    bind(authorization: string | null): string | undefined;
+  requestCredentials?: {
+    bind(apiKey: string | null, browserZone?: string): {
+      principalId: string;
+      run<T>(operation: () => Promise<T>): Promise<T>;
+    } | undefined;
   };
   browserAvailable: boolean;
   widgetHtml: string;
@@ -77,29 +77,39 @@ export function startHttpServer(options: {
       }
 
       const protectedMode = isProtected(profile, options);
-      let authenticatedPrincipal: string | undefined;
+      let credentialBinding: ReturnType<
+        NonNullable<typeof options.requestCredentials>["bind"]
+      > = undefined;
       if (protectedMode) {
-        authenticatedPrincipal = (profile === "browser"
-          ? options.browserCredentials
-          : options.bearerCredentials
-        )?.bind(request.headers.get("authorization"));
-        if (!authenticatedPrincipal) {
-          const browser = profile === "browser";
+        const browserZone = profile === "browser"
+          ? url.searchParams.get("zone")?.trim() || undefined
+          : undefined;
+        if (browserZone && !/^[A-Za-z0-9_-]{1,128}$/.test(browserZone)) {
           return withCors(
-            new Response(
-              browser
-                ? "Bright Data Browser API credentials required"
-                : "Bright Data API key required",
+            Response.json(
               {
-                status: 401,
-                headers: {
-                  "cache-control": "no-store",
-                  "www-authenticate": browser
-                    ? 'Basic realm="Bright MCP Browser", charset="UTF-8"'
-                    : 'Bearer realm="Bright MCP"',
-                },
+                error: "invalid_request",
+                error_description: "The Browser API zone preference is invalid.",
               },
+              { status: 400 },
             ),
+            request,
+            true,
+            options.allowedOrigins,
+          );
+        }
+        credentialBinding = options.requestCredentials?.bind(
+          request.headers.get("x-bright-api-key"),
+          browserZone,
+        );
+        if (!credentialBinding) {
+          return withCors(
+            new Response("Bright Data API key required", {
+              status: 401,
+              headers: {
+                "cache-control": "no-store",
+              },
+            }),
             request,
             true,
             options.allowedOrigins,
@@ -128,7 +138,7 @@ export function startHttpServer(options: {
       }
       const sessionId = request.headers.get("mcp-session-id");
       let session = sessionId ? sessions.get(sessionId) : undefined;
-      const requestPrincipal = authenticatedPrincipal ?? options.localPrincipalId;
+      const requestPrincipal = credentialBinding?.principalId ?? options.localPrincipalId;
       if (
         sessionId &&
         (!session ||
@@ -189,9 +199,10 @@ export function startHttpServer(options: {
         session = { principalId: requestPrincipal, profile, server, transport };
         await server.connect(transport);
       }
-      const response = await session.transport.handleRequest(request, {
-        parsedBody,
-      });
+      const handleRequest = () => session.transport.handleRequest(request, { parsedBody });
+      const response = credentialBinding
+        ? await credentialBinding.run(handleRequest)
+        : await handleRequest();
       return withCors(
         response,
         request,
@@ -215,13 +226,10 @@ export function startHttpServer(options: {
 function isProtected(
   profile: McpProfile,
   options: {
-    bearerCredentials?: unknown;
-    browserCredentials?: unknown;
+    requestCredentials?: unknown;
   },
 ) {
-  return profile === "browser"
-    ? Boolean(options.browserCredentials)
-    : Boolean(options.bearerCredentials);
+  return Boolean(options.requestCredentials);
 }
 
 function validateHostedEdge(
@@ -257,7 +265,7 @@ function withCors(
   headers.set("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
   headers.set(
     "access-control-allow-headers",
-    "authorization, content-type, mcp-protocol-version, mcp-session-id",
+    "content-type, mcp-protocol-version, mcp-session-id, x-bright-api-key",
   );
   headers.set("access-control-expose-headers", "mcp-session-id, www-authenticate");
   return new Response(response.body, {

@@ -69,14 +69,17 @@ also require a pre-trigger maximum-cost cap. Preview remains their default.
 
 ## Browser profile
 
-The live browser profile uses Bright Data Browser API credentials, not the
-regular API token:
+The live browser profile uses the same Bright Data API key as the data tools and
+resolves an existing active Browser API zone internally:
 
 ```dotenv
 MCP_BROWSER_PROFILE=brightdata
-BRIGHTDATA_BROWSER_USERNAME=replace-with-your-browser-api-username
-BRIGHTDATA_BROWSER_PASSWORD=replace-with-your-browser-api-password
 ```
+
+Exactly one active Browser API zone is selected automatically. If the account
+has multiple active zones, set `BRIGHTDATA_BROWSER_ZONE` for local stdio or add
+`?zone=<name>` to the hosted `/mcp/browser` URL. The server never creates a
+Browser API zone.
 
 No local browser is launched or downloaded. To run the opt-in paid remote
 navigation check, also set `BRIGHTDATA_BROWSER_CHECK=1`, then run:
@@ -92,11 +95,12 @@ For stdio, select one stable surface with
 ## Hosted authorization
 
 Set `MCP_PUBLIC_URL=https://<host>/mcp`. `/mcp`, `/mcp/web`,
-`/mcp/deep-lookup`, and `/mcp/marketplace` accept the caller's Bright Data API key
-as a Bearer token. `/mcp/browser` accepts the caller's Scraping Browser username
-and password through standard HTTP Basic authorization. The server uses a hash
-as the session identity, keeps credentials only in bounded memory for at most
-one hour, and never stores them or includes them in MCP content. Hosted mode
+`/mcp/deep-lookup`, `/mcp/marketplace`, and `/mcp/browser` accept the caller's
+Bright Data API key through `X-Bright-API-Key`. The MCP client owns the secret
+and sends it on every request. The browser surface resolves native zone
+credentials internally. The server uses a hash as the session identity, keeps
+the raw key only for the active request or upstream operation, and never caches,
+persists, or includes it in MCP content. Hosted mode
 requires HTTPS, rejects deployment-global credentials, and requires the
 surface's authorization on every MCP request. Set `MCP_ALLOWED_ORIGINS` to a
 comma-separated browser-origin allowlist when needed.

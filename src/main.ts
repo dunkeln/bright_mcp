@@ -15,13 +15,12 @@ import { createBrowserUseCases } from "./browser/use-cases";
 import type { BrowserUseCases } from "./browser/use-cases";
 import { LocalResultStore, LocalWebContentStore } from "./adapters/result-store";
 import {
-  createBearerCredentialProvider,
+  createRequestCredentialProvider,
   macOsKeychainCredential,
   staticCredential,
 } from "./connections/credentials";
 import {
-  createBasicBrowserCredentialProvider,
-  staticBrowserCredential,
+  createApiKeyBrowserCredentialProvider,
 } from "./connections/browser-credentials";
 import {
   createBrightMcpServer,
@@ -49,11 +48,8 @@ if (publicMcpUrl && (publicMcpUrl.pathname !== "/mcp" || publicMcpUrl.search)) {
 if (hosted && publicMcpUrl?.protocol !== "https:") {
   throw new Error("Hosted HTTP requires an HTTPS MCP_PUBLIC_URL.");
 }
-const bearerCredentials = hosted
-  ? createBearerCredentialProvider()
-  : undefined;
-const browserCredentials = hosted
-  ? createBasicBrowserCredentialProvider()
+const requestCredentials = hosted
+  ? createRequestCredentialProvider()
   : undefined;
 const allowedOrigins = new Set(
   (process.env.MCP_ALLOWED_ORIGINS ?? "")
@@ -72,6 +68,10 @@ if (!(credentialSource === "auto" || credentialSource === "keychain")) {
   );
 }
 const apiKey = process.env.BRIGHTDATA_API_KEY?.trim();
+const browserZone = process.env.BRIGHTDATA_BROWSER_ZONE?.trim() || undefined;
+if (browserZone && !/^[A-Za-z0-9_-]{1,128}$/.test(browserZone)) {
+  throw new Error("BRIGHTDATA_BROWSER_ZONE must be a valid Bright Data zone name.");
+}
 if (credentialSource === "keychain" && apiKey) {
   throw new Error(
     "Choose either BRIGHTDATA_API_KEY or BRIGHTDATA_CREDENTIAL_SOURCE=keychain, not both.",
@@ -87,23 +87,25 @@ if (hosted && (apiKey || credentialSource === "keychain")) {
 }
 if (
   hosted &&
-  (process.env.BRIGHTDATA_SERP_ZONE || process.env.BRIGHTDATA_UNLOCKER_ZONE)
+  (process.env.BRIGHTDATA_SERP_ZONE ||
+    process.env.BRIGHTDATA_UNLOCKER_ZONE ||
+    browserZone)
 ) {
   throw new Error(
-    "Hosted HTTP discovers zones per caller and cannot use deployment-global zone names.",
+    "Hosted HTTP discovers zones per caller and cannot use deployment-global zone preferences.",
   );
 }
 const localCredentials = apiKey
-  ? staticCredential(apiKey)
+  ? staticCredential(apiKey, browserZone)
   : credentialSource === "keychain"
-    ? macOsKeychainCredential()
+    ? macOsKeychainCredential(browserZone)
     : undefined;
-if (!testFixtures && !bearerCredentials && !localCredentials) {
+if (!testFixtures && !requestCredentials && !localCredentials) {
   throw new Error(
     "Stdio requires BRIGHTDATA_API_KEY or BRIGHTDATA_CREDENTIAL_SOURCE=keychain.",
   );
 }
-const credentials = bearerCredentials?.credentials ?? localCredentials;
+const credentials = requestCredentials?.credentials ?? localCredentials;
 const gateway = credentials
   ? new BrightDataGateway({
         credentials,
@@ -112,6 +114,9 @@ const gateway = credentials
           error: (record) => console.error(JSON.stringify(record)),
         },
       })
+  : undefined;
+const browserCredentials = gateway && credentials
+  ? createApiKeyBrowserCredentialProvider(gateway, credentials)
   : undefined;
 const datasetAdapter = testFixtures
   ? createDemoDatasetAdapter(resultStore)
@@ -139,7 +144,7 @@ const selectedProfile = transportName === "stdio"
   ? readProfile(process.env.MCP_PROFILE)
   : "all";
 const browserProvider = hosted
-  ? createBrightDataBrowserProvider(browserCredentials!.credentials)
+  ? createBrightDataBrowserProvider(browserCredentials!)
   : browserProfile === "disabled"
     ? undefined
     : createBrowserProvider(browserProfile);
@@ -149,7 +154,7 @@ if (
   !browserProvider
 ) {
   throw new Error(
-    "The browser MCP profile requires MCP_BROWSER_PROFILE=brightdata and Browser API credentials.",
+    "The browser MCP profile requires MCP_BROWSER_PROFILE=brightdata and BRIGHTDATA_API_KEY.",
   );
 }
 const widgetFile = Bun.file(
@@ -217,11 +222,6 @@ process.on("SIGTERM", shutdown);
 function createBrowserProvider(
   profile: "fixture" | "brightdata",
 ): BrowserProvider {
-  if (hosted && profile === "brightdata") {
-    throw new Error(
-      "Hosted HTTP cannot use deployment-global Browser API credentials.",
-    );
-  }
   return profile === "fixture"
     ? createFakeBrowserProvider()
     : brightDataBrowserProvider();
@@ -236,16 +236,7 @@ function createBrowser(provider: BrowserProvider) {
 }
 
 function brightDataBrowserProvider() {
-  const username = process.env.BRIGHTDATA_BROWSER_USERNAME?.trim();
-  const password = process.env.BRIGHTDATA_BROWSER_PASSWORD;
-  if (!username || !password) {
-    throw new Error(
-      "The brightdata browser profile requires BRIGHTDATA_BROWSER_USERNAME and BRIGHTDATA_BROWSER_PASSWORD.",
-    );
-  }
-  return createBrightDataBrowserProvider(
-    staticBrowserCredential(username, password),
-  );
+  return createBrightDataBrowserProvider(browserCredentials!);
 }
 
 if (transportName === "stdio") {
@@ -257,8 +248,7 @@ if (transportName === "stdio") {
     port,
     publicUrl: publicMcpUrl,
     allowedOrigins,
-    bearerCredentials,
-    browserCredentials,
+    requestCredentials,
     browserAvailable: Boolean(browserProvider),
     widgetHtml,
     localPrincipalId: principalId,

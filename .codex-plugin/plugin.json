@@ -15,7 +15,16 @@
     "bright": {
       "type": "http",
       "url": "https://bright-mcp.onrender.com/mcp",
-      "bearer_token_env_var": "BRIGHTDATA_API_KEY"
+      "env_http_headers": {
+        "X-Bright-API-Key": "BRIGHTDATA_API_KEY"
+      }
+    },
+    "bright-browser": {
+      "type": "http",
+      "url": "https://bright-mcp.onrender.com/mcp/browser",
+      "env_http_headers": {
+        "X-Bright-API-Key": "BRIGHTDATA_API_KEY"
+      }
     }
   },
   "interface": {
@@ -24,7 +33,7 @@
     "longDescription": "Use seven agent-oriented Bright Data tools for live search, source discovery, exact reading, structured extraction, research, and Marketplace datasets, with an interactive dataset workbench where supported.",
     "developerName": "dunkeln",
     "category": "Developer Tools",
-    "capabilities": ["Web search", "Research", "Structured data", "Interactive results"],
+    "capabilities": ["Web search", "Research", "Structured data", "Remote browser", "Interactive results"],
     "websiteURL": "https://bright-mcp.vercel.app",
     "defaultPrompt": [
       "Research this question with current sources.",

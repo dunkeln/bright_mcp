@@ -17,7 +17,15 @@
       "type": "http",
       "url": "https://bright-mcp.onrender.com/mcp",
       "headers": {
-        "Authorization": "Bearer ${BRIGHTDATA_API_KEY}"
+        "X-Bright-API-Key": "${BRIGHTDATA_API_KEY}"
+      },
+      "tools": ["*"]
+    },
+    "bright-browser": {
+      "type": "http",
+      "url": "https://bright-mcp.onrender.com/mcp/browser",
+      "headers": {
+        "X-Bright-API-Key": "${BRIGHTDATA_API_KEY}"
       },
       "tools": ["*"]
     }

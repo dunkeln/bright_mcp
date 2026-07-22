@@ -1,8 +1,8 @@
-import { LRUCache } from "lru-cache";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 export type CredentialProvider = (
   principalId: string,
-) => Promise<{ apiKey: string }>;
+) => Promise<{ apiKey: string; browserZone?: string }>;
 
 export class CredentialResolutionError extends Error {
   constructor(readonly reason: "missing" | "unavailable", message: string) {
@@ -11,42 +11,54 @@ export class CredentialResolutionError extends Error {
   }
 }
 
-export function staticCredential(apiKey: string): CredentialProvider {
-  return async () => ({ apiKey });
+export function staticCredential(
+  apiKey: string,
+  browserZone?: string,
+): CredentialProvider {
+  return async () => ({ apiKey, browserZone });
 }
 
-export function createBearerCredentialProvider() {
-  const apiKeys = new LRUCache<string, string>({
-    max: 1_000,
-    ttl: 60 * 60_000,
-    updateAgeOnGet: true,
-    ttlAutopurge: true,
-  });
+export function createRequestCredentialProvider() {
+  const requestCredentials = new AsyncLocalStorage<{
+    principalId: string;
+    credential: { apiKey: string; browserZone?: string };
+  }>();
   return {
     credentials: async (principalId: string) => {
-      const apiKey = apiKeys.get(principalId);
-      if (!apiKey) {
+      const current = requestCredentials.getStore();
+      if (!current || current.principalId !== principalId) {
         throw new CredentialResolutionError(
           "missing",
-          "No Bright Data API key is bound to this MCP session.",
+          "No Bright Data API key is bound to this MCP request.",
         );
       }
-      return { apiKey };
+      return current.credential;
     },
-    bind(authorization: string | null) {
-      const match = /^Bearer ([^\s]{1,4096})$/.exec(authorization ?? "");
-      if (!match) return undefined;
-      const apiKey = match[1]!;
-      const digest = new Bun.CryptoHasher("sha256").update(apiKey).digest("hex");
+    bind(apiKeyHeader: string | null, browserZone?: string) {
+      if (!apiKeyHeader || !/^[^\s]{1,4096}$/.test(apiKeyHeader)) return undefined;
+      const apiKey = apiKeyHeader;
+      const digest = new Bun.CryptoHasher("sha256")
+        .update(`${apiKey}\0${browserZone ?? ""}`)
+        .digest("hex");
       const principalId = `byok_${digest.slice(0, 32)}`;
-      apiKeys.set(principalId, apiKey);
-      return principalId;
+      return {
+        principalId,
+        run<T>(operation: () => Promise<T>) {
+          return requestCredentials.run(
+            { principalId, credential: { apiKey, browserZone } },
+            operation,
+          );
+        },
+      };
     },
   };
 }
 
-export function macOsKeychainCredential(): CredentialProvider {
-  return async () => ({ apiKey: await readMacOsKeychainCredential() });
+export function macOsKeychainCredential(browserZone?: string): CredentialProvider {
+  return async () => ({
+    apiKey: await readMacOsKeychainCredential(),
+    browserZone,
+  });
 }
 
 export async function hasMacOsKeychainCredential() {

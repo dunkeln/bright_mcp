@@ -4,6 +4,7 @@ import { safeError, serverLabel, type ServerId, writeReport } from "./mcp";
 import { benchmarkProfile, workflowCases } from "./workflows";
 
 const apiKey = required("OPENROUTER_API_KEY");
+const brightDataApiKey = required("BRIGHTDATA_API_KEY");
 const configuredModel = required("OPENROUTER_MODEL");
 const model = configuredModel.startsWith("openrouter/")
   ? configuredModel
@@ -19,7 +20,7 @@ const selectedCases = process.env.EVAL_CASE
 if (selectedCases.length === 0) throw new Error(`Unknown EVAL_CASE: ${process.env.EVAL_CASE}`);
 
 const upstream = new URL("https://mcp.brightdata.com/mcp");
-upstream.searchParams.set("token", required("BRIGHTDATA_API_KEY"));
+upstream.searchParams.set("token", brightDataApiKey);
 const upstreamEcommerce = new URL(upstream);
 upstreamEcommerce.searchParams.set("groups", "ecommerce");
 const manager = new MCPClientManager(undefined, { defaultTimeout: 60_000 });
@@ -34,7 +35,11 @@ try {
   await Promise.all([
     ...(["web", "marketplace"] as const).map((profile) => manager.connectToServer(`bright-${profile}`, {
       url: new URL(`/mcp/${profile}`, process.env.BRIGHT_MCP_URL?.trim() || "https://bright-mcp.onrender.com").href,
-      accessToken: required("BRIGHTDATA_API_KEY"),
+      requestInit: {
+        headers: {
+          "X-Bright-API-Key": brightDataApiKey,
+        },
+      },
     })),
     manager.connectToServer("upstream", { url: upstream.toString() }),
     manager.connectToServer("upstream-ecommerce", { url: upstreamEcommerce.toString() }),

@@ -58,7 +58,7 @@
 6. Add `search_web`, `discover_web`, `read_web`, `extract_web`, and `research_web` through the
    same core/adapter boundaries.
 7. Add the opt-in browser profile through a fake provider, then Bright Data CDP.
-8. Add hosted caller-funded Bearer authorization as a deployment slice.
+8. Add hosted caller-funded request-secret authorization as a deployment slice.
 9. Separate stable profiles by capability and credential without dynamic tool lists.
 10. Expand the catalog as data; do not expand the declared tool surfaces.
 

@@ -1,30 +1,35 @@
 <div align="center">
   <img src="./assets/icon.png" alt="Bright MCP" width="320" />
   <br />
-  <i>unofficial iteration on BrightData API served as MCP</i>
+  <i>unofficial Bright Data MCP</i>
 </div>
 
 Agent-oriented Bright Data capabilities over MCP, built on Bun. The seven-tool
 all profile separates search, ranked source discovery, exact reading, extraction, research, maintained
 dataset discovery, and execution. It pages complete pages and upstream snapshots
-as resources and renders structured results in a
-transient React MCP workbench.
+as resources and renders structured results in a transient React MCP workbench.
 
 The full seven-tool contract remains at `/mcp`. Entitlement-aligned installs can
-use stable three- or two-tool surfaces at `/mcp/web`, `/mcp/deep-lookup`, or
+use stable three or two-tool surfaces at `/mcp/web`, `/mcp/deep-lookup`, or
 `/mcp/marketplace`; Scraping Browser is a separate four-tool surface at
 `/mcp/browser`. Tool lists never change after initialization based on a probe.
 
 ## Install
 
-Set `BRIGHTDATA_API_KEY` in the client environment first.
+Install from [`server.json`](./server.json) in clients that support MCP Registry
+remote metadata. The client prompts once for `X-Bright-API-Key`, keeps it in its
+own secret store, and adds it to each HTTP request. The key is never exposed to
+the model.
+
+Clients that do not yet implement registry secret prompts can reference
+`BRIGHTDATA_API_KEY` from their own configuration:
 
 ### Plugin
 
 Codex:
 
 ```bash
-codex plugin marketplace add dunkeln/bright_mcp --ref main
+codex plugin marketplace add dunkeln/bright_mcp
 codex plugin add bright@bright
 ```
 
@@ -39,16 +44,21 @@ claude plugin install bright@bright
 
 Codex:
 
-```bash
-codex mcp add bright --url https://bright-mcp.onrender.com/mcp \
-  --bearer-token-env-var BRIGHTDATA_API_KEY
+```toml
+[mcp_servers.bright]
+url = "https://bright-mcp.onrender.com/mcp"
+
+[mcp_servers.bright.env_http_headers]
+X-Bright-API-Key = "BRIGHTDATA_API_KEY"
 ```
 
 Claude Code:
 
 ```bash
 claude mcp add --transport http bright https://bright-mcp.onrender.com/mcp \
-  --header "Authorization: Bearer ${BRIGHTDATA_API_KEY}"
+  --header "X-Bright-API-Key: ${BRIGHTDATA_API_KEY}"
+claude mcp add --transport http bright-browser https://bright-mcp.onrender.com/mcp/browser \
+  --header "X-Bright-API-Key: ${BRIGHTDATA_API_KEY}"
 ```
 
 Cursor (`~/.cursor/mcp.json`):
@@ -58,26 +68,30 @@ Cursor (`~/.cursor/mcp.json`):
   "mcpServers": {
     "bright": {
       "url": "https://bright-mcp.onrender.com/mcp",
-      "headers": { "Authorization": "Bearer ${env:BRIGHTDATA_API_KEY}" }
+      "headers": { "X-Bright-API-Key": "${env:BRIGHTDATA_API_KEY}" }
+    },
+    "bright-browser": {
+      "url": "https://bright-mcp.onrender.com/mcp/browser",
+      "headers": { "X-Bright-API-Key": "${env:BRIGHTDATA_API_KEY}" }
     }
   }
 }
 ```
 
-The key is forwarded
-over HTTPS and kept only in a bounded in-memory cache; Bright MCP does not
-persist it. Available live capabilities follow the products enabled on that
-Bright Data account.
+The key is forwarded over HTTPS for each request and is not cached or persisted by Bright MCP.
+Available live capabilities follow the products enabled on that Bright Data account.
+The browser surface selects the account's sole active Browser API zone automatically. For multiple
+active zones, append `?zone=<name>` once to the `bright-browser` URL.
 
 Choose the narrowest surface your account and workflow need:
 
-| Endpoint | Tools | Bright Data access | Authorization |
+| Endpoint | Tools | Bright Data access | Client header |
 |---|---|---|---|
-| `/mcp` | All seven data tools | SERP, Discover, Web Unlocker, Deep Lookup, Marketplace as used | Bearer API key |
-| `/mcp/web` | `search_web`, `discover_web`, `read_web` | SERP + Discover + Web Unlocker | Bearer API key |
-| `/mcp/deep-lookup` | `extract_web`, `research_web` | General Deep Lookup | Bearer API key |
-| `/mcp/marketplace` | `find_datasets`, `run_dataset` | Account-visible Marketplace datasets | Bearer API key |
-| `/mcp/browser` | Four `browser_*` tools | Scraping Browser | HTTP Basic with Browser API username/password |
+| `/mcp` | All seven data tools | SERP, Discover, Web Unlocker, Deep Lookup, Marketplace as used | `X-Bright-API-Key` |
+| `/mcp/web` | `search_web`, `discover_web`, `read_web` | SERP + Discover + Web Unlocker | `X-Bright-API-Key` |
+| `/mcp/deep-lookup` | `extract_web`, `research_web` | General Deep Lookup | `X-Bright-API-Key` |
+| `/mcp/marketplace` | `find_datasets`, `run_dataset` | Account-visible Marketplace datasets | `X-Bright-API-Key` |
+| `/mcp/browser` | Four `browser_*` tools | Scraping Browser | `X-Bright-API-Key`; native zone credentials resolved internally |
 
 Choose among the seven data tools by intent:
 

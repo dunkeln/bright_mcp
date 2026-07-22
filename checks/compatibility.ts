@@ -394,11 +394,10 @@ async function checkBrowserProfile() {
 }
 
 async function checkRealBrowser() {
-  const username = process.env.BRIGHTDATA_BROWSER_USERNAME;
-  const password = process.env.BRIGHTDATA_BROWSER_PASSWORD;
+  const apiKey = process.env.BRIGHTDATA_API_KEY;
   assert(
-    username && password,
-    "The real browser check requires Bright Data Browser API credentials.",
+    apiKey,
+    "The real browser check requires BRIGHTDATA_API_KEY.",
   );
   const transport = new StdioClientTransport({
     command: bun,
@@ -408,8 +407,8 @@ async function checkRealBrowser() {
       MCP_TRANSPORT: "stdio",
       MCP_PROFILE: "browser",
       MCP_BROWSER_PROFILE: "brightdata",
-      BRIGHTDATA_BROWSER_USERNAME: username,
-      BRIGHTDATA_BROWSER_PASSWORD: password,
+      BRIGHTDATA_API_KEY: apiKey,
+      BRIGHTDATA_BROWSER_ZONE: process.env.BRIGHTDATA_BROWSER_ZONE ?? "",
     }),
     stderr: "pipe",
   });

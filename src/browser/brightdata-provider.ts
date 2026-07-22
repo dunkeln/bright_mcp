@@ -32,7 +32,7 @@ export function createBrightDataBrowserProvider(
   return {
     async createAndNavigate(url, timeoutMs, context) {
       return runRemote(async () => {
-        const credential = await credentials(context.principalId);
+        const credential = await credentials(context);
         const endpoint = browserEndpoint(credential);
         let browser: Browser | undefined;
         try {
@@ -318,9 +318,9 @@ export function normalizeBrowserError(error: unknown) {
   if (/(?:401|403|407|authentication)/i.test(message)) {
     return new CapabilityError(
       "browser_authentication_failed",
-      "Bright Data rejected the configured Browser API credentials.",
+      "Bright Data rejected the selected Browser API zone credentials.",
       false,
-      "Replace the Browser API username and password.",
+      "Verify that the Browser API zone is active and readable by BRIGHTDATA_API_KEY.",
     );
   }
   if (/ERR_BLOCKED_BY_CLIENT/i.test(message)) {

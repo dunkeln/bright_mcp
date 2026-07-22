@@ -5,12 +5,14 @@ Bright Data credential or silently substitute fixture data.
 
 ## Hosted BYOK
 
-Hosted Streamable HTTP clients MUST send their Bright Data API key as an
-environment-backed `Authorization: Bearer` header over HTTPS. The server MUST:
+Hosted Streamable HTTP clients MUST keep their Bright Data API key in a
+client-side secret store and send it as `X-Bright-API-Key` over HTTPS. The
+canonical `server.json` MUST declare this header as required and secret. The
+server MUST:
 
 - require the key on every MCP request;
 - bind sessions, results, tasks, and resources to a one-way key digest;
-- retain the raw key only in a bounded in-memory cache for at most one hour;
+- retain the raw key only for the active request or upstream operation;
 - never persist, log, return, or place the key in model-visible content; and
 - reject deployment-global Bright Data credentials at startup.
 
@@ -18,16 +20,19 @@ Each hosted MCP session MUST receive an isolated task store. Closing the
 session or reaching a task TTL MUST cancel any still-running upstream work
 before its task state is discarded.
 
-The bearer is the upstream Bright Data credential, not a separately issued MCP
-OAuth token. Revocation and replacement happen in the caller's Bright Data
-account and client environment.
+`Authorization` is reserved for MCP authorization and MUST NOT carry the
+upstream Bright Data credential. Revocation and replacement happen in the
+caller’s Bright Data account and client-side secret store.
 
-The hosted browser profile is a distinct credential boundary. `/mcp/browser`
-MUST accept caller-owned Scraping Browser username/password through HTTPS Basic
-authorization, bind sessions and artifacts to a namespaced digest of both
-values, retain the raw pair only in bounded memory for at most one hour, and
-never accept the regular API key as a substitute. Data profiles MUST NOT accept
-Browser API credentials.
+The hosted browser profile MUST accept the same caller-owned API key through
+the `X-Bright-API-Key` header. It MUST discover active `browser_api` zones and
+resolve the selected zone's native username/password internally. With exactly
+one active zone it selects that zone automatically; with none it returns an
+actionable enablement error; with multiple it requires the optional `zone`
+query preference on the browser MCP URL. Resolved native credentials MUST be
+retained only for the active browser connection and never returned, logged,
+persisted, or exposed to the client. The server MUST NOT create a Browser API
+zone automatically.
 
 ## Local stdio
 

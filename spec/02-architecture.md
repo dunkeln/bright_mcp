@@ -37,7 +37,8 @@ MUST NOT become core domain models.
 - Resolves local credentials from explicit environment or Keychain input.
 - Keeps Bright Data credentials out of use-case input,
   tool schemas, canonical results, resources, and app payloads.
-- Separates API-key principals from Scraping Browser username/password principals.
+- Keeps browser sessions isolated while deriving their native zone credentials
+  from the same API-key principal used by data profiles.
 
 ### Core
 

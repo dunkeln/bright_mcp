@@ -14,7 +14,14 @@
     "bright": {
       "httpUrl": "https://bright-mcp.onrender.com/mcp",
       "headers": {
-        "Authorization": "Bearer ${BRIGHTDATA_API_KEY}"
+        "X-Bright-API-Key": "${BRIGHTDATA_API_KEY}"
+      },
+      "timeout": 600000
+    },
+    "bright-browser": {
+      "httpUrl": "https://bright-mcp.onrender.com/mcp/browser",
+      "headers": {
+        "X-Bright-API-Key": "${BRIGHTDATA_API_KEY}"
       },
       "timeout": 600000
     }

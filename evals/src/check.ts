@@ -24,6 +24,7 @@ const expectedBrightProfiles = {
   "/mcp/web": ["discover_web", "read_web", "search_web"],
   "/mcp/deep-lookup": ["extract_web", "research_web"],
   "/mcp/marketplace": ["find_datasets", "run_dataset"],
+  "/mcp/browser": ["browser_close", "browser_interact", "browser_navigate", "browser_observe"],
 } as const;
 
 const reports = [];
@@ -69,8 +70,9 @@ for (const server of ["bright", "upstream"] as const) {
     );
     if (server === "bright") {
       for (const [path, expected] of Object.entries(expectedBrightProfiles)) {
-        const profile = await connect("bright", path);
+        let profile: Client | undefined;
         try {
+          profile = await connect("bright", path);
           const actual = (await profile.listTools()).tools.map(({ name }) => name).toSorted();
           record(
             checks,
@@ -78,8 +80,16 @@ for (const server of ["bright", "upstream"] as const) {
             JSON.stringify(actual) === JSON.stringify(expected),
             `expected ${expected.join(", ")}; received ${actual.join(", ")}`,
           );
+        } catch (error) {
+          record(
+            checks,
+            `${path} exposes its frozen tool surface`,
+            false,
+            safeError(error),
+            path !== "/mcp/browser",
+          );
         } finally {
-          await profile.close();
+          await profile?.close();
         }
       }
       await probe(checks, client, "known-URL extraction preview is available", "extract_web", {

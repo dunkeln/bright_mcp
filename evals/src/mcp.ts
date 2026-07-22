@@ -22,7 +22,11 @@ export async function connect(server: ServerId, path = "/mcp") {
   await client.connect(
     new StreamableHTTPClientTransport(url, {
       requestInit: server === "bright"
-        ? { headers: { authorization: `Bearer ${token}` } }
+        ? {
+            headers: {
+              "X-Bright-API-Key": token,
+            },
+          }
         : undefined,
     }),
   );
@@ -30,7 +34,7 @@ export async function connect(server: ServerId, path = "/mcp") {
 }
 
 export function serverLabel(server: ServerId) {
-  return server === "bright" ? "Bright MCP" : "BrightData MCP";
+  return server === "bright" ? "Bright MCP" : "Bright Data MCP";
 }
 
 export function safeError(error: unknown) {

@@ -143,18 +143,19 @@ export function createBrightDataCatalog(gateway: BrightDataGateway): DatasetCata
         .filter(({ score }) => score > 0)
         .sort((left, right) => right.score - left.score || candidateTitle(left).localeCompare(candidateTitle(right)))
         .slice(0, limit);
-      return Promise.all(selected.map(async (candidate) => {
+      const definitions = await Promise.all(selected.map(async (candidate) => {
         if ("collector" in candidate) return maintainedCollectorDefinition(candidate.collector);
         const fallback = maintainedCollectors.get(candidate.dataset.id);
         try {
           return marketplaceDefinition(candidate.dataset, await fields(candidate.dataset.id, context));
         } catch (error) {
-          if (fallback && error instanceof CapabilityError && error.code === "upstream_capability_unavailable") {
-            return maintainedCollectorDefinition(fallback);
+          if (error instanceof CapabilityError && error.code === "upstream_capability_unavailable") {
+            return fallback ? maintainedCollectorDefinition(fallback) : undefined;
           }
           throw error;
         }
       }));
+      return definitions.filter((definition): definition is DatasetDefinition => definition !== undefined);
     },
 
     async describe(datasetId, context) {

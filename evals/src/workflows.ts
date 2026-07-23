@@ -12,6 +12,13 @@ export const workflowCases = [
     brightProfile: "web",
     prompt:
       'Find Tesla\'s current stock price. Return one JSON object with keys "price", "currency", "asOf", and "sourceUrl". A single Markdown JSON fence and brief surrounding text are allowed.',
+    turns: [
+      'Find Tesla\'s current stock price. Return one JSON object with keys "price", "currency", "asOf", and "sourceUrl". A single Markdown JSON fence and brief surrounding text are allowed.',
+      'Verify the quote against another current source. Return the best-supported answer in the same JSON shape, updating the source and timestamp if needed.',
+      'Check whether the selected quote is delayed, real-time, or unspecified. Keep the same JSON shape and do not invent a precision the source does not provide.',
+      'Resolve any remaining disagreement using the freshest evidence available. Return the revised answer in the same JSON shape.',
+      'Give the final concise, best-supported answer in the same JSON shape with a working source URL.',
+    ],
     toolPath: {
       bright: [["search_web"]],
       upstream: [["search_engine"]],
@@ -26,6 +33,13 @@ export const workflowCases = [
     brightProfile: "web",
     prompt:
       'Read https://example.com and https://www.iana.org/help/example-domains in that order. Return one JSON array; each item must have "url", "title", and "summary". A single Markdown JSON fence and brief surrounding text are allowed.',
+    turns: [
+      'Read https://example.com and https://www.iana.org/help/example-domains in that order. Return one JSON array; each item must have "url", "title", and "summary". A single Markdown JSON fence and brief surrounding text are allowed.',
+      'Verify both summaries against the page evidence. Return the complete revised two-item array in the same JSON shape.',
+      'Make the different purpose of each page explicit without adding unsupported detail. Return the complete array again.',
+      'Check that each title and URL corresponds to the correct page. Return the corrected complete array.',
+      'Give the final concise two-item array in the same JSON shape.',
+    ],
     toolPath: {
       bright: [["read_web"]],
       upstream: [["scrape_batch", "scrape_as_markdown"]],
@@ -96,6 +110,13 @@ export const workflowCases = [
     brightProfile: "marketplace",
     prompt:
       'Get structured Amazon product search data for wireless earbuds from Amazon.com. Do not explain which product to use; execute the available data capability. Return one JSON object with keys "dataset", "rowCount", "fields", and "continuation". A single Markdown JSON fence and brief surrounding text are allowed.',
+    turns: [
+      'Get structured Amazon product search data for wireless earbuds from Amazon.com. Do not explain which product to use; execute the available data capability. Return one JSON object with keys "dataset", "rowCount", "fields", and "continuation". A single Markdown JSON fence and brief surrounding text are allowed.',
+      'Verify that the dataset, row count, and fields are supported by the tool result. Rerun only if evidence is missing, then return the complete object in the same JSON shape.',
+      'Determine whether a continuation or pagination value is actually available. Return the complete revised object and do not invent one.',
+      'Remove any fields or claims that are inferred rather than present in the result. Return the complete object again.',
+      'Give the final concise, evidence-grounded object in the same JSON shape.',
+    ],
     upstreamProfile: "ecommerce",
     toolPath: {
       bright: [["find_datasets"], ["run_dataset"]],
@@ -119,3 +140,8 @@ export const workflowCases = [
 ] as const;
 
 export type WorkflowCase = (typeof workflowCases)[number];
+
+if (import.meta.main) {
+  if (workflowCases.some(({ turns }) => turns.length < 5)) throw new Error("Every active workflow must author five turns.");
+  console.log(`${workflowCases.length} workflows author at least five turns.`);
+}

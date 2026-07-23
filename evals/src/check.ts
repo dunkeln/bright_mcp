@@ -35,6 +35,8 @@ for (const server of ["bright", "upstream"] as const) {
   const checks: Check[] = [];
   let client: Client | undefined;
   try {
+    const conformance = await runConformance(server);
+    record(checks, "MCPJam protocol conformance", conformance.ok, conformance.detail);
     client = await connect(server);
     const { tools } = await client.listTools();
     const actual = tools.map(({ name }) => name).toSorted();
@@ -53,6 +55,17 @@ for (const server of ["bright", "upstream"] as const) {
       incompatibleSchemas.length === 0,
       `incompatible tools: ${incompatibleSchemas.join(", ")}`,
     );
+    const acceptsEmptyInput: string[] = [];
+    for (const { name, inputSchema } of tools) {
+      const required = (inputSchema as { required?: string[] }).required ?? [];
+      if (required.length && !(await rejects(client, name, {}))) acceptsEmptyInput.push(name);
+    }
+    record(
+      checks,
+      "every required-input tool rejects an empty call",
+      acceptsEmptyInput.length === 0,
+      `accepted empty input: ${acceptsEmptyInput.join(", ")}`,
+    );
 
     const searchName = server === "bright" ? "search_web" : "search_engine";
     const search = tools.find(({ name }) => name === searchName);
@@ -63,15 +76,18 @@ for (const server of ["bright", "upstream"] as const) {
     const queryProperty = server === "bright" ? "queries" : "query";
     record(checks, "search query is schema-required", schema?.required?.includes(queryProperty) === true);
     record(checks, "search query is schema-declared", queryProperty in (schema?.properties ?? {}));
-    record(
-      checks,
-      "missing search query is rejected",
-      await rejects(client, searchName, {}),
-    );
     if (server === "bright") {
       for (const [path, expected] of Object.entries(expectedBrightProfiles)) {
         let profile: Client | undefined;
         try {
+          const conformance = await runConformance("bright", path);
+          record(
+            checks,
+            `${path} passes MCPJam protocol conformance`,
+            conformance.ok,
+            conformance.detail,
+            path !== "/mcp/browser",
+          );
           profile = await connect("bright", path);
           const actual = (await profile.listTools()).tools.map(({ name }) => name).toSorted();
           record(
@@ -152,7 +168,58 @@ function record(
   detail?: string,
   blocking = true,
 ) {
-  checks.push({ name, ok, ...(ok || !detail ? {} : { detail }), ...(blocking ? {} : { blocking: false }) });
+  checks.push({ name, ok, ...(!detail ? {} : { detail }), ...(blocking ? {} : { blocking: false }) });
+}
+
+async function runConformance(server: ServerId, path = "/mcp") {
+  const token = process.env.BRIGHTDATA_API_KEY;
+  if (!token) return { ok: false, detail: "BRIGHTDATA_API_KEY is required for MCPJam conformance." };
+  const url = server === "bright"
+    ? new URL(path, "https://bright-mcp.onrender.com/mcp")
+    : new URL("https://mcp.brightdata.com/mcp");
+  const args = [
+    new URL("../node_modules/.bin/mcpjam", import.meta.url).pathname,
+    "protocol",
+    "conformance",
+    "--url",
+    server === "upstream" ? `${url}?token=${encodeURIComponent(token)}` : url.href,
+    "--reporter",
+    "json-summary",
+    ...(server === "bright" ? ["--header", `X-Bright-API-Key: ${token}`] : []),
+  ];
+  const child = Bun.spawn(args, { stdout: "pipe", stderr: "pipe" });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ]);
+  try {
+    const jsonStart = stdout.indexOf('{"schemaVersion"');
+    const report = JSON.parse(jsonStart < 0 ? stdout : stdout.slice(jsonStart)) as {
+      passed?: boolean;
+      groups?: Array<{
+        passed?: boolean;
+        summary?: string;
+        cases?: Array<{ title?: string; status?: string }>;
+      }>;
+    };
+    const group = report.groups?.[0];
+    const failures = group?.cases
+      ?.filter(({ status }) => status === "failed")
+      .map(({ title }) => title)
+      .filter(Boolean) ?? [];
+    return {
+      ok: exitCode === 0 && report.passed === true && group?.passed === true,
+      detail: [group?.summary, failures.length ? `failed: ${failures.join(", ")}` : undefined]
+        .filter(Boolean)
+        .join("; ") || `MCPJam exited ${exitCode}.`,
+    };
+  } catch {
+    return {
+      ok: false,
+      detail: safeError(stderr.trim() || `MCPJam exited ${exitCode} without a JSON report.`),
+    };
+  }
 }
 
 async function rejects(client: Client, name: string, args: Record<string, unknown>) {

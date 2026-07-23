@@ -1,4 +1,4 @@
-import { HostRunner, MCPClientManager } from "@mcpjam/sdk";
+import { HostRunner, MCPClientManager, type PromptResult } from "@mcpjam/sdk";
 import { validatesOutcome } from "./grading";
 import { safeError, serverLabel, type ServerId, writeReport } from "./mcp";
 import { benchmarkProfile, workflowCases } from "./workflows";
@@ -9,7 +9,7 @@ const configuredModel = required("OPENROUTER_MODEL");
 const model = configuredModel.startsWith("openrouter/")
   ? configuredModel
   : `openrouter/${configuredModel}`;
-const runs = integer("EVAL_RUNS", 10, 1, 100);
+const runs = integer("EVAL_RUNS", 5, 1, 100);
 const concurrency = integer("EVAL_CONCURRENCY", 4, 2, 20);
 const artifactName = process.env.EVAL_ARTIFACT?.trim() || "agent";
 if (!/^[a-z0-9-]+$/.test(artifactName)) throw new Error("EVAL_ARTIFACT must contain only lowercase letters, numbers, and hyphens.");
@@ -18,6 +18,8 @@ const selectedCases = process.env.EVAL_CASE
   ? workflowCases.filter(({ id }) => id === process.env.EVAL_CASE)
   : workflowCases;
 if (selectedCases.length === 0) throw new Error(`Unknown EVAL_CASE: ${process.env.EVAL_CASE}`);
+const authoredTurns = Math.min(...selectedCases.map(({ turns }) => turns.length));
+const turns = integer("EVAL_TURNS", 5, 1, authoredTurns);
 
 const upstream = new URL("https://mcp.brightdata.com/mcp");
 upstream.searchParams.set("token", brightDataApiKey);
@@ -77,24 +79,31 @@ try {
       model,
       apiKey,
       temperature: 0.1,
-      maxSteps: job.useCase.toolPath[job.server].length + 2,
+      maxSteps: Math.max(...Object.values(job.useCase.toolPath).map((path) => path.length)) + 2,
       mcpClientManager: manager,
     });
     const startedAt = performance.now();
-    const result = await runner.run(job.useCase.prompt, { timeoutMs: 120_000 });
+    const turnResults: PromptResult[] = [];
+    for (const prompt of job.useCase.turns.slice(0, turns)) {
+      turnResults.push(await runner.run(prompt, {
+        context: turnResults,
+        timeoutMs: 120_000,
+      }));
+    }
+    const result = turnResults.at(-1)!;
     const path = job.useCase.toolPath[job.server];
-    const called = result.toolsCalled();
+    const called = turnResults.flatMap((turn) => turn.toolsCalled());
     const toolSelected = followsPath(called, path);
     const responseComplete = result.text.trim().length > 0;
     const outcomeValid = validatesOutcome(result.text, job.useCase);
-    const toolEvidence = result.getToolMessages();
+    const toolEvidence = turnResults.flatMap((turn) => turn.getToolMessages());
     const successfulTools = successfulToolExecutions(toolEvidence);
     const toolExecutionValid = path.every((choices) =>
       choices.some((tool) => successfulTools.has(tool))
     );
     const argumentsValid = toolExecutionValid;
     const toolExecutionClean =
-      !result.hasError() && !hasToolExecutionError(toolEvidence);
+      turnResults.every((turn) => !turn.hasError()) && !hasToolExecutionError(toolEvidence);
     const passed = responseComplete && outcomeValid;
     return {
       caseId: job.useCase.id,
@@ -110,15 +119,29 @@ try {
       responseComplete,
       outcomeValid,
       toolsCalled: called,
-      inputTokens: result.inputTokens(),
-      outputTokens: result.outputTokens(),
-      tokenCount: result.totalTokens(),
+      inputTokens: sum(turnResults, (turn) => turn.inputTokens()),
+      outputTokens: sum(turnResults, (turn) => turn.outputTokens()),
+      tokenCount: sum(turnResults, (turn) => turn.totalTokens()),
       latencyMs: Math.round(performance.now() - startedAt),
+      llmLatencyMs: sum(turnResults, (turn) => turn.llmLatencyMs()),
+      mcpLatencyMs: sum(turnResults, (turn) => turn.mcpLatencyMs()),
       response: result.text,
-      toolCalls: result.getToolCalls(),
+      toolCalls: turnResults.flatMap((turn) => turn.getToolCalls()),
       toolEvidence,
-      ...(result.hasError()
-        ? { error: safeError(result.getError()) }
+      turns: turnResults.map((turn, index) => ({
+        turn: index + 1,
+        responseComplete: turn.text.trim().length > 0,
+        toolsCalled: turn.toolsCalled(),
+        inputTokens: turn.inputTokens(),
+        outputTokens: turn.outputTokens(),
+        tokenCount: turn.totalTokens(),
+        latencyMs: turn.e2eLatencyMs(),
+        llmLatencyMs: turn.llmLatencyMs(),
+        mcpLatencyMs: turn.mcpLatencyMs(),
+        ...(turn.hasError() ? { error: safeError(turn.getError()) } : {}),
+      })),
+      ...(turnResults.find((turn) => turn.hasError())
+        ? { error: safeError(turnResults.find((turn) => turn.hasError())!.getError()) }
         : toolExecutionClean || passed
           ? {}
           : { error: "MCP tool execution failed." }),
@@ -166,11 +189,29 @@ type AgentResult = {
   outputTokens: number;
   tokenCount: number;
   latencyMs: number;
+  llmLatencyMs: number;
+  mcpLatencyMs: number;
   response: string;
   toolCalls: unknown[];
   toolEvidence: unknown[];
+  turns: Array<{
+    turn: number;
+    responseComplete: boolean;
+    toolsCalled: string[];
+    inputTokens: number;
+    outputTokens: number;
+    tokenCount: number;
+    latencyMs: number;
+    llmLatencyMs: number;
+    mcpLatencyMs: number;
+    error?: string;
+  }>;
   error?: string;
 };
+
+function sum(values: PromptResult[], select: (value: PromptResult) => number) {
+  return values.reduce((total, value) => total + select(value), 0);
+}
 
 function followsPath(called: string[], path: readonly (readonly string[])[]) {
   let position = 0;
@@ -237,9 +278,10 @@ async function readPrevious(): Promise<AgentResult[]> {
     profile?: string;
     model?: string;
     runsPerCase?: number;
+    turnsPerCase?: number;
     results?: AgentResult[];
   };
-  return report.schemaVersion === 7 && report.profile === benchmarkProfile && report.model === model && report.runsPerCase === runs && Array.isArray(report.results)
+  return report.schemaVersion === 7 && report.profile === benchmarkProfile && report.model === model && report.runsPerCase === runs && report.turnsPerCase === turns && Array.isArray(report.results)
     ? report.results
     : [];
 }
@@ -256,6 +298,7 @@ async function persist() {
     profile: benchmarkProfile,
     model,
     runsPerCase: runs,
+    turnsPerCase: turns,
     grading:
       "End-to-end pass requires a complete response with the required outcome fields and provenance. Intended tool selection, valid execution of each expected workflow step, clean execution, and recovery are reported as separate dimensions. Factual values are not independently graded.",
     results,

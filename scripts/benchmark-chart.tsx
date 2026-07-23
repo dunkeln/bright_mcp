@@ -2,8 +2,10 @@ import { useEffect } from "react";
 import { createRoot } from "react-dom/client";
 
 type ServerDatum = {
+  successfulRuns: number;
   passRate: number;
   averageTokens: number;
+  medianLatency: number;
   averageTools: number;
 };
 type TaskDatum = {
@@ -21,8 +23,13 @@ declare global {
       judgeModel: string;
       runsPerCase: number;
       tasks: TaskDatum[];
-      quality: { dimensions: QualityDimension[] };
+      quality: { scale: { minimum: number; maximum: number }; dimensions: QualityDimension[] };
       preference: { brightData: number; bright: number; ties: number };
+      overallQuality: { brightData: number; bright: number };
+      contextGate: {
+        runsPerServer: number;
+        current: Record<"bright" | "brightData", { averageTokens: number }>;
+      };
     };
   }
 }
@@ -31,7 +38,14 @@ const colors = { brightData: "#a371f7", bright: "#438cf5" } as const;
 const plot = { left: 210, right: 1080, top: 34, bottom: 430 };
 
 function BenchmarkCharts() {
-  const { tasks, model, judgeModel, quality, preference, runsPerCase } = window.benchmark;
+  const { tasks, model, judgeModel, quality, preference, overallQuality, runsPerCase, contextGate } = window.benchmark;
+  const efficiencyTasks = tasks.map((task) => task.label === "Current search"
+    ? {
+        ...task,
+        bright: { ...task.bright, averageTokens: contextGate.current.bright.averageTokens },
+        brightData: { ...task.brightData, averageTokens: contextGate.current.brightData.averageTokens },
+      }
+    : task);
   useEffect(() => {
     let frames = 0;
     const ready = () => {
@@ -43,32 +57,30 @@ function BenchmarkCharts() {
 
   return (
     <main className="w-[1200px] bg-[#0d1117] text-neutral-50">
+      <Chart id="benchmark-outcomes" title="Bright MCP leads the five-turn benchmark" subtitle="Matched conversations · higher is better on every row" meta={meta(model, runsPerCase)}>
+        <OutcomeScorecard tasks={tasks} quality={overallQuality} preference={preference} />
+      </Chart>
       <Chart id="benchmark-completion" title="Where each MCP completes the job" subtitle="Tool-use pass rate by workflow" meta={meta(model, runsPerCase)}>
         <PairedBars tasks={tasks} value={(datum) => datum.passRate * 100} domain={100} format={(value) => `${Math.round(value)}%`} />
       </Chart>
-      <Chart id="benchmark-preference" title="Which answer the blind judge preferred" subtitle="Matched runs · ties remain ties" meta={`${judgeModel} judge`}>
+      <Chart id="benchmark-latency" title="How long successful workflows take" subtitle="Median end-to-end latency · lower is better · failures stay in completion rate" meta={meta(model, runsPerCase)}>
+        <PairedBars tasks={tasks} value={(datum) => datum.medianLatency / 1000} domain={latencyDomain(tasks)} format={(value) => `${value.toFixed(1)}s`} formatValue={(value, datum) => `${value.toFixed(1)}s · n=${datum.successfulRuns}`} />
+      </Chart>
+      <Chart id="benchmark-preference" title={preferenceTitle(preference)} subtitle="Matched runs · ties remain ties" meta={`${judgeModel} judge`}>
         <Preference values={preference} />
       </Chart>
-      <Chart id="benchmark-radar" title="How the answers compare" subtitle="Blind judge scores · every spoke uses the same 1–5 scale" meta={judgeModel}>
-        <Radar dimensions={quality.dimensions} />
+      <Chart id="benchmark-radar" title={qualityTitle(quality.dimensions)} subtitle={`Blind judge scores · every spoke uses the same ${quality.scale.minimum}–${quality.scale.maximum} scale`} meta={`${judgeModel} judge`}>
+        <Radar dimensions={quality.dimensions} maximum={quality.scale.maximum} />
       </Chart>
-      <Chart id="benchmark-quality-cost" title="How much answer quality each token budget buys" subtitle="Blind-judge points per 10k tokens · higher is better" meta={`${judgeModel} judge`}>
+      <Chart id="benchmark-efficiency" title="How much context successful workflows use" subtitle="Average total tokens · lower is better · Search uses the targeted rerun" meta={`Search n=${contextGate.runsPerServer} · other rows n=${runsPerCase}`}>
         <PairedBars
-          tasks={tasks}
-          value={(datum, task, server) => datum.averageTokens ? task.quality[server] * 10_000 / datum.averageTokens : 0}
-          domain={qualityEfficiencyDomain(tasks)}
-          format={(value) => value.toFixed(1)}
+          tasks={efficiencyTasks}
+          value={(datum) => datum.averageTokens}
+          domain={tokenDomain(efficiencyTasks)}
+          format={(value) => Math.round(value).toLocaleString("en-US")}
         />
       </Chart>
-      <Chart id="benchmark-efficiency" title="How many passing runs each token budget buys" subtitle="Benchmark passes per 10k total tokens · higher is better" meta={meta(model, runsPerCase)}>
-        <PairedBars
-          tasks={tasks}
-          value={(datum) => datum.averageTokens ? datum.passRate * 10_000 / datum.averageTokens : 0}
-          domain={efficiencyDomain(tasks)}
-          format={(value) => value.toFixed(1)}
-        />
-      </Chart>
-      <Chart id="benchmark-complexity" title="How much tool work each workflow takes" subtitle="Average MCP tool calls per run" meta={meta(model, runsPerCase)}>
+      <Chart id="benchmark-complexity" title="How much tool work successful workflows take" subtitle="Average MCP tool calls among successful runs" meta={meta(model, runsPerCase)}>
         <PairedBars tasks={tasks} value={(datum) => datum.averageTools} domain={Math.max(...tasks.flatMap(({ bright, brightData }) => [bright.averageTools, brightData.averageTools]), 1)} format={(value) => value.toFixed(1)} />
       </Chart>
     </main>
@@ -95,12 +107,63 @@ function Legend() {
   return (
     <div className="mt-4 flex gap-5 text-xs text-neutral-300" aria-hidden="true">
       <span className="flex items-center gap-2"><i className="h-3 w-3 bg-[#438cf5]" />Bright MCP</span>
-      <span className="flex items-center gap-2"><i className="h-3 w-3 bg-[#a371f7]" />BrightData MCP</span>
+      <span className="flex items-center gap-2"><i className="h-3 w-3 bg-[#a371f7]" />Official Bright Data MCP</span>
     </div>
   );
 }
 
-function PairedBars({ tasks, value, domain, format }: { tasks: TaskDatum[]; value: (datum: ServerDatum, task: TaskDatum, server: "bright" | "brightData") => number; domain: number; format: (value: number) => string }) {
+function OutcomeScorecard({ tasks, quality, preference }: {
+  tasks: TaskDatum[];
+  quality: { brightData: number; bright: number };
+  preference: { brightData: number; bright: number; ties: number };
+}) {
+  const successful = {
+    bright: tasks.reduce((sum, task) => sum + task.bright.successfulRuns, 0),
+    brightData: tasks.reduce((sum, task) => sum + task.brightData.successfulRuns, 0),
+  };
+  const totalRuns = tasks.length * window.benchmark.runsPerCase;
+  const preferenceTotal = preference.bright + preference.brightData + preference.ties;
+  const rows = [
+    {
+      label: "Completed workflows",
+      detail: `${totalRuns} matched runs`,
+      bright: successful.bright / totalRuns,
+      brightData: successful.brightData / totalRuns,
+      format: (value: number, server: "bright" | "brightData") => `${successful[server]}/${totalRuns} · ${Math.round(value * 100)}%`,
+    },
+    {
+      label: "Blind answer quality",
+      detail: "mean across five judged dimensions",
+      bright: quality.bright / 10,
+      brightData: quality.brightData / 10,
+      format: (_value: number, server: "bright" | "brightData") => `${quality[server].toFixed(2)}/10`,
+    },
+    {
+      label: "Judge preference",
+      detail: `${preference.ties} ties retained`,
+      bright: preference.bright / preferenceTotal,
+      brightData: preference.brightData / preferenceTotal,
+      format: (value: number, server: "bright" | "brightData") => `${preference[server]} of ${preferenceTotal} · ${Math.round(value * 100)}%`,
+    },
+  ];
+  const x = (value: number) => 300 + value * 730;
+  return <svg viewBox="0 0 1120 460" role="img" className="h-full w-full">
+    <Patterns />
+    {rows.map((row, index) => {
+      const y = 72 + index * 120;
+      return <g key={row.label}>
+        <text x="0" y={y} className="label">{row.label}</text>
+        <text x="0" y={y + 19} className="axis">{row.detail}</text>
+        <rect x="300" y={y - 17} width={Math.max(1, x(row.bright) - 300)} height="14" fill="url(#blue-dither)" />
+        <rect x="300" y={y + 7} width={Math.max(1, x(row.brightData) - 300)} height="14" fill="url(#purple-dither)" />
+        <text x={Math.min(x(row.bright) + 10, 1075)} y={y - 5} className="value">{row.format(row.bright, "bright")}</text>
+        <text x={Math.min(x(row.brightData) + 10, 1075)} y={y + 20} className="value">{row.format(row.brightData, "brightData")}</text>
+      </g>;
+    })}
+  </svg>;
+}
+
+function PairedBars({ tasks, value, domain, format, formatValue = format }: { tasks: TaskDatum[]; value: (datum: ServerDatum, task: TaskDatum, server: "bright" | "brightData") => number; domain: number; format: (value: number) => string; formatValue?: (value: number, datum: ServerDatum, task: TaskDatum, server: "bright" | "brightData") => string }) {
   const x = (number: number) => plot.left + (number / domain) * (plot.right - plot.left);
   return (
     <svg viewBox="0 0 1120 460" role="img" className="h-full w-full">
@@ -114,15 +177,15 @@ function PairedBars({ tasks, value, domain, format }: { tasks: TaskDatum[]; valu
           <text x="0" y={y + 5} className="label">{task.label}</text>
           <rect x={plot.left} y={y - 12} width={Math.max(1, x(bright) - plot.left)} height="10" fill="url(#blue-dither)" />
           <rect x={plot.left} y={y + 3} width={Math.max(1, x(brightData) - plot.left)} height="10" fill="url(#purple-dither)" />
-          <text x={Math.min(x(bright) + 8, 1090)} y={y - 3} className="value">{format(bright)}</text>
-          <text x={Math.min(x(brightData) + 8, 1090)} y={y + 13} className="value">{format(brightData)}</text>
+          <text x={Math.min(x(bright) + 8, 1090)} y={y - 3} className="value">{formatValue(bright, task.bright, task, "bright")}</text>
+          <text x={Math.min(x(brightData) + 8, 1090)} y={y + 13} className="value">{formatValue(brightData, task.brightData, task, "brightData")}</text>
         </g>;
       })}
     </svg>
   );
 }
 
-function Radar({ dimensions }: { dimensions: QualityDimension[] }) {
+function Radar({ dimensions, maximum }: { dimensions: QualityDimension[]; maximum: number }) {
   const center = { x: 560, y: 225 };
   const radius = 155;
   const point = (index: number, value: number, extra = 0) => {
@@ -131,7 +194,7 @@ function Radar({ dimensions }: { dimensions: QualityDimension[] }) {
     return { x: center.x + Math.cos(angle) * distance, y: center.y + Math.sin(angle) * distance };
   };
   const points = (server: "bright" | "brightData") => dimensions.map((dimension, index) => {
-    const position = point(index, dimension[server] / 5);
+    const position = point(index, dimension[server] / maximum);
     return `${position.x},${position.y}`;
   }).join(" ");
   return (
@@ -150,11 +213,11 @@ function Radar({ dimensions }: { dimensions: QualityDimension[] }) {
       <polygon points={points("brightData")} fill="url(#purple-dither)" fillOpacity="0.35" stroke={colors.brightData} strokeWidth="3" />
       <polygon points={points("bright")} fill="url(#blue-dither)" fillOpacity="0.35" stroke={colors.bright} strokeWidth="3" />
       {(["brightData", "bright"] as const).flatMap((server) => dimensions.map((dimension, index) => {
-        const p = point(index, dimension[server] / 5);
+        const p = point(index, dimension[server] / maximum);
         return <circle key={`${server}-${dimension.label}`} cx={p.x} cy={p.y} r="5" fill={`url(#${server === "bright" ? "blue" : "purple"}-dither)`} stroke={colors[server]} />;
       }))}
-      <text x={center.x + 8} y={center.y - radius * 0.4} className="axis">2</text>
-      <text x={center.x + 8} y={center.y - radius} className="axis">5</text>
+      <text x={center.x + 8} y={center.y - radius * 0.5} className="axis">{maximum / 2}</text>
+      <text x={center.x + 8} y={center.y - radius} className="axis">{maximum}</text>
     </svg>
   );
 }
@@ -163,7 +226,7 @@ function Preference({ values }: { values: { brightData: number; bright: number; 
   const total = values.bright + values.brightData + values.ties;
   const rows = [
     { label: "Bright MCP", value: values.bright, fill: "url(#blue-dither)" },
-    { label: "BrightData MCP", value: values.brightData, fill: "url(#purple-dither)" },
+    { label: "Official Bright Data MCP", value: values.brightData, fill: "url(#purple-dither)" },
     { label: "Tie", value: values.ties, fill: "#484f58" },
   ];
   const x = (value: number) => 210 + (value / Math.max(total, 1)) * 820;
@@ -188,16 +251,25 @@ function meta(model: string, runs: number) {
   return `${model} · ${runs} runs/case`;
 }
 
-function efficiencyDomain(tasks: TaskDatum[]) {
-  const maximum = Math.max(...tasks.flatMap(({ bright, brightData }) => [bright, brightData]).map((datum) => datum.averageTokens ? datum.passRate * 10_000 / datum.averageTokens : 0));
-  return Math.ceil(maximum * 2) / 2;
+function latencyDomain(tasks: TaskDatum[]) {
+  const maximum = Math.max(...tasks.flatMap(({ bright, brightData }) => [bright.medianLatency, brightData.medianLatency])) / 1000;
+  return Math.ceil(maximum * 1.2 / 10) * 10;
 }
 
-function qualityEfficiencyDomain(tasks: TaskDatum[]) {
-  const maximum = Math.max(...tasks.flatMap((task) => (["bright", "brightData"] as const).map((server) =>
-    task[server].averageTokens ? task.quality[server] * 10_000 / task[server].averageTokens : 0
-  )));
-  return Math.ceil(maximum * 2) / 2;
+function tokenDomain(tasks: TaskDatum[]) {
+  const maximum = Math.max(...tasks.flatMap(({ bright, brightData }) => [bright.averageTokens, brightData.averageTokens]));
+  return Math.ceil(maximum * 1.15 / 10_000) * 10_000;
+}
+
+function preferenceTitle(preference: { brightData: number; bright: number }) {
+  return `Blind judge preferred Bright MCP ${preference.bright}–${preference.brightData}`;
+}
+
+function qualityTitle(dimensions: QualityDimension[]) {
+  const wins = dimensions.filter(({ bright, brightData }) => bright > brightData).length;
+  return wins === dimensions.length
+    ? `Bright MCP wins all ${wins} quality dimensions`
+    : `Bright MCP wins ${wins} of ${dimensions.length} quality dimensions`;
 }
 
 const root = document.getElementById("root");

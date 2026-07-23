@@ -1,13 +1,42 @@
 <div align="center">
-  <img src="./assets/icon.png" alt="Bright MCP" width="320" />
+  <img src="./assets/icon.png" alt="Bright MCP" width="170" />
   <br />
-  <i>unofficial Bright Data MCP</i>
+  <i>unofficial support for Bright Data APIs</i>
+  <p>
+    <a href="https://github.com/dunkeln/bright_mcp/releases"><img alt="Release" src="https://img.shields.io/github/v/tag/dunkeln/bright_mcp?label=release" /></a>
+    <a href="https://github.com/dunkeln/bright_mcp/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/dunkeln/bright_mcp/actions/workflows/ci.yml/badge.svg" /></a>
+  </p>
+  <p>
+    Works with <a href="#codex">Codex</a> · <a href="#claude-code">Claude Code</a> · <a href="#cursor">Cursor</a>
+  </p>
 </div>
 
-Agent-oriented Bright Data capabilities over MCP, built on Bun. The seven-tool
-all profile separates search, ranked source discovery, exact reading, extraction, research, maintained
-dataset discovery, and execution. It pages complete pages and upstream snapshots
-as resources and renders structured results in a transient React MCP workbench.
+Bright Data services shaped for agents, built on Bun.
+
+The bet is not one giant tool, or the fewest possible tool calls. It is that the
+model should make only the decisions where judgment adds value. Bright MCP keeps
+search, source choice, reading, extraction, research, and dataset selection visible;
+it internalizes deterministic plumbing such as retries, polling, pagination,
+transitions, bounded previews, and partial recovery.
+
+## Why this MCP
+
+Bright Data's official MCP is a broad local toolbox. Bright MCP is deliberately a
+smaller, caller-scoped decision surface for hosted agents. Its seven data tools are
+named for outcomes rather than Bright Data product mechanics, keep credentials out
+of model-visible inputs and results, and preserve large or asynchronous results as
+bounded session resources.
+
+That narrower surface is useful only when it still completes the workflow. Choose
+Bright MCP when stable agent contracts, caller isolation, and predictable failure
+boundaries matter. Choose the official MCP when maximum Bright Data coverage and
+direct provider controls matter more. This project does not claim broader product
+coverage, durable scheduling, or a replacement Bright Data control plane.
+
+The seven-tool all profile separates search, ranked source discovery, exact reading,
+extraction, research, maintained dataset discovery, and execution. It pages complete
+pages and upstream snapshots as resources and renders structured results in a
+transient React MCP workbench.
 
 The full seven-tool contract remains at `/mcp`. Entitlement-aligned installs can
 use stable three or two-tool surfaces at `/mcp/web`, `/mcp/deep-lookup`, or
@@ -26,14 +55,16 @@ Clients that do not yet implement registry secret prompts can reference
 
 ### Plugin
 
-Codex:
+<a id="codex"></a>
+**Codex**
 
 ```bash
 codex plugin marketplace add dunkeln/bright_mcp
 codex plugin add bright@bright
 ```
 
-Claude Code:
+<a id="claude-code"></a>
+**Claude Code**
 
 ```bash
 claude plugin marketplace add dunkeln/bright_mcp
@@ -61,7 +92,8 @@ claude mcp add --transport http bright-browser https://bright-mcp.onrender.com/m
   --header "X-Bright-API-Key: ${BRIGHTDATA_API_KEY}"
 ```
 
-Cursor (`~/.cursor/mcp.json`):
+<a id="cursor"></a>
+**Cursor** (`~/.cursor/mcp.json`)
 
 ```json
 {
@@ -111,41 +143,29 @@ hosted authorization.
 ## Evaluated with MCPJam
 
 <!-- benchmark:start -->
-Bright MCP uses `@mcpjam/sdk` to run real-world agent workflows against its
-published MCP endpoints. The suite checks task completion, tool selection,
-valid arguments, provenance, latency, tool calls, token use, and answer quality.
+**Test setup:** MCPJam HostRunner (`@mcpjam/sdk` 2.0.0 on Bun 1.3.14, macOS arm64) gave both MCPs the same five-turn prompts, Bright Data account credential, and `openrouter/anthropic/claude-haiku-4.5` agent through OpenRouter at temperature 0.1 for 5 runs per workflow. Runs were scheduled as matched pairs, two pairs at a time; calls within each conversation stayed sequential with a 120-second turn timeout. Each agent saw only its MCP's advertised tools and could take its own valid path to the same requested output. `anthropic/claude-sonnet-5` then judged anonymized answers against their tool evidence, with a label-swap check for position bias.
 
-![Paired horizontal bars comparing MCP completion by workflow](./assets/benchmark-completion.png)
+![Outcome scorecard comparing completion, blind answer quality, and judge preference](./assets/benchmark-outcomes.png)
 
-*Bright MCP completed 29 of 30 workflows; Bright Data MCP completed 29 of 30.*
+**In this five-turn snapshot, Bright MCP leads the product outcomes:** 14/15 completed workflows, 7.59/10 blind quality, and a 9–4 judge preference win. Bright is the guided route: typed outcomes, bounded handoffs, and mechanics handled inside the MCP. The official MCP is the broader toolbox, which is better when coverage and direct provider control matter more than guidance.
 
 ![Radar chart comparing blind answer-quality dimensions](./assets/benchmark-radar.png)
 
-*Blind scoring compares task fulfillment, grounding, information density, source quality, and actionability.*
+Bright's structured evidence and explicit provenance made it easier for the model to build a complete, grounded answer across turns. The official MCP still slightly won Known Pages quality, which fits its strong direct scrape-and-clean architecture.
 
 ![Horizontal bars comparing blind pairwise preference](./assets/benchmark-preference.png)
 
-*The blind judge preferred Bright MCP 17 times versus 3 for Bright Data MCP, with 10 ties.*
+The blind judge preferred Bright MCP 9 times versus 4 for the official MCP, with 2 ties. Bright won Marketplace 5–0; the official MCP won Known Pages 2–1 with 2 ties. That split is useful: Bright's typed workflow helped on multi-step data retrieval, while the official MCP's direct scraper was highly competitive on known URLs.
 
-![Paired horizontal bars comparing judged answer quality per token budget](./assets/benchmark-quality-cost.png)
+![Paired horizontal bars comparing successful-workflow latency](./assets/benchmark-latency.png)
 
-*Quality per token shows where richer answers repay their context cost.*
+Successful Search was effectively tied, with the official MCP slightly ahead; Known Pages tied; Bright led Marketplace. The official MCP benefits from a shorter direct search-and-scrape path, while Bright accepts more internal machinery for recovery, batching, and typed transitions.
 
-![Paired horizontal bars comparing benchmark passes per token budget](./assets/benchmark-efficiency.png)
+![Paired horizontal bars comparing successful-run token use](./assets/benchmark-efficiency.png)
 
-*Passing runs per token compares workflow completion against total model context used.*
+The targeted three-run Search rerun measured 80,628 tokens for Bright versus 169,547 for the official MCP. Bright fell 39% from its earlier 131,866-token baseline after readable-page normalization and stronger summary-sufficiency guidance; one run answered from compact summaries without opening pages. Search uses the new regression result, while the other rows retain the published five-run snapshot.
 
-![Paired horizontal bars comparing average tool calls by workflow](./assets/benchmark-complexity.png)
+> Provisional: 67% label-swap agreement is below the 75% publication gate. The Search context rerun had three pairs and no judge calls, so treat it as a regression signal rather than a stable production estimate.
 
-*Average tool calls show the agent path each workflow required.*
-
-In the comparative baseline, Bright MCP completed 29 of 30 workflows; Bright Data MCP completed 29 of 30.
-Bright MCP scored 4.51/5 versus 3.78/5 in blind answer-quality grading and was
-preferred in 17 runs versus 3, with 10 ties.
-
-This study predates the current profile routing and retry changes. Its quality
-results remain useful, while its latency, call-count, and token measurements
-should be treated as a historical baseline.
-
-[Method, scenarios, and full results](./evals/README.md#full-tool-use-benchmark-pre-routing-baseline)
+[Evaluation design and provisional results](./evals/README.md#current-tool-use-benchmark)
 <!-- benchmark:end -->

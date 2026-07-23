@@ -11,7 +11,11 @@ if (!["--write", "--check", "--preview"].includes(mode ?? "")) throw new Error("
 const published = await Bun.file(
   new URL("../evals/results/published-benchmark.json", import.meta.url),
 ).json() as { schemaVersion: number; report: Report; judge: JudgeReport };
+const contextGate = await Bun.file(
+  new URL("../evals/results/current-search-gate.json", import.meta.url),
+).json() as ContextGate;
 if (published.schemaVersion !== 1) throw new Error("Invalid published benchmark result.");
+if (contextGate.schemaVersion !== 2) throw new Error("Invalid Current Search context gate.");
 const { report, judge } = published;
 const activeCaseIds = new Set<string>(workflowCases.map(({ id }) => id));
 const activeJudgments = judge.judgments.filter(({ pairId }) => activeCaseIds.has(pairId.split(":")[0]!));
@@ -20,14 +24,14 @@ const tasks = workflowCases.map(({ id, shortLabel }) => ({
   brightData: summarize(report.results.filter((result) => result.caseId === id && result.server === "upstream")),
   bright: summarize(report.results.filter((result) => result.caseId === id && result.server === "bright")),
   quality: {
-    brightData: quality(judge, id, "upstream"),
-    bright: quality(judge, id, "bright"),
+    brightData: quality(judge, id, "upstream", report.results),
+    bright: quality(judge, id, "bright", report.results),
   },
 }));
 const complete = workflowCases.every(({ id }) => (["bright", "upstream"] as const).every((server) => report.results.filter((result) => result.caseId === id && result.server === server).length === report.runsPerCase)) && activeJudgments.length === workflowCases.length * report.runsPerCase;
 if (mode !== "--preview" && !complete) process.exit(0);
 
-const charts = ["completion", "preference", "radar", "quality-cost", "efficiency", "complexity"] as const;
+const charts = ["outcomes", "completion", "latency", "preference", "radar", "efficiency", "complexity"] as const;
 const temporaryDirectory = await mkdtemp(join(tmpdir(), "bright-benchmark-"));
 try {
   const assets = await buildAppAssets({
@@ -47,8 +51,14 @@ try {
       bright: activeJudgments.filter(({ winner }) => winner === "bright").length,
       ties: activeJudgments.filter(({ winner }) => winner === "tie").length,
     },
+    overallQuality: {
+      brightData: overallQuality(judge, "upstream"),
+      bright: overallQuality(judge, "bright"),
+    },
+    contextGate,
     tasks,
     quality: {
+      scale: judge.scale,
       dimensions: judge.rubric.map((key) => ({
         label: dimensionLabel(key),
         brightData: dimension(judge, key, "upstream"),
@@ -78,21 +88,35 @@ try {
   await rm(temporaryDirectory, { recursive: true, force: true });
 }
 
-type Result = { caseId: string; server: "bright" | "upstream"; passed: boolean; tokenCount: number; toolsCalled: string[] };
+type Result = { caseId: string; server: "bright" | "upstream"; run: number; passed: boolean; tokenCount: number; latencyMs: number; toolsCalled: string[] };
 type Report = { model: string; runsPerCase: number; results: Result[] };
+type ContextGate = {
+  schemaVersion: 2;
+  runsPerServer: number;
+  previousBrightAverageTokens: number;
+  current: Record<"bright" | "brightData", { averageTokens: number }>;
+};
 type Dimension = "taskFulfillment" | "evidenceGrounding" | "informationDensity" | "sourceQuality" | "actionability";
-type JudgeReport = { model: string; runsPerCase: number; rubric: Dimension[]; judgments: Array<{ pairId: string; scores: Record<"bright" | "upstream", Record<Dimension, number>>; winner: "bright" | "upstream" | "tie" }> };
+type JudgeReport = { model: string; runsPerCase: number; scale: { minimum: 0; maximum: 10 }; rubric: Dimension[]; judgments: Array<{ pairId: string; scores: Record<"bright" | "upstream", Record<Dimension, number>>; winner: "bright" | "upstream" | "tie" }> };
 
 function summarize(results: Result[]) {
+  const successful = results.filter(({ passed }) => passed);
   return {
-    passRate: results.length ? results.filter(({ passed }) => passed).length / results.length : 0,
-    averageTokens: average(results.map(({ tokenCount }) => tokenCount)),
-    averageTools: average(results.map(({ toolsCalled }) => toolsCalled.length)),
+    successfulRuns: successful.length,
+    passRate: results.length ? successful.length / results.length : 0,
+    averageTokens: average(successful.map(({ tokenCount }) => tokenCount)),
+    medianLatency: median(successful.map(({ latencyMs }) => latencyMs)),
+    averageTools: average(successful.map(({ toolsCalled }) => toolsCalled.length)),
   };
 }
 function average(values: number[]) { return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0; }
-function quality(report: JudgeReport, caseId: string, server: "bright" | "upstream") { return average(report.judgments.filter(({ pairId }) => pairId.startsWith(`${caseId}:`)).flatMap(({ scores }) => Object.values(scores[server]))); }
+function median(values: number[]) { const sorted = values.toSorted((a, b) => a - b); const middle = Math.floor(sorted.length / 2); return !sorted.length ? 0 : sorted.length % 2 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2; }
+function quality(report: JudgeReport, caseId: string, server: "bright" | "upstream", results: Result[]) {
+  const successfulRuns = new Set(results.filter((result) => result.caseId === caseId && result.server === server && result.passed).map(({ run }) => run));
+  return average(report.judgments.filter(({ pairId }) => pairId.startsWith(`${caseId}:`) && successfulRuns.has(Number(pairId.split(":")[1]))).flatMap(({ scores }) => Object.values(scores[server])));
+}
 function dimension(report: JudgeReport, key: Dimension, server: "bright" | "upstream") { return average(report.judgments.filter(({ pairId }) => activeCaseIds.has(pairId.split(":")[0]!)).map(({ scores }) => scores[server][key])); }
+function overallQuality(report: JudgeReport, server: "bright" | "upstream") { return average(report.rubric.map((key) => dimension(report, key, server))); }
 function dimensionLabel(value: Dimension) { return value.replace(/([A-Z])/g, " $1").replace(/^./, (letter) => letter.toUpperCase()); }
 function safeJson(value: unknown) { return JSON.stringify(value).replaceAll("<", "\\u003c"); }
 function previewPath(directory: string | undefined, chart: string) {

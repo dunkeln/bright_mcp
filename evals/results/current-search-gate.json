@@ -1,15 +1,25 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-07-22T05:53:08.575Z",
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-23T03:03:15.922Z",
   "model": "openrouter/anthropic/claude-haiku-4.5",
+  "turnsPerRun": 5,
   "runsPerServer": 3,
-  "direct": {
-    "bright": { "latencyMs": 13725, "resultBytes": 2158 },
-    "brightData": { "latencyMs": 15372, "resultBytes": 3128 }
+  "previousBrightAverageTokens": 131866,
+  "current": {
+    "bright": {
+      "passes": 3,
+      "averageTokens": 80628,
+      "medianTokens": 66982,
+      "medianLatencyMs": 66821,
+      "averageTools": 4
+    },
+    "brightData": {
+      "passes": 3,
+      "averageTokens": 169547,
+      "medianTokens": 150181,
+      "medianLatencyMs": 78838,
+      "averageTools": 6.67
+    }
   },
-  "agent": {
-    "bright": { "passes": 2, "cleanRuns": 2, "selectedRuns": 3, "averageTokens": 3172.33, "medianLatencyMs": 17676, "averageTools": 1.33 },
-    "brightData": { "passes": 3, "cleanRuns": 3, "selectedRuns": 3, "averageTokens": 4449.33, "medianLatencyMs": 9963, "averageTools": 1 }
-  },
-  "note": "No judge calls. Bright's incomplete run selected search_web successfully, then unnecessarily called read_web; the read returned a normalized upstream 502. The generic summary-sufficiency instruction was tightened after this gate and was not rerun."
+  "note": "Targeted five-turn Current Search regression only; no judge calls. Bright's average context fell 39% from the prior five-run snapshot after readable-page normalization and summary-sufficiency guidance. Three runs establish a regression direction, not a stable production estimate."
 }

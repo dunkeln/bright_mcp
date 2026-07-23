@@ -2,22 +2,26 @@ import { benchmarkProfile, workflowCases } from "./workflows";
 import { writeReport, type ServerId } from "./mcp";
 
 const dimensions = ["taskFulfillment", "evidenceGrounding", "informationDensity", "sourceQuality", "actionability"] as const;
-const rubric = `You are a blind evaluator comparing two MCP-assisted answers to the same task. Judge only the supplied final response, tool calls, and tool evidence. Do not reward verbosity, brand, or a preferred tool sequence. Do not use outside knowledge to repair an answer.
+const scoreMinimum = 0;
+const scoreMaximum = 10;
+const scoreValues = Array.from({ length: scoreMaximum + 1 }, (_, value) => value);
+const judgeBatchSize = 5;
+const rubric = `You are a blind evaluator comparing two MCP-assisted answers to the same task. Judge the final response against the supplied tool evidence. Do not score tool selection or call count; deterministic MCP checks cover those. Do not reward verbosity, brand, or a preferred tool sequence. Do not use outside knowledge to repair an answer.
 
-Score A and B independently from 1 (poor) to 5 (excellent):
+Score A and B independently with integers from 0 to 10. Use the full anchored scale: 0 means absent or unusable, 5 means adequate with material limitations, and 10 means complete with no material defect.
 - taskFulfillment: satisfies the requested task and format.
 - evidenceGrounding: claims are supported by the supplied tool evidence.
 - informationDensity: useful information per word/token, balancing richness and compactness.
 - sourceQuality: sources are relevant, credible, sufficiently diverse, and current when required.
 - actionability: the result is immediately usable and makes limitations clear.
 
-Choose the stronger artifact overall, or tie when materially equivalent. Give one concise evidence-based reason. Return one judgment for every pairId.`;
+Choose the stronger artifact overall, or tie when materially equivalent. Confidence must also be an integer from 0 to 10. Give one concise evidence-based reason naming the most important observable difference. Return one judgment for every pairId.`;
 
 const apiKey = required("OPENROUTER_API_KEY");
 const judgeModel = required("OPENROUTER_JUDGE");
 const artifact = (await Bun.file(new URL("../.artifacts/agent.json", import.meta.url)).json()) as AgentReport;
 const judgeArtifact = Bun.file(new URL("../.artifacts/judge.json", import.meta.url));
-if (artifact.schemaVersion !== 7 || artifact.profile !== benchmarkProfile) throw new Error("Run the agent evaluation before judging it.");
+if (artifact.schemaVersion !== 7 || artifact.profile !== benchmarkProfile || !Number.isInteger(artifact.turnsPerCase)) throw new Error("Run the agent evaluation before judging it.");
 
 const expected = workflowCases.length * artifact.runsPerCase * 2;
 if (artifact.results.length !== expected) throw new Error(`Agent evaluation is incomplete (${artifact.results.length}/${expected}).`);
@@ -30,7 +34,7 @@ const pairs = workflowCases.flatMap((useCase) =>
     const bright = artifact.results.find((result) => result.caseId === useCase.id && result.server === "bright" && result.run === run);
     const upstream = artifact.results.find((result) => result.caseId === useCase.id && result.server === "upstream" && result.run === run);
     if (!bright || !upstream) throw new Error(`Missing pair ${useCase.id}:${run}.`);
-    return { id: `${useCase.id}:${run}`, prompt: useCase.prompt, bright, upstream };
+    return { id: `${useCase.id}:${run}`, prompt: useCase.turns.slice(0, artifact.turnsPerCase).map((prompt, turn) => `Turn ${turn + 1}: ${prompt}`).join("\n"), bright, upstream };
   }),
 );
 
@@ -41,22 +45,22 @@ if (previous.judgments.length === pairs.length && typeof previous.sideAgreement 
 }
 const judgments = previous.judgments;
 const remaining = pairs.filter((pair) => !judgments.some(({ pairId }) => pairId === pair.id));
-for (let index = 0; index < remaining.length; index += 2) {
-  judgments.push(...await judge(remaining.slice(index, index + 2).map((pair) => blind(pair, false))));
+for (let index = 0; index < remaining.length; index += judgeBatchSize) {
+  judgments.push(...await judge(remaining.slice(index, index + judgeBatchSize).map((pair) => blind(pair, false))));
   await persist();
   console.log(`${judgments.length}/${pairs.length} paired judgments`);
 }
 
 const swapped = workflowCases.map((useCase) => blind(pairs.find((pair) => pair.id === `${useCase.id}:1`)!, true));
 const consistency: Judgment[] = [];
-for (let index = 0; index < swapped.length; index += 2) consistency.push(...await judge(swapped.slice(index, index + 2)));
+for (let index = 0; index < swapped.length; index += judgeBatchSize) consistency.push(...await judge(swapped.slice(index, index + judgeBatchSize)));
 const originals = new Map(judgments.map((item) => [item.pairId, item]));
 const sideAgreement = consistency.filter((item) => item.winner === originals.get(item.pairId)?.winner).length / consistency.length;
 await persist(sideAgreement);
 
 type Scores = Record<(typeof dimensions)[number], number>;
 type AgentResult = { caseId: string; server: ServerId; run: number; response: string; toolCalls: unknown[]; toolEvidence: unknown[] };
-type AgentReport = { schemaVersion: number; profile: string; generatedAt: string; model: string; runsPerCase: number; results: AgentResult[] };
+type AgentReport = { schemaVersion: number; profile: string; generatedAt: string; model: string; runsPerCase: number; turnsPerCase: number; results: AgentResult[] };
 type Pair = { id: string; prompt: string; bright: AgentResult; upstream: AgentResult };
 type BlindPair = { pairId: string; prompt: string; aServer: ServerId; bServer: ServerId; artifactA: string; artifactB: string };
 type Judgment = { pairId: string; scores: Record<ServerId, Scores>; winner: ServerId | "tie"; confidence: number; reason: string };
@@ -110,7 +114,7 @@ async function judge(pairs: BlindPair[]): Promise<Judgment[]> {
 }
 
 function compact(result: AgentResult) {
-  return limit(JSON.stringify({ response: result.response, toolCalls: result.toolCalls, toolEvidence: result.toolEvidence }), 24_000);
+  return limit(JSON.stringify({ response: result.response, toolCalls: result.toolCalls, toolEvidence: result.toolEvidence }), 16_000);
 }
 
 function validate(value: unknown, pairs: BlindPair[]) {
@@ -126,9 +130,9 @@ function validate(value: unknown, pairs: BlindPair[]) {
     const scores = candidate.scores as Record<string, unknown> | undefined;
     const parsedScores = { A: score(scores?.A), B: score(scores?.B) };
     if (!(["A", "B", "tie"] as unknown[]).includes(candidate.winner)) throw new Error("Judge returned an invalid winner.");
-    if (typeof candidate.confidence !== "number" || candidate.confidence < 0 || candidate.confidence > 1) throw new Error("Judge returned invalid confidence.");
+    if (!Number.isInteger(candidate.confidence) || Number(candidate.confidence) < scoreMinimum || Number(candidate.confidence) > scoreMaximum) throw new Error("Judge returned invalid confidence.");
     if (typeof candidate.reason !== "string" || !candidate.reason.trim()) throw new Error("Judge returned no rationale.");
-    return { pairId, scores: parsedScores, winner: candidate.winner as "A" | "B" | "tie", confidence: candidate.confidence, reason: candidate.reason.trim() };
+    return { pairId, scores: parsedScores, winner: candidate.winner as "A" | "B" | "tie", confidence: Number(candidate.confidence), reason: candidate.reason.trim() };
   });
 }
 
@@ -136,13 +140,13 @@ function score(value: unknown): Scores {
   if (!value || typeof value !== "object") throw new Error("Judge returned invalid scores.");
   return Object.fromEntries(dimensions.map((dimension) => {
     const value_ = (value as Record<string, unknown>)[dimension];
-    if (!Number.isInteger(value_) || Number(value_) < 1 || Number(value_) > 5) throw new Error(`Judge returned invalid ${dimension}.`);
+    if (!Number.isInteger(value_) || Number(value_) < scoreMinimum || Number(value_) > scoreMaximum) throw new Error(`Judge returned invalid ${dimension}.`);
     return [dimension, Number(value_)];
   })) as Scores;
 }
 
 function responseSchema(pairIds: string[]) {
-  const scoreProperties = Object.fromEntries(dimensions.map((dimension) => [dimension, { type: "integer" }]));
+  const scoreProperties = Object.fromEntries(dimensions.map((dimension) => [dimension, { type: "integer", enum: scoreValues }]));
   const scores = { type: "object", additionalProperties: false, required: [...dimensions], properties: scoreProperties };
   return {
     type: "object", additionalProperties: false, required: ["judgments"], properties: {
@@ -151,7 +155,7 @@ function responseSchema(pairIds: string[]) {
           pairId: { type: "string", enum: pairIds },
           scores: { type: "object", additionalProperties: false, required: ["A", "B"], properties: { A: scores, B: scores } },
           winner: { type: "string", enum: ["A", "B", "tie"] },
-          confidence: { type: "number" },
+          confidence: { type: "integer", enum: scoreValues },
           reason: { type: "string" },
         },
       } },
@@ -165,20 +169,22 @@ function required(name: string) { const value = process.env[name]?.trim(); if (!
 
 async function readPrevious(): Promise<Previous> {
   if (!(await judgeArtifact.exists())) return { judgments: [] };
-  const value = await judgeArtifact.json() as { schemaVersion?: number; model?: string; agentModel?: string; agentGeneratedAt?: string; runsPerCase?: number; judgments?: Judgment[]; sideAgreement?: number };
-  return value.schemaVersion === 2 && value.model === judgeModel && value.agentModel === artifact.model && value.agentGeneratedAt === artifact.generatedAt && value.runsPerCase === artifact.runsPerCase && Array.isArray(value.judgments)
+  const value = await judgeArtifact.json() as { schemaVersion?: number; model?: string; agentModel?: string; agentGeneratedAt?: string; runsPerCase?: number; turnsPerCase?: number; judgments?: Judgment[]; sideAgreement?: number };
+  return value.schemaVersion === 3 && value.model === judgeModel && value.agentModel === artifact.model && value.agentGeneratedAt === artifact.generatedAt && value.runsPerCase === artifact.runsPerCase && value.turnsPerCase === artifact.turnsPerCase && Array.isArray(value.judgments)
     ? { judgments: value.judgments, sideAgreement: value.sideAgreement }
     : { judgments: [] };
 }
 
 async function persist(sideAgreement?: number) {
   await writeReport("judge", {
-    schemaVersion: 2,
+    schemaVersion: 3,
     generatedAt: new Date().toISOString(),
     model: judgeModel,
     agentModel: artifact.model,
     agentGeneratedAt: artifact.generatedAt,
     runsPerCase: artifact.runsPerCase,
+    turnsPerCase: artifact.turnsPerCase,
+    scale: { minimum: scoreMinimum, maximum: scoreMaximum },
     rubric: dimensions,
     ...(sideAgreement === undefined ? {} : { sideAgreement }),
     judgments,

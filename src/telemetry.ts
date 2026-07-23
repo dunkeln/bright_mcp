@@ -11,7 +11,7 @@ logfire.configure({
   },
   sendToLogfire: "if-token-present",
   serviceName: "bright-mcp",
-  serviceVersion: "0.3.0",
+  serviceVersion: "0.4.0",
 });
 
 export { logfire };

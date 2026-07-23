@@ -21,10 +21,15 @@ import {
   staticCredential,
 } from "./connections/credentials";
 import {
+  createOAuthService,
+  readOAuthEncryptionKey,
+} from "./connections/oauth";
+import {
   createApiKeyBrowserCredentialProvider,
 } from "./connections/browser-credentials";
 import {
   createBrightMcpServer,
+  MCP_PROFILE_PATHS,
   type McpProfile,
 } from "./mcp/server";
 import { startHttpServer } from "./mcp/http-server";
@@ -115,6 +120,41 @@ const gateway = credentials
           error: (record) => console.error(JSON.stringify(record)),
         },
       })
+  : undefined;
+const oauth = hosted && publicMcpUrl
+  ? createOAuthService({
+      issuer: publicMcpUrl,
+      resourceUrls: new Set(
+        Object.keys(MCP_PROFILE_PATHS).map((path) =>
+          new URL(path, publicMcpUrl).toString()
+        ),
+      ),
+      encryptionKey: readOAuthEncryptionKey(process.env.OAUTH_TOKEN_SECRET),
+      async validateApiKey(candidate) {
+        const binding = requestCredentials!.bind(candidate);
+        if (!binding) return false;
+        try {
+          await binding.run(() =>
+            gateway!.requestJson(
+              {
+                method: "GET",
+                path: "/status",
+                maxAttempts: 1,
+                timeoutMs: 10_000,
+                maxResponseBytes: 8_192,
+              },
+              {
+                principalId: binding.principalId,
+                requestId: crypto.randomUUID(),
+              },
+            )
+          );
+          return true;
+        } catch {
+          return false;
+        }
+      },
+    })
   : undefined;
 const browserCredentials = gateway && credentials
   ? createApiKeyBrowserCredentialProvider(gateway, credentials)
@@ -253,6 +293,7 @@ if (transportName === "stdio") {
     publicUrl: publicMcpUrl,
     allowedOrigins,
     requestCredentials,
+    oauth,
     browserAvailable: Boolean(browserProvider),
     widgetHtml,
     localPrincipalId: principalId,

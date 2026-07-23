@@ -4,6 +4,7 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import { InMemoryTaskStore } from "@modelcontextprotocol/sdk/experimental/tasks/stores/in-memory.js";
 import { CallToolResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import { datasetResultSchema } from "../src/core/contracts";
+import { createOAuthService } from "../src/connections/oauth";
 import { DATASET_WORKBENCH_URI } from "../src/mcp/dataset-tools";
 import { assert, testEnvironment as environment, waitForServer } from "./compatibility-support";
 
@@ -13,11 +14,138 @@ const projectRoot = new URL("../", import.meta.url).pathname;
 await checkStdio();
 await checkTaskExecution();
 await checkBrowserProfile();
+await checkOAuth();
 if (process.env.BRIGHTDATA_BROWSER_CHECK === "1") {
   await checkRealBrowser();
 }
 await checkHttp();
-console.log("MCP tool, resource, stdio, and Bun HTTP compatibility passed.");
+console.log("MCP tool, resource, OAuth, stdio, and Bun HTTP compatibility passed.");
+
+async function checkOAuth() {
+  const origin = "https://bright.example";
+  const resource = `${origin}/mcp`;
+  const redirectUri = "http://127.0.0.1:4567/callback";
+  const oauth = createOAuthService({
+    issuer: new URL(resource),
+    resourceUrls: new Set([resource]),
+    encryptionKey: crypto.getRandomValues(new Uint8Array(32)),
+    validateApiKey: async (apiKey) => apiKey === "valid-key",
+  });
+  const registration = await oauth.handle(
+    new Request(`${origin}/oauth/register`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        client_name: "Compatibility check",
+        redirect_uris: [redirectUri],
+        token_endpoint_auth_method: "none",
+      }),
+    }),
+  );
+  assert(registration?.status === 201, "OAuth dynamic registration failed.");
+  const clientId = (await registration.json() as { client_id?: string }).client_id;
+  assert(clientId, "OAuth registration omitted the client ID.");
+
+  const verifier = "a".repeat(43);
+  const challenge = Buffer.from(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)),
+  ).toString("base64url");
+  const authorizationUrl = new URL(`${origin}/oauth/authorize`);
+  authorizationUrl.search = new URLSearchParams({
+    response_type: "code",
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    code_challenge: challenge,
+    code_challenge_method: "S256",
+    resource,
+    state: "state",
+  }).toString();
+  const page = await oauth.handle(new Request(authorizationUrl));
+  const requestToken = (await page?.text())
+    ?.match(/name="request" value="([^"]+)"/)?.[1];
+  assert(requestToken, "OAuth authorization page omitted its sealed request.");
+
+  const approval = await oauth.handle(
+    new Request(`${origin}/oauth/authorize`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        request: requestToken,
+        api_key: "valid-key",
+      }),
+    }),
+  );
+  assert(approval?.status === 302, "OAuth BYOK approval failed.");
+  assert(
+    !approval.headers.get("set-cookie")?.includes("valid-key"),
+    "OAuth exposed the Bright Data key in its browser cookie.",
+  );
+  const code = new URL(approval.headers.get("location")!).searchParams.get("code");
+  assert(code, "OAuth approval omitted the authorization code.");
+  const tokenBody = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    code_verifier: verifier,
+    resource,
+  });
+  const token = await oauth.handle(
+    new Request(`${origin}/oauth/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: tokenBody,
+    }),
+  );
+  assert(token?.status === 200, "OAuth authorization-code exchange failed.");
+  const issued = await token.json() as {
+    access_token?: string;
+    refresh_token?: string;
+  };
+  const accessToken = issued.access_token;
+  assert(accessToken, "OAuth token response omitted the access token.");
+  assert(issued.refresh_token, "OAuth token response omitted the refresh token.");
+  const authenticated = await oauth.authenticate(
+    new Request(resource, {
+      headers: { authorization: `Bearer ${accessToken}` },
+    }),
+    resource,
+  );
+  assert(
+    authenticated?.apiKey === "valid-key",
+    "OAuth access token did not recover the caller credential.",
+  );
+  assert(
+    !(await oauth.authenticate(
+      new Request(resource, {
+        headers: { authorization: `Bearer ${accessToken}` },
+      }),
+      `${origin}/mcp/browser`,
+    )),
+    "OAuth accepted an access token for the wrong MCP resource.",
+  );
+  const replay = await oauth.handle(
+    new Request(`${origin}/oauth/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: tokenBody,
+    }),
+  );
+  assert(replay?.status === 400, "OAuth accepted a replayed authorization code.");
+  const refreshed = await oauth.handle(
+    new Request(`${origin}/oauth/token`, {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: issued.refresh_token,
+        client_id: clientId,
+        resource,
+      }),
+    }),
+  );
+  assert(refreshed?.status === 200, "OAuth refresh-token exchange failed.");
+}
 
 async function checkStdio() {
   const transport = new StdioClientTransport({

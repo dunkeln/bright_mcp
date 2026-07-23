@@ -120,7 +120,7 @@ export class BrightDataGateway {
           headers: {
             authorization: `Bearer ${apiKey}`,
             "content-type": "application/json",
-            "user-agent": "bright-mcp/0.3.0",
+            "user-agent": "bright-mcp/0.4.0",
             "x-request-id": context.requestId,
           },
           body: request.body === undefined ? undefined : JSON.stringify(request.body),

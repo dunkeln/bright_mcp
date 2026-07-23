@@ -33,6 +33,8 @@ MUST NOT become core domain models.
 
 ### Credential boundary
 
+- Owns hosted OAuth discovery, registration, authorization, token sealing, and
+  bearer verification without a durable caller credential store.
 - Binds hosted sessions to a digest of the caller's Bright Data key.
 - Resolves local credentials from explicit environment or Keychain input.
 - Keeps Bright Data credentials out of use-case input,

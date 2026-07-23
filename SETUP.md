@@ -95,14 +95,27 @@ For stdio, select one stable surface with
 ## Hosted authorization
 
 Set `MCP_PUBLIC_URL=https://<host>/mcp`. `/mcp`, `/mcp/web`,
-`/mcp/deep-lookup`, `/mcp/marketplace`, and `/mcp/browser` accept the caller's
-Bright Data API key through `X-Bright-API-Key`. The MCP client owns the secret
-and sends it on every request. Claude Code plugins bind it from sensitive
-`userConfig`; Codex plugins may send it as a bearer credential so each client's
-install-time vault can own the secret. The browser surface resolves native zone
-credentials internally. The server uses a hash as the session identity, keeps
-the raw key only for the active request or upstream operation, and never caches,
-persists, or includes it in MCP content. Hosted mode
-requires HTTPS, rejects deployment-global credentials, and requires the
-surface's authorization on every MCP request. Set `MCP_ALLOWED_ORIGINS` to a
-comma-separated browser-origin allowlist when needed.
+`/mcp/deep-lookup`, `/mcp/marketplace`, and `/mcp/browser` advertise MCP OAuth.
+Set `OAUTH_TOKEN_SECRET` to a base64url-encoded 32-byte random value. The
+authorization page validates the caller's Bright Data key and seals it into
+short-lived access tokens, renewable client-held refresh tokens, and an
+HttpOnly browser cookie; the service keeps no credential database.
+
+```bash
+openssl rand -base64 32 | tr '+/' '-_' | tr -d '='
+```
+
+OAuth uses dynamic client registration, authorization code with S256 PKCE,
+exact redirect matching, resource audience binding, one-hour access tokens,
+and one-year refresh tokens. Rotating `OAUTH_TOKEN_SECRET` intentionally forces
+every client to reconnect. Direct `X-Bright-API-Key` remains available for
+clients without OAuth; raw Bright keys are never accepted as OAuth bearer
+tokens.
+
+The browser surface resolves native zone credentials internally. The server
+uses a hash as the session identity, keeps the raw key only for the active
+request or inside authenticated encrypted client tokens, and never persists,
+logs, or includes it in MCP content. Hosted mode requires HTTPS, rejects
+deployment-global credentials, and requires authorization on every MCP request.
+Set `MCP_ALLOWED_ORIGINS` to a comma-separated browser-origin allowlist when
+needed.

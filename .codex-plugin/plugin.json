@@ -1,6 +1,6 @@
 {
   "name": "bright",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Agent-oriented Bright Data web intelligence, research, extraction, and dataset workflows over MCP.",
   "author": {
     "name": "dunkeln",
@@ -15,12 +15,12 @@
     "bright": {
       "type": "http",
       "url": "https://bright-mcp.onrender.com/mcp",
-      "bearer_token_env_var": "BRIGHTDATA_API_KEY"
+      "auth": "oauth"
     },
     "bright-browser": {
       "type": "http",
       "url": "https://bright-mcp.onrender.com/mcp/browser",
-      "bearer_token_env_var": "BRIGHTDATA_API_KEY"
+      "auth": "oauth"
     }
   },
   "interface": {

@@ -51,8 +51,9 @@ Using the pinned Bun version, a disposable spike MUST prove:
 
 1. MCP SDK plus Zod 4 registers and invokes one tool and reads one resource.
 2. Stdio and Bun-hosted Web-standard Streamable HTTP transports both work.
-3. Task negotiation and client-secret-header-authenticated data and browser
-   Streamable HTTP execute as specified.
+3. Task negotiation and OAuth-authenticated data and browser Streamable HTTP
+   execute as specified, with the direct client-secret header fallback verified
+   separately.
 4. `playwright-core` connects to Bright Data CDP, navigates, observes, and closes.
 5. The table app bundle loads as an MCP UI resource in a target host.
 

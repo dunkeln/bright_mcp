@@ -55,7 +55,7 @@ export function createBrightMcpServer(dependencies: {
   const server = new McpServer(
     {
       name: "bright-mcp",
-      version: "0.3.0",
+      version: "0.4.0",
       icons: [dependencies.icon],
     },
     {

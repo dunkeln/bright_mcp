@@ -2,6 +2,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { LRUCache } from "lru-cache";
 import { logfire } from "../telemetry";
+import type { OAuthService } from "../connections/oauth";
 import {
   MCP_PROFILE_PATHS,
   type McpProfile,
@@ -21,6 +22,7 @@ export function startHttpServer(options: {
       run<T>(operation: () => Promise<T>): Promise<T>;
     } | undefined;
   };
+  oauth?: OAuthService;
   browserAvailable: boolean;
   widgetHtml: string;
   localPrincipalId: string;
@@ -53,6 +55,8 @@ export function startHttpServer(options: {
         options.allowedOrigins,
       );
       if (rejectedEdgeRequest) return rejectedEdgeRequest;
+      const oauthResponse = await options.oauth?.handle(request);
+      if (oauthResponse) return oauthResponse;
       if (request.method === "GET" && url.pathname === "/") {
         return new Response("Bright MCP", { status: 200 });
       }
@@ -78,6 +82,10 @@ export function startHttpServer(options: {
       }
 
       const protectedMode = isProtected(profile, options);
+      const resourceUrl = new URL(
+        url.pathname,
+        options.publicUrl ?? url,
+      ).toString();
       let credentialBinding: ReturnType<
         NonNullable<typeof options.requestCredentials>["bind"]
       > = undefined;
@@ -101,19 +109,27 @@ export function startHttpServer(options: {
         }
         const apiKeyHeader = request.headers.get("x-bright-api-key");
         const authorization = request.headers.get("authorization");
-        const bearer = /^Bearer ([^\s]{1,4096})$/.exec(authorization ?? "")?.[1];
-        const conflictingCredentials =
-          (authorization !== null && !bearer) ||
-          (apiKeyHeader !== null && bearer !== undefined && apiKeyHeader !== bearer);
-        credentialBinding = conflictingCredentials
-          ? undefined
-          : options.requestCredentials?.bind(apiKeyHeader ?? bearer ?? null, browserZone);
+        const oauthCredential = authorization && !apiKeyHeader
+          ? await options.oauth?.authenticate(request, resourceUrl)
+          : undefined;
+        credentialBinding = apiKeyHeader && !authorization
+          ? options.requestCredentials?.bind(apiKeyHeader, browserZone)
+          : oauthCredential
+            ? options.requestCredentials?.bind(oauthCredential.apiKey, browserZone)
+            : undefined;
         if (!credentialBinding) {
           return withCors(
             new Response("Bright Data API key required", {
               status: 401,
               headers: {
                 "cache-control": "no-store",
+                ...(options.oauth
+                  ? {
+                      "www-authenticate": options.oauth.challenge(
+                        resourceUrl,
+                      ),
+                    }
+                  : {}),
               },
             }),
             request,

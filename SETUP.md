@@ -97,7 +97,9 @@ For stdio, select one stable surface with
 Set `MCP_PUBLIC_URL=https://<host>/mcp`. `/mcp`, `/mcp/web`,
 `/mcp/deep-lookup`, `/mcp/marketplace`, and `/mcp/browser` accept the caller's
 Bright Data API key through `X-Bright-API-Key`. The MCP client owns the secret
-and sends it on every request. The browser surface resolves native zone
+and sends it on every request. Claude Code plugins bind it from sensitive
+`userConfig`; Codex plugins may send it as a bearer credential so each client's
+install-time vault can own the secret. The browser surface resolves native zone
 credentials internally. The server uses a hash as the session identity, keeps
 the raw key only for the active request or upstream operation, and never caches,
 persists, or includes it in MCP content. Hosted mode

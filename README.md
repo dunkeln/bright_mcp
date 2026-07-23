@@ -63,6 +63,10 @@ codex plugin marketplace add dunkeln/bright_mcp
 codex plugin add bright@bright
 ```
 
+The Codex app requests the Bright Data key through its install-time
+authentication flow and stores it client-side. Codex sends it as a bearer
+credential; other clients continue to use `X-Bright-API-Key`.
+
 <a id="claude-code"></a>
 **Claude Code**
 
@@ -71,17 +75,10 @@ claude plugin marketplace add dunkeln/bright_mcp
 claude plugin install bright@bright
 ```
 
+Claude Code prompts for the Bright Data key when enabling the plugin, masks it,
+and stores it in the client's secure credential store.
+
 ### MCP
-
-Codex:
-
-```toml
-[mcp_servers.bright]
-url = "https://bright-mcp.onrender.com/mcp"
-
-[mcp_servers.bright.env_http_headers]
-X-Bright-API-Key = "BRIGHTDATA_API_KEY"
-```
 
 Claude Code:
 

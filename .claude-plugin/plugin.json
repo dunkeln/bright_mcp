@@ -1,6 +1,6 @@
 {
   "name": "bright",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Agent-oriented Bright Data web intelligence, research, extraction, and dataset workflows over MCP.",
   "author": {
     "name": "dunkeln"
@@ -9,19 +9,28 @@
   "repository": "https://github.com/dunkeln/bright_mcp",
   "license": "MIT",
   "skills": "./skills/",
+  "userConfig": {
+    "api_key": {
+      "type": "string",
+      "title": "Bright Data API key",
+      "description": "Your Bright Data API key",
+      "sensitive": true,
+      "required": true
+    }
+  },
   "mcpServers": {
     "bright": {
       "type": "http",
       "url": "https://bright-mcp.onrender.com/mcp",
       "headers": {
-        "X-Bright-API-Key": "${BRIGHTDATA_API_KEY}"
+        "X-Bright-API-Key": "${user_config.api_key}"
       }
     },
     "bright-browser": {
       "type": "http",
       "url": "https://bright-mcp.onrender.com/mcp/browser",
       "headers": {
-        "X-Bright-API-Key": "${BRIGHTDATA_API_KEY}"
+        "X-Bright-API-Key": "${user_config.api_key}"
       }
     }
   }

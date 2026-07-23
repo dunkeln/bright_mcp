@@ -8,6 +8,7 @@ const form = document.querySelector<HTMLFormElement>("form[data-expires-in]");
 const input = form?.querySelector<HTMLInputElement>("#api_key");
 const button = form?.querySelector<HTMLButtonElement>("button[type=submit]");
 const status = document.querySelector<HTMLElement>("#oauth-status");
+const buttonText = button?.textContent ?? "Connect Bright";
 let submitted = false;
 
 form?.addEventListener("submit", (event) => {
@@ -31,6 +32,20 @@ form?.addEventListener("formdata", () => {
     status.hidden = false;
     status.textContent = "Validating your key and returning to your client…";
   }
+  setTimeout(() => {
+    if (!submitted) return;
+    submitted = false;
+    form.removeAttribute("aria-busy");
+    if (input) {
+      input.readOnly = false;
+      input.removeAttribute("aria-disabled");
+    }
+    if (button) {
+      button.textContent = buttonText;
+      button.removeAttribute("aria-disabled");
+    }
+    if (status) status.textContent = "Connection did not finish. Try again.";
+  }, 15_000);
 });
 
 setTimeout(() => {

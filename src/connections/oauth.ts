@@ -185,7 +185,7 @@ export function createOAuthService(options: {
       clientName: validated.clientName,
       requestToken,
       hasSavedKey: Boolean(savedKey),
-    }));
+    }), 200, callbackSource(validated.redirectUri));
   }
 
   async function authorize(request: Request) {
@@ -205,7 +205,7 @@ export function createOAuthService(options: {
         requestToken: requestToken!,
         hasSavedKey: false,
         error: "Paste a valid Bright Data API key.",
-      }), 400);
+      }), 400, callbackSource(payload.redirectUri));
     }
     if (!(await options.validateApiKey(apiKey))) {
       return html(connectPage({
@@ -213,7 +213,7 @@ export function createOAuthService(options: {
         requestToken: requestToken!,
         hasSavedKey: false,
         error: "Bright Data rejected that key. Check it and try again.",
-      }), 401);
+      }), 401, callbackSource(payload.redirectUri));
     }
     const code = await seal({
       kind: "code",
@@ -552,18 +552,26 @@ function tooManyRequests() {
   );
 }
 
-function html(body: string, status = 200) {
+function html(body: string, status = 200, formAction?: string) {
   return new Response(body, {
     status,
     headers: {
       "cache-control": "no-store",
       "content-security-policy":
-        "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+        `default-src 'none'; img-src 'self'; script-src 'self'; style-src 'unsafe-inline'; form-action 'self'${formAction ? ` ${formAction}` : ""}; base-uri 'none'; frame-ancestors 'none'`,
       "content-type": "text/html; charset=utf-8",
       "referrer-policy": "no-referrer",
       "x-content-type-options": "nosniff",
     },
   });
+}
+
+function callbackSource(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  const url = new URL(value);
+  return url.protocol === "http:" || url.protocol === "https:"
+    ? url.origin
+    : url.protocol;
 }
 
 function connectPage(options: {

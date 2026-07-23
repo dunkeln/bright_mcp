@@ -86,10 +86,74 @@ export const datasetResultSchema = z.object({
   }
 });
 
+export const datasetUnavailableSchema = z.object({
+  schemaVersion: z.literal(1),
+  status: z.literal("unavailable"),
+  title: z.literal("Access limited"),
+  message: z.string().min(1),
+  nextAction: z.string().min(1),
+  fallbackTools: z.array(z.enum(["search_web", "read_web"])).min(1).max(2),
+});
+
+export const datasetToolOutputSchema = z.object({
+  schemaVersion: z.literal(1),
+  status: z.literal("unavailable").optional(),
+}).passthrough();
+
+export const itemFailureSchema = z.object({
+  code: z.string(),
+  message: z.string(),
+  retryable: z.boolean(),
+  nextAction: z.string().optional(),
+  requestId: z.string().optional(),
+});
+
+export const searchResponseSchema = z.object({
+  searches: z.array(z.object({
+    query: z.string(),
+    retrievedAt: z.iso.datetime(),
+    providerQuery: z.string().optional(),
+    detectedQuery: z.string().optional(),
+    spelling: z.object({
+      originalText: z.string().nullable().optional(),
+      originalUrl: z.url().nullable().optional(),
+      correctedText: z.string().nullable().optional(),
+      correctedUrl: z.url().nullable().optional(),
+      includedText: z.string().nullable().optional(),
+      includedUrl: z.url().nullable().optional(),
+      suggestedText: z.string().nullable().optional(),
+      suggestedUrl: z.url().nullable().optional(),
+      originalEmpty: z.boolean().nullable().optional(),
+    }).optional(),
+    results: z.array(z.object({
+      title: z.string(),
+      url: z.url(),
+      summary: z.string(),
+      rank: z.number().int().positive().optional(),
+      siteLinks: z.array(z.object({
+        url: z.url(),
+        text: z.string(),
+      })).optional(),
+    })),
+    topStories: z.array(z.object({
+      title: z.string(),
+      url: z.url(),
+      source: z.string().optional(),
+      published: z.string().optional(),
+      imageUrl: z.url().optional(),
+    })).optional(),
+    nextCursor: z.string().optional(),
+    error: itemFailureSchema.optional(),
+  })),
+});
+
 export type JsonObject = Record<string, unknown>;
 export type DatasetOperation = z.infer<typeof datasetOperationSchema>;
 export type DatasetProfile = z.infer<typeof datasetProfileSchema>;
 export type DatasetResult = z.infer<typeof datasetResultSchema>;
+export type DatasetUnavailable = z.infer<typeof datasetUnavailableSchema>;
+export type ItemFailure = z.infer<typeof itemFailureSchema>;
+export type SearchResponse = z.infer<typeof searchResponseSchema>;
 export type DatasetResultBase = Omit<
   DatasetResult,
   "profiles" | "rows" | "rowRefs" | "page" | "artifact"

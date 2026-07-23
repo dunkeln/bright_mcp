@@ -171,8 +171,8 @@ function Links({ rows, onOpenLink }: { rows: JsonObject[]; onOpenLink: (url: str
 
 function Provenance({ page, loaded }: { page: DatasetResult; loaded: number }) {
   const facts = [
-    ["Dataset", page.dataset.title],
-    ["Dataset ID", page.dataset.id],
+    ["Data", page.dataset.title],
+    ["Source ID", page.dataset.id],
     ["Operation", page.operation],
     ["Loaded rows", loaded],
     ["Reported rows", page.page.totalRows ?? page.rows.length],

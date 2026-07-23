@@ -1,7 +1,12 @@
 import { ResourceTemplate, type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import {
+  itemFailureSchema,
+  searchResponseSchema,
+} from "../core/contracts";
 import { isPublicHttpUrl } from "../core/public-url";
 import type { WebAdapter, WebContentStore } from "../core/web";
+import { DATA_WORKBENCH_META } from "./dataset-tools";
 import { reply, requestContext, runTool } from "./support";
 
 const annotations = {
@@ -10,20 +15,6 @@ const annotations = {
   idempotentHint: true,
   openWorldHint: false,
 } as const;
-
-const searchResultSchema = z.object({
-  title: z.string(),
-  url: z.url(),
-  summary: z.string(),
-});
-
-const itemFailureSchema = z.object({
-  code: z.string(),
-  message: z.string(),
-  retryable: z.boolean(),
-  nextAction: z.string().optional(),
-  requestId: z.string().optional(),
-});
 
 const readItemSchema = z.object({
   url: z.url(),
@@ -90,21 +81,14 @@ export function registerWebTools(
       description:
         "Find current public-web sources through a fast ordinary lookup when the relevant pages are not yet known. Submit one to five related queries together. Results contain compact titles, URLs, and summaries; answer from them when they already contain the requested fact. retrievedAt records when Bright MCP received the result, not when a source published or updated it. Do not infer a source date, quote time, or year unless that result's title or summary states it. On first use, Bright MCP may create the deterministic bright_mcp_serp zone in the caller's Bright Data account when no compatible SERP zone exists. Use discover_web instead when sources must be ranked against an explicit goal or constrained by geography, language, keywords, or dates. Use read_web only when page-level text is missing or explicitly required, not merely to verify a useful summary. Use a returned cursor only to continue that query. Do not repeat unchanged queries, and do not use this tool for known URLs, ad hoc extraction, or structured dataset records.",
       inputSchema: searchInputSchema,
-      outputSchema: {
-        searches: z.array(z.object({
-          query: z.string(),
-          retrievedAt: z.iso.datetime(),
-          results: z.array(searchResultSchema),
-          nextCursor: z.string().optional(),
-          error: itemFailureSchema.optional(),
-        })),
-      },
+      outputSchema: searchResponseSchema,
       annotations: {
         ...annotations,
         readOnlyHint: false,
         idempotentHint: false,
         openWorldHint: true,
       },
+      _meta: DATA_WORKBENCH_META,
     },
     async (input, extra) => {
       const context = requestContext(principalId, extra.signal, extra.authInfo);

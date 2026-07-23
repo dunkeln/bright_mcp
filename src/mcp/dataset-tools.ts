@@ -16,6 +16,7 @@ import {
   CapabilityError,
   datasetOperationSchema,
   datasetResultSchema,
+  datasetToolOutputSchema,
   jsonValueSchema,
   type RequestContext,
 } from "../core/contracts";
@@ -79,12 +80,12 @@ const extractionInputSchema = z.object({
   }
 });
 
-const appMeta = {
+export const DATA_WORKBENCH_META = {
   ui: { resourceUri: DATASET_WORKBENCH_URI, visibility: ["model", "app"] },
   "ui/resourceUri": DATASET_WORKBENCH_URI,
   "openai/outputTemplate": DATASET_WORKBENCH_URI,
-  "openai/toolInvocation/invoking": "Running dataset…",
-  "openai/toolInvocation/invoked": "Dataset workbench ready",
+  "openai/toolInvocation/invoking": "Loading data…",
+  "openai/toolInvocation/invoked": "Data workbench ready",
 } as const;
 
 const runDatasetConfig = {
@@ -103,7 +104,7 @@ const runDatasetConfig = {
     idempotentHint: false,
     openWorldHint: true,
   },
-  _meta: appMeta,
+  _meta: DATA_WORKBENCH_META,
 } as const;
 
 type DatasetToolDependencies = {
@@ -118,21 +119,22 @@ export function registerDeepLookupTools(
   server: McpServer,
   dependencies: DatasetToolDependencies,
 ) {
-  server.registerTool(
+  let disableUnavailableTools = () => {};
+  const extractTool = server.registerTool(
     "extract_web",
     {
       title: "Extract web fields",
       description:
         "Extract an ad hoc structured record from each known public URL. Supply the exact field names and meanings required in the result. Use this when the source URLs are already known and the desired schema is temporary; use read_web for exact page evidence, research_web when sources are not known, and run_dataset for a maintained extractor. Preview is the default. Full extraction is caller-funded and requires acknowledgeCost=true plus maxCostUsd.",
       inputSchema: extractionInputSchema,
-      outputSchema: datasetResultSchema,
+      outputSchema: datasetToolOutputSchema,
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
         idempotentHint: false,
         openWorldHint: true,
       },
-      _meta: appMeta,
+      _meta: DATA_WORKBENCH_META,
     },
     async (input, extra) => {
       return executeDeepLookup({
@@ -145,32 +147,37 @@ export function registerDeepLookupTools(
         dependencies.principalId,
         extra.signal,
         extra.authInfo,
-      ));
+      ), disableUnavailableTools);
     },
   );
 
-  server.registerTool(
+  const researchTool = server.registerTool(
     "research_web",
     {
       title: "Research web",
       description:
         "Turn an open-ended objective into a sourced structured table when the relevant pages are not known in advance. Use for multi-source comparison, entity discovery, or broad web research that should return records. Use search_web for compact source discovery, read_web for exact known-page evidence, and extract_web when URLs and fields are already known. Preview is the default. Full research is caller-funded and requires acknowledgeCost=true plus maxCostUsd.",
       inputSchema: deepLookupInputSchema,
-      outputSchema: datasetResultSchema,
+      outputSchema: datasetToolOutputSchema,
       annotations: {
         readOnlyHint: false,
         destructiveHint: true,
         idempotentHint: false,
         openWorldHint: true,
       },
-      _meta: appMeta,
+      _meta: DATA_WORKBENCH_META,
     },
     async (input, extra) => executeDeepLookup(
       input,
       dependencies,
       requestContext(dependencies.principalId, extra.signal, extra.authInfo),
+      disableUnavailableTools,
     ),
   );
+  disableUnavailableTools = () => {
+    extractTool.disable();
+    researchTool.disable();
+  };
 }
 
 export function registerMarketplaceTools(
@@ -340,18 +347,18 @@ export function registerDatasetResources(
 
   registerAppResource(
     server,
-    "Dataset workbench",
+    "Data workbench",
     DATASET_WORKBENCH_URI,
     {
       mimeType: RESOURCE_MIME_TYPE,
-      description: "Transient inspection and handoff surface for a canonical dataset result",
+      description: "Transient inspection and handoff surface for structured web data",
       _meta: {
         ui: {
           prefersBorder: true,
           csp: { connectDomains: [], resourceDomains: [] },
         },
         "openai/widgetDescription":
-          "Inspects a dataset through a table, profiles, quality checks, provenance, and exports.",
+          "Inspects structured web data through a table, profiles, quality checks, provenance, and exports.",
       },
     },
     async () => ({
@@ -366,7 +373,7 @@ export function registerDatasetResources(
               csp: { connectDomains: [], resourceDomains: [] },
             },
             "openai/widgetDescription":
-              "Inspects a dataset through a table, profiles, quality checks, provenance, and exports.",
+              "Inspects structured web data through a table, profiles, quality checks, provenance, and exports.",
           },
         },
       ],
@@ -405,12 +412,26 @@ function executeDeepLookup(
   input: z.infer<typeof deepLookupInputSchema>,
   dependencies: Pick<DatasetToolDependencies, "datasets">,
   context: RequestContext,
+  onUnavailable: () => void,
 ) {
-  return runTool(async () => datasetReply(await dependencies.datasets.runner.run({
-    datasetId: "deep-web-research",
-    operation: "search",
-    arguments: input,
-  }, context)));
+  return runTool(async () => {
+    try {
+      return datasetReply(await dependencies.datasets.runner.run({
+        datasetId: "deep-web-research",
+        operation: "search",
+        arguments: input,
+      }, context));
+    } catch (error) {
+      if (
+        error instanceof CapabilityError &&
+        error.code === "upstream_capability_unavailable"
+      ) {
+        onUnavailable();
+        return datasetUnavailableReply(error);
+      }
+      throw error;
+    }
+  });
 }
 
 function extractionQuery(input: {
@@ -444,6 +465,25 @@ function datasetReply(structuredContent: z.infer<typeof datasetResultSchema>) {
         mimeType: structuredContent.artifact.mediaType,
       },
     ],
+  };
+}
+
+function datasetUnavailableReply(error: CapabilityError) {
+  const structuredContent = {
+    schemaVersion: 1 as const,
+    status: "unavailable" as const,
+    title: "Access limited" as const,
+    message: error.message,
+    nextAction:
+      "Use search_web to find sources, then read_web only for pages that need exact evidence.",
+    fallbackTools: ["search_web", "read_web"] as const,
+  };
+  return {
+    structuredContent,
+    content: [{
+      type: "text" as const,
+      text: JSON.stringify(structuredContent),
+    }],
   };
 }
 

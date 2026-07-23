@@ -2,7 +2,11 @@ import {
   applyDocumentTheme,
   getDocumentTheme,
 } from "@modelcontextprotocol/ext-apps";
-import { devDatasetResult } from "./dev-fixture";
+import {
+  devDatasetResult,
+  devSearchResult,
+  devUnavailable,
+} from "./dev-fixture";
 
 const previewWindow = window as Window & {
   brightMcpPreview?: boolean;
@@ -10,9 +14,14 @@ const previewWindow = window as Window & {
 };
 
 previewWindow.brightMcpPreview = true;
+const preview = new URLSearchParams(window.location.search);
 previewWindow.openai = {
   ...previewWindow.openai,
-  toolOutput: devDatasetResult,
+  toolOutput: preview.has("unavailable")
+    ? devUnavailable
+    : preview.has("search")
+    ? devSearchResult
+    : devDatasetResult,
 };
 
 document.documentElement.dataset.preview = "true";

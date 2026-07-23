@@ -17,7 +17,7 @@ const html = `<!doctype html>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Dataset workbench</title>
+    <title>Data workbench</title>
     <style>${css}</style>
   </head>
   <body>
@@ -57,4 +57,4 @@ if (!oauthDither.success) {
   throw new Error("Bun failed to build the OAuth dither script.");
 }
 
-console.log("Built dist/dataset-table.html");
+console.log("Built data workbench");

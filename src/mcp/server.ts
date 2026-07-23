@@ -25,7 +25,7 @@ export const MCP_PROFILE_PATHS: Readonly<Record<string, McpProfile>> = {
 };
 
 const instructions: Record<McpProfile, string> = {
-  all: "Choose by source certainty, discovery scope, and output: fast ordinary lookup -> search_web; intent-ranked or constrained source shortlist -> discover_web; known URLs plus readable evidence or exact source -> read_web; known URLs plus named fields -> extract_web; unknown sources plus sourced structured records -> research_web; maintained vertical data -> find_datasets then run_dataset. Do not substitute a discovery/read chain when research_web matches the requested outcome.",
+  all: "Choose by source certainty, discovery scope, and output: fast ordinary lookup -> search_web; intent-ranked or constrained source shortlist -> discover_web; known URLs plus readable evidence or exact source -> read_web; known URLs plus named fields -> extract_web; unknown sources plus sourced structured records -> research_web; maintained vertical data -> find_datasets then run_dataset. If Deep Lookup reports that it is unavailable, use search_web to find sources and read_web only where exact page evidence is needed.",
   web: "Use search_web for a fast ordinary lookup. Use discover_web when sources must be ranked against a goal or constrained. Answer from returned summaries when they contain the requested fact. Use read_web only when page-level evidence or exact HTML is required; do not reopen a result merely to verify a useful summary.",
   "deep-lookup": "Use extract_web for named fields when source URLs are known. Use research_web for sourced structured records when sources are unknown. Preview before a caller-approved paid run.",
   marketplace: "Use find_datasets only for maintained vertical data, then call run_dataset once with the returned identifier, operation, argument schema, and cost acknowledgement.",
@@ -85,7 +85,12 @@ export function createBrightMcpServer(dependencies: {
   if (profile === "all" || profile === "marketplace") {
     registerMarketplaceTools(server, dependencies);
   }
-  if (profile === "all" || profile === "deep-lookup" || profile === "marketplace") {
+  if (
+    profile === "all" ||
+    profile === "web" ||
+    profile === "deep-lookup" ||
+    profile === "marketplace"
+  ) {
     registerDatasetResources(server, dependencies);
   }
   if (profile === "browser") {

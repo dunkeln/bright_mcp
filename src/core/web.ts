@@ -1,4 +1,8 @@
-import type { RequestContext } from "./contracts";
+import type {
+  ItemFailure as ContractItemFailure,
+  RequestContext,
+  SearchResponse as ContractSearchResponse,
+} from "./contracts";
 
 export type SearchQuery = {
   query: string;
@@ -32,32 +36,12 @@ export type DiscoverResponse = {
   }>;
 };
 
-export type SearchResponse = {
-  searches: Array<{
-    query: string;
-    retrievedAt: string;
-    results: Array<{
-      title: string;
-      url: string;
-      summary: string;
-    }>;
-    nextCursor?: string;
-    error?: ItemFailure;
-  }>;
-};
-
-export type SingleSearchResponse = {
-  results: Array<{ title: string; url: string; summary: string }>;
-  nextCursor?: string;
-};
-
-export type ItemFailure = {
-  code: string;
-  message: string;
-  retryable: boolean;
-  nextAction?: string;
-  requestId?: string;
-};
+export type SearchResponse = ContractSearchResponse;
+export type SingleSearchResponse = Omit<
+  SearchResponse["searches"][number],
+  "query" | "retrievedAt" | "error"
+>;
+export type ItemFailure = ContractItemFailure;
 
 export type ReadItem = {
   url: string;

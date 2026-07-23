@@ -23,6 +23,10 @@ Do not replace `research_web` with repeated search-and-read calls when the user
 asked for a sourced structured table. Do not call `find_datasets` when ordinary
 web evidence is sufficient.
 
+Treat the connection's advertised tools as authoritative. If Deep Lookup returns
+`upstream_capability_unavailable`, follow its `search_web` and `read_web` fallback
+once; do not retry `research_web` or `extract_web`.
+
 ## Execute
 
 1. Infer source certainty and output shape from the request.

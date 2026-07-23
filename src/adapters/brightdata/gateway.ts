@@ -332,7 +332,7 @@ function statusError(status: number, requestId?: string, responseBody = ""): Cap
         "upstream_capability_unavailable",
         "The configured Deep Lookup capability only supports business-email queries.",
         false,
-        "Enable general Deep Lookup access or configure another structured extraction backend.",
+        "Use search_web to find sources, then read_web only for pages that need exact evidence.",
         requestId,
       );
     }

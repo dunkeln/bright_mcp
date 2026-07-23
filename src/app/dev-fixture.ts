@@ -1,4 +1,8 @@
-import type { DatasetResult } from "../core/contracts";
+import type {
+  DatasetResult,
+  DatasetUnavailable,
+  SearchResponse,
+} from "../core/contracts";
 import { profileDataset } from "../core/profiles";
 
 const columns = [
@@ -87,3 +91,54 @@ export const devDatasetResult = {
     expiresAt: new Date(Date.now() + 15 * 60_000).toISOString(),
   },
 } satisfies DatasetResult;
+
+export const devUnavailable = {
+  schemaVersion: 1,
+  status: "unavailable",
+  title: "Access limited",
+  message: "Deep Lookup is not available for this connection.",
+  nextAction:
+    "Use search_web to find sources, then read_web only for pages that need exact evidence.",
+  fallbackTools: ["search_web", "read_web"],
+} satisfies DatasetUnavailable;
+
+export const devSearchResult = {
+  searches: [
+    {
+      query: "open source TypeScript MCP SDKs",
+      retrievedAt: "2026-07-23T07:58:32.117Z",
+      providerQuery: "open source TypeScript MCP SDKs",
+      detectedQuery: "open source TypeScript MCP SDKs",
+      results: [
+        {
+          rank: 1,
+          title: "Model Context Protocol TypeScript SDK",
+          url: "https://github.com/modelcontextprotocol/typescript-sdk",
+          summary: "The official TypeScript SDK for Model Context Protocol.",
+          siteLinks: [
+            {
+              text: "Documentation",
+              url: "https://github.com/modelcontextprotocol/typescript-sdk#readme",
+            },
+          ],
+        },
+        {
+          rank: 2,
+          title: "Model Context Protocol servers",
+          url: "https://github.com/modelcontextprotocol/servers",
+          summary: "Reference MCP server implementations and community examples.",
+        },
+      ],
+      topStories: [
+        {
+          title: "New MCP tools arrive for TypeScript developers",
+          url: "https://example.com/mcp-typescript",
+          source: "Example News",
+          published: "2 hours ago",
+          imageUrl: "https://example.com/mcp-typescript.png",
+        },
+      ],
+      nextCursor: "search_10",
+    },
+  ],
+} satisfies SearchResponse;

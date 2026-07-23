@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LRUCache } from "lru-cache";
 import {
   CapabilityError,
   jsonValueSchema,
@@ -73,12 +74,22 @@ export function createBrightDataDatasetAdapter(
   resultStore: ResultStore,
 ) {
   const catalog = createBrightDataCatalog(gateway);
+  const unavailableDeepLookup = new LRUCache<string, true>({
+    max: 1_000,
+    ttl: 60 * 60_000,
+  });
   return {
     catalog,
     runner: {
       async run(input, context) {
         if (input.datasetId === "deep-web-research") {
-          return runDeepLookup(gateway, resultStore, input.arguments, context);
+          return runDeepLookup(
+            gateway,
+            resultStore,
+            input.arguments,
+            context,
+            unavailableDeepLookup,
+          );
         }
         if (input.datasetId.startsWith("marketplace:")) {
           const definition = await catalog.describe(input.datasetId, context);
@@ -240,15 +251,29 @@ async function runDeepLookup(
   store: ResultStore,
   value: JsonObject,
   context: RequestContext,
+  unavailable: LRUCache<string, true>,
 ) {
   const input = deepLookupInputSchema.safeParse(value);
   if (!input.success) throw invalidArguments(input.error);
-  const preview = parse(deepPreviewTriggerSchema, (await gateway.requestJson({
-    method: "POST",
-    path: "/datasets/deep_lookup/v1/preview",
-    body: [{ query: input.data.query }],
-    timeoutMs: 30_000,
-  }, context)).data);
+  if (unavailable.has(context.principalId)) throw deepLookupUnavailable();
+  let preview: z.infer<typeof deepPreviewTriggerSchema>;
+  try {
+    preview = parse(deepPreviewTriggerSchema, (await gateway.requestJson({
+      method: "POST",
+      path: "/datasets/deep_lookup/v1/preview",
+      body: [{ query: input.data.query }],
+      timeoutMs: 30_000,
+    }, context)).data);
+  } catch (error) {
+    if (
+      error instanceof CapabilityError &&
+      error.code === "upstream_capability_unavailable"
+    ) {
+      unavailable.set(context.principalId, true);
+      throw deepLookupUnavailable(error.requestId);
+    }
+    throw error;
+  }
   const previewData = await finishDeepPreview(gateway, preview.preview_id, context);
   if (input.data.preview) {
     const rows = previewData.sample_data ?? [];
@@ -301,6 +326,16 @@ async function runDeepLookup(
     code: "billed_operation",
     message: `Bright Data billed the caller account ${completed.total_cost ?? triggered.max_cost ?? "for matched records"}.`,
   }]), rows, context);
+}
+
+function deepLookupUnavailable(requestId?: string) {
+  return new CapabilityError(
+    "upstream_capability_unavailable",
+    "Deep Lookup is not available for this connection.",
+    false,
+    "Use search_web to find sources, then read_web only for pages that need exact evidence.",
+    requestId,
+  );
 }
 
 async function saveSnapshot(

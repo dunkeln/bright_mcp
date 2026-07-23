@@ -22,6 +22,7 @@ const READ_LATENCY_WARMUP = 3;
 const READ_TIMEOUT_DEFAULT_MS = 15_000;
 const READ_TIMEOUT_MIN_MS = 8_000;
 const READ_TIMEOUT_MAX_MS = 30_000;
+const urlSchema = z.url();
 const organicResultSchema = z.object({
   title: z.string().optional(),
   link: z.url().optional(),
@@ -29,11 +30,39 @@ const organicResultSchema = z.object({
   description: z.string().optional(),
   snippet: z.string().optional(),
   type: z.string().optional(),
+  global_rank: z.number().int().positive().optional(),
+  extensions: z.array(z.object({
+    type: z.string().optional(),
+    link: z.string().optional(),
+    text: z.string().optional(),
+  })).optional(),
 });
 
 const searchEnvelopeSchema = z.object({
   organic: z.array(organicResultSchema).optional(),
   results: z.array(organicResultSchema).optional(),
+  general: z.object({
+    query: z.string().optional(),
+    detected_query: z.string().optional(),
+  }).optional(),
+  spelling: z.object({
+    original_text: z.string().nullable().optional(),
+    original_link: z.string().nullable().optional(),
+    auto_corrected_text: z.string().nullable().optional(),
+    auto_corrected_link: z.string().nullable().optional(),
+    auto_included_text: z.string().nullable().optional(),
+    auto_included_link: z.string().nullable().optional(),
+    suggested_text: z.string().nullable().optional(),
+    suggested_link: z.string().nullable().optional(),
+    original_empty: z.boolean().nullable().optional(),
+  }).optional(),
+  top_stories: z.array(z.object({
+    title: z.string().optional(),
+    link: z.string().optional(),
+    source: z.string().optional(),
+    date: z.string().optional(),
+    image: z.string().optional(),
+  })).optional(),
 });
 const discoverTriggerSchema = z.object({ task_id: z.string().min(1) });
 const discoverResultSchema = z.object({
@@ -373,13 +402,54 @@ async function searchSerp(
     .filter((item) => !item.type || item.type === "organic")
     .flatMap((item) => {
       const url = item.link ?? item.url;
-      return url && item.title
-        ? [{ title: item.title, url, summary: item.description ?? item.snippet ?? "" }]
-        : [];
+      if (!url || !item.title) return [];
+      const siteLinks = item.extensions?.flatMap((extension) => {
+        const link = validUrl(extension.link);
+        return link && extension.text
+          ? [{ url: link, text: extension.text }]
+          : []
+      });
+      return [{
+        title: item.title,
+        url,
+        summary: item.description ?? item.snippet ?? "",
+        ...(item.global_rank !== undefined && { rank: item.global_rank }),
+        ...(siteLinks?.length && { siteLinks }),
+      }];
     })
     .slice(0, SEARCH_PAGE_SIZE);
+  const topStories = envelope.top_stories?.flatMap((story) => {
+    const url = validUrl(story.link);
+    const imageUrl = validUrl(story.image);
+    return url && story.title
+      ? [{
+          title: story.title,
+          url,
+          ...(story.source && { source: story.source }),
+          ...(story.date && { published: story.date }),
+          ...(imageUrl && { imageUrl }),
+        }]
+      : [];
+  });
+  const spelling = envelope.spelling && {
+    originalText: envelope.spelling.original_text,
+    originalUrl: validUrl(envelope.spelling.original_link),
+    correctedText: envelope.spelling.auto_corrected_text,
+    correctedUrl: validUrl(envelope.spelling.auto_corrected_link),
+    includedText: envelope.spelling.auto_included_text,
+    includedUrl: validUrl(envelope.spelling.auto_included_link),
+    suggestedText: envelope.spelling.suggested_text,
+    suggestedUrl: validUrl(envelope.spelling.suggested_link),
+    originalEmpty: envelope.spelling.original_empty,
+  };
   return {
     results,
+    ...(envelope.general?.query && { providerQuery: envelope.general.query }),
+    ...(envelope.general?.detected_query && {
+      detectedQuery: envelope.general.detected_query,
+    }),
+    ...(spelling && { spelling }),
+    ...(topStories?.length && { topStories }),
     nextCursor: results.length === SEARCH_PAGE_SIZE && offset < MAX_SEARCH_OFFSET
       ? `search_${offset + SEARCH_PAGE_SIZE}`
       : undefined,
@@ -392,6 +462,11 @@ function parseSearchEnvelope(value: unknown) {
     throw malformedSearch();
   }
   return parsed.data;
+}
+
+function validUrl(value: string | null | undefined) {
+  const parsed = urlSchema.safeParse(value);
+  return parsed.success ? parsed.data : undefined;
 }
 
 async function waitForSearchRetry(

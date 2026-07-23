@@ -25,9 +25,14 @@ import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   datasetResultSchema,
+  datasetUnavailableSchema,
+  searchResponseSchema,
   type DatasetResult,
+  type DatasetUnavailable,
   type JsonObject,
+  type SearchResponse,
 } from "../core/contracts";
+import { profileDataset } from "../core/profiles";
 import { DatasetOverview } from "./DatasetOverview";
 import {
   DatasetWorkbench,
@@ -43,13 +48,16 @@ type Sort = { key: string; direction: "ascending" | "descending" } | null;
 type Selection = { rowRef: string; row: JsonObject };
 type View = "table" | "overview" | WorkbenchPanel;
 
-function DatasetWorkbenchApp() {
+function DataWorkbenchApp() {
   const isBrowserPreview = Boolean(
     (window as Window & { brightMcpPreview?: boolean }).brightMcpPreview,
   );
   const [initial] = useState(readInitialResult);
   const [pages, setPages] = useState<DatasetResult[]>(
     initial.result ? [initial.result] : [],
+  );
+  const [unavailable, setUnavailable] = useState<DatasetUnavailable | null>(
+    initial.unavailable ?? null,
   );
   const [pageIndex, setPageIndex] = useState(0);
   const [filter, setFilter] = useState("");
@@ -67,7 +75,7 @@ function DatasetWorkbenchApp() {
   const activeResize = useRef<AbortController | null>(null);
 
   const { app, isConnected, error } = useApp({
-    appInfo: { name: "bright-dataset-workbench", version: "0.4.0" },
+    appInfo: { name: "bright-data-workbench", version: "0.4.0" },
     capabilities: {},
     onAppCreated(createdApp) {
       createdApp.ontoolresult = (toolResult) => {
@@ -76,7 +84,14 @@ function DatasetWorkbenchApp() {
           setPageError(parsed.message);
           return;
         }
+        if (parsed.unavailable) {
+          setPages([]);
+          setUnavailable(parsed.unavailable);
+          setPageError(null);
+          return;
+        }
         setPages([parsed.value]);
+        setUnavailable(null);
         setPageIndex(0);
         setView("table");
         setProfileIndex(0);
@@ -165,6 +180,26 @@ function DatasetWorkbenchApp() {
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  if (unavailable) {
+    return (
+      <main
+        className="flex min-h-56 flex-col items-center justify-center gap-5 p-6 text-center"
+        role="alert"
+        aria-label={`${unavailable.title}. ${unavailable.message}`}
+      >
+        <div
+          className="flex size-16 items-center justify-center rounded-2xl bg-surface-secondary text-5xl font-light text-secondary"
+          aria-hidden="true"
+        >
+          ×
+        </div>
+        <h1 className="text-lg font-semibold text-primary">
+          {unavailable.title}
+        </h1>
+      </main>
+    );
+  }
+
   if (!page) {
     return (
       <main
@@ -175,7 +210,7 @@ function DatasetWorkbenchApp() {
         {pageError ??
           (error
             ? "This workbench is waiting for a supported MCP Apps host."
-            : "Waiting for a dataset result…")}
+            : "Waiting for structured data…")}
       </main>
     );
   }
@@ -192,6 +227,7 @@ function DatasetWorkbenchApp() {
         content && "text" in content ? JSON.parse(content.text) : null,
       );
       if (!parsed.ok) throw new Error(parsed.message);
+      if (parsed.unavailable) throw new Error(parsed.unavailable.message);
       setPages((current) => [...current.slice(0, pageIndex + 1), parsed.value]);
       setPageIndex((current) => current + 1);
       setFilter("");
@@ -332,8 +368,8 @@ function DatasetWorkbenchApp() {
               color="secondary"
               size="sm"
               uniform
-              aria-label="Dataset actions"
-              title="Dataset actions"
+              aria-label="Data actions"
+              title="Data actions"
             >
               <DataControls className="size-4" aria-hidden="true" />
             </Button>
@@ -690,34 +726,125 @@ function parseToolResult(result: CallToolResult) {
 
 function parseResult(
   value: unknown,
-): { ok: true; value: DatasetResult } | { ok: false; message: string } {
-  const parsed = datasetResultSchema.safeParse(value);
-  if (!parsed.success) {
-    const version =
-      value && typeof value === "object" && "schemaVersion" in value
-        ? String(value.schemaVersion)
-        : "missing";
-    return {
-      ok: false,
-      message: `Unsupported or invalid dataset result schema (${version}).`,
-    };
+):
+  | { ok: true; value: DatasetResult; unavailable?: undefined }
+  | { ok: true; unavailable: DatasetUnavailable; value?: undefined }
+  | { ok: false; message: string } {
+  const unavailable = datasetUnavailableSchema.safeParse(value);
+  if (unavailable.success) {
+    return { ok: true, unavailable: unavailable.data };
   }
-  return { ok: true, value: parsed.data };
+  const parsed = datasetResultSchema.safeParse(value);
+  if (parsed.success) return { ok: true, value: parsed.data };
+  const search = searchResponseSchema.safeParse(value);
+  if (search.success) return { ok: true, value: searchToDataset(search.data) };
+  const version =
+    value && typeof value === "object" && "schemaVersion" in value
+      ? String(value.schemaVersion)
+      : "missing";
+  return {
+    ok: false,
+    message: `Unsupported or invalid workbench result schema (${version}).`,
+  };
 }
 
-function readInitialResult(): { result?: DatasetResult; error?: string } {
+function searchToDataset(search: SearchResponse): DatasetResult {
+  const columns: DatasetResult["columns"] = [
+    { key: "query", label: "Query", type: "string" },
+    { key: "kind", label: "Kind", type: "string" },
+    { key: "rank", label: "Rank", type: "number" },
+    { key: "title", label: "Title", type: "string" },
+    { key: "url", label: "URL", type: "string" },
+    { key: "summary", label: "Summary", type: "string" },
+    { key: "source", label: "Source", type: "string" },
+    { key: "published", label: "Published", type: "string" },
+    { key: "siteLinks", label: "Site links", type: "array" },
+    { key: "imageUrl", label: "Image", type: "string" },
+  ];
+  const rows: JsonObject[] = search.searches.flatMap((item) => [
+    ...item.results.map((result) => ({
+      query: item.query,
+      kind: "Organic",
+      rank: result.rank,
+      title: result.title,
+      url: result.url,
+      summary: result.summary,
+      siteLinks: result.siteLinks,
+    })),
+    ...(item.topStories ?? []).map((story) => ({
+      query: item.query,
+      kind: "Top story",
+      title: story.title,
+      url: story.url,
+      source: story.source,
+      published: story.published,
+      imageUrl: story.imageUrl,
+    })),
+  ]);
+  const warnings = search.searches.flatMap((item, index) => {
+    const messages = [];
+    if (item.error) messages.push(item.error.message);
+    if (item.providerQuery && item.providerQuery !== item.query) {
+      messages.push(`Provider received “${item.providerQuery}”.`);
+    }
+    if (item.detectedQuery && item.detectedQuery !== item.query) {
+      messages.push(`Provider searched for “${item.detectedQuery}”.`);
+    }
+    const correction =
+      item.spelling?.correctedText ?? item.spelling?.suggestedText;
+    if (correction) messages.push(`Spelling alternative: “${correction}”.`);
+    return messages.map((message, warningIndex) => ({
+      code: `search_${index + 1}_${warningIndex + 1}`,
+      message,
+    }));
+  });
+  const first = search.searches[0];
+  return {
+    schemaVersion: 1,
+    resultId: `search-${first?.retrievedAt ?? "empty"}`,
+    dataset: {
+      id: "web-search",
+      title: search.searches.length === 1
+        ? `Search · ${first?.query ?? ""}`
+        : `Web search · ${search.searches.length} queries`,
+    },
+    operation: "search",
+    columns,
+    profiles: profileDataset(columns, rows),
+    rows,
+    rowRefs: rows.map((_, index) => `search-row-${index + 1}`),
+    page: {
+      truncated: search.searches.some((item) => Boolean(item.nextCursor)),
+      totalRows: rows.length,
+    },
+    artifact: {
+      uri: "mcp://bright/search_web",
+      mediaType: "application/json",
+    },
+    ...(warnings.length && { warnings }),
+  };
+}
+
+function readInitialResult(): {
+  result?: DatasetResult;
+  unavailable?: DatasetUnavailable;
+  error?: string;
+} {
   const value = (
     window as Window & { openai?: { toolOutput?: unknown } }
   ).openai?.toolOutput;
   if (value === undefined) return {};
   const parsed = parseResult(value);
-  return parsed.ok ? { result: parsed.value } : { error: parsed.message };
+  if (!parsed.ok) return { error: parsed.message };
+  return parsed.unavailable
+    ? { unavailable: parsed.unavailable }
+    : { result: parsed.value };
 }
 
 const root = document.getElementById("root");
-if (!root) throw new Error("Dataset workbench root element is missing.");
+if (!root) throw new Error("Data workbench root element is missing.");
 createRoot(root).render(
   <StrictMode>
-    <DatasetWorkbenchApp />
+    <DataWorkbenchApp />
   </StrictMode>,
 );

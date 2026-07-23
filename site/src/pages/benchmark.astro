@@ -1,5 +1,7 @@
 ---
 import SiteHeader from "../components/SiteHeader.astro";
+
+const repoUrl = "https://github.com/dunkeln/bright_mcp";
 ---
 
 <!doctype html>
@@ -7,14 +9,249 @@ import SiteHeader from "../components/SiteHeader.astro";
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width" />
-    <meta name="description" content="Bright MCP benchmarks." />
-    <title>Benchmarks · Bright MCP</title>
+    <meta
+      name="description"
+      content="A five-turn benchmark of Bright MCP and the official Bright Data MCP."
+    />
+    <title>Five-turn benchmark · Bright MCP</title>
   </head>
   <body>
     <SiteHeader />
-    <main class="benchmark-grid" aria-label="Benchmarks">
-      <!-- Add benchmark content here. -->
-      <h1>MCPJam benchmarks</h1>
+
+    <main>
+      <article>
+        <header class="article-head">
+          <p class="meta">Benchmark report · July 2026</p>
+          <h1>Five turns reveal what one tool call cannot.</h1>
+          <p class="deck">
+            Bright MCP is built around a simple boundary: the model makes decisions
+            where judgment helps, while the MCP owns retries, polling, batching,
+            and result shaping. The test measures whether that boundary still pays
+            off across a complete conversation.
+          </p>
+        </header>
+
+        <div class="prose">
+          <p>
+            The test gave Bright MCP and the official Bright Data MCP the same
+            five-turn tasks across Current Search, Known Pages, and Marketplace
+            retrieval. Both sides used the same model and Bright Data account. A
+            stronger model then judged the answers without knowing which MCP
+            produced them.
+          </p>
+          <p>
+            Across fifteen matched conversations, Bright completed
+            {" "}<strong>14 workflows</strong> to the official MCP's 13, scored
+            {" "}<strong>7.59/10</strong> in blind answer quality to 6.43, and won
+            {" "}<strong>9–4</strong> in pairwise preference, with two ties.
+          </p>
+        </div>
+
+        <figure class="figure-wide">
+          <img
+            src="/assets/benchmarks/outcomes.png"
+            alt="Bright MCP completed 14 of 15 workflows, scored 7.59 out of 10 for answer quality, and was preferred in 9 of 15 matched runs. The official Bright Data MCP completed 13, scored 6.43, and was preferred in 4."
+          />
+          <figcaption>
+            The result across all three five-turn workflows. Higher is better on
+            every row.
+          </figcaption>
+        </figure>
+
+        <section class="prose">
+          <h2>Why test the conversation instead of the tool?</h2>
+          <p>
+            A single tool call mostly tells us whether a server can return data.
+            Real agent work continues after that. The model has to choose a source,
+            preserve useful evidence, recover when something breaks, and turn the
+            result into an answer several turns later.
+          </p>
+          <p>
+            This is where the two MCPs make different bets. The official MCP is a
+            broad Bright Data toolbox. It gives a knowledgeable caller direct
+            product controls and can take a very short route when one mature tool
+            already matches the task.
+          </p>
+          <p>
+            Bright MCP exposes a smaller set of outcomes: search, discover, read,
+            extract, research, find a dataset, and run it. The model still chooses
+            what evidence it needs and which source fits. Deterministic mechanics
+            such as retries, polling, pagination, batching, and partial recovery
+            remain below the tool boundary.
+          </p>
+          <blockquote>
+            The model should spend context on judgment, not on replaying provider
+            workflows.
+          </blockquote>
+          <p>
+            That narrower surface matters only if it still finishes the job. The
+            benchmark was designed to test exactly that.
+          </p>
+        </section>
+
+        <section class="prose">
+          <h2>The quality difference appeared across turns.</h2>
+          <p>
+            Bright led every aggregate quality dimension: task fulfillment,
+            evidence grounding, information density, source quality, and
+            actionability. Its clearest advantage came in Marketplace, where the
+            agent had to discover a typed dataset before running it and then carry
+            the result into the final answer.
+          </p>
+        </section>
+
+        <figure class="figure-wide">
+          <img
+            src="/assets/benchmarks/quality.png"
+            alt="Radar chart showing Bright MCP ahead on task fulfillment, evidence grounding, information density, source quality, and actionability."
+          />
+          <figcaption>
+            Structured, bounded evidence gave the model cleaner material to reuse
+            across the conversation.
+          </figcaption>
+        </figure>
+
+        <div class="prose">
+          <p>
+            The blind judge preferred Bright nine times and the official MCP four
+            times. Marketplace finished 5–0 for Bright and Search finished 3–2.
+            The result was not uniform, which is useful: Known Pages favored the
+            official MCP 2–1, with two ties.
+          </p>
+          <p>
+            That Known Pages result fits the architecture. When the URL is already
+            known and the job is simply to read it, the official MCP's direct
+            scrape-and-clean path is already excellent. Bright's extra workflow
+            structure adds less value there.
+          </p>
+        </div>
+
+        <figure class="figure-wide">
+          <img
+            src="/assets/benchmarks/preference.png"
+            alt="Blind judge preference: Bright MCP 9, official Bright Data MCP 4, and 2 ties."
+          />
+          <figcaption>
+            Bright's advantage was concentrated in the workflows with more
+            decisions and transitions.
+          </figcaption>
+        </figure>
+
+        <section class="prose">
+          <h2>Neither architecture won every operational metric.</h2>
+          <p>
+            Successful Search was effectively tied, with the official MCP slightly
+            faster. Known Pages tied. Bright was faster on Marketplace despite
+            spending an extra call on dataset discovery.
+          </p>
+          <p>
+            The official MCP benefits when its broad surface lets the agent jump
+            directly to the right provider operation. Bright accepts more internal
+            machinery when that machinery can improve recovery, preserve typed
+            transitions, or reduce what the model has to reason through.
+          </p>
+        </section>
+
+        <figure class="figure-wide">
+          <img
+            src="/assets/benchmarks/latency.png"
+            alt="Median successful workflow latency by task. Search: Bright MCP 71.7 seconds and official 70.2. Known Pages: both 20.8. Marketplace: Bright 22.1 and official 25.3."
+          />
+          <figcaption>
+            Median end-to-end latency among successful workflows. Lower is better.
+          </figcaption>
+        </figure>
+
+        <div class="prose">
+          <p>
+            Context shows the same architectural split. After Bright normalized
+            readable pages and taught the agent to stop when search summaries were
+            sufficient, its targeted Search rerun used 39% fewer tokens than its
+            earlier baseline. Marketplace used 28,455 tokens per successful run
+            versus 166,517 for the official MCP.
+          </p>
+          <p>
+            Known Pages was nearly even. Again, a simple direct reading task leaves
+            less workflow overhead for either MCP to remove.
+          </p>
+        </div>
+
+        <figure class="figure-wide">
+          <img
+            src="/assets/benchmarks/context.png"
+            alt="Average tokens per successful workflow. Bright MCP used fewer tokens in the targeted Search rerun and Marketplace, while Known Pages was nearly equal."
+          />
+          <figcaption>
+            Average context used by successful workflows. Lower is better.
+          </figcaption>
+        </figure>
+
+        <div class="prose">
+          <p>
+            Tool-call count by itself is not the goal. Bright used fewer calls on
+            Known Pages because it accepts several URLs in one typed batch. The
+            official MCP used fewer calls on Marketplace because its larger,
+            dataset-specific surface can jump straight to the operation. Bright
+            deliberately spends one call discovering the catalog first so the
+            model does not have to guess a provider tool.
+          </p>
+        </div>
+
+        <figure class="figure-wide">
+          <img
+            src="/assets/benchmarks/tool-calls.png"
+            alt="Average tool calls per successful workflow. Bright MCP used fewer calls on Known Pages and more on Marketplace."
+          />
+          <figcaption>
+            Calls are useful when they represent a real decision; they are waste
+            when they only expose deterministic plumbing.
+          </figcaption>
+        </figure>
+
+        <section class="prose conclusion">
+          <h2>What this changes about the MCP surface</h2>
+          <p>
+            The benchmark does not say every MCP should have fewer tools. It says
+            the public surface should match the decisions an agent is actually
+            qualified to make.
+          </p>
+          <p>
+            Choose the official MCP when broad Bright Data coverage and direct
+            provider control matter most. Choose Bright MCP when a production
+            agent needs a stable, caller-scoped path through several connected
+            decisions.
+          </p>
+          <p>
+            Bright MCP does not try to rebuild Bright Data's control plane or hide
+            every product behind one giant tool. Its direction is narrower: keep
+            judgment visible, keep mechanics internal, and make sure the smaller
+            surface still completes the workflow.
+          </p>
+        </section>
+
+        <section class="method">
+          <details>
+            <summary>How the benchmark ran <span>+</span></summary>
+            <div class="prose method-body">
+              <p>
+                MCPJam HostRunner gave both MCPs the same five-turn prompts, Bright
+                Data credential, and Claude Haiku 4.5 agent. Each MCP could use its
+                own valid tool path because the surface design was part of the
+                comparison.
+              </p>
+              <p>
+                Fifteen matched conversations covered Current Search, Known Pages,
+                and Marketplace retrieval. Claude Sonnet 5 judged anonymized
+                answers against their tool evidence for fulfillment, grounding,
+                density, source quality, and actionability.
+              </p>
+              <a href={`${repoUrl}/tree/main/evals`} target="_blank" rel="noreferrer">
+                Read the evaluation design and results →
+              </a>
+            </div>
+          </details>
+        </section>
+      </article>
     </main>
   </body>
 </html>
@@ -22,18 +259,134 @@ import SiteHeader from "../components/SiteHeader.astro";
 <style>
   :global(*) { box-sizing: border-box; }
   :global(body) {
-    background: #141414;
+    --bg: #141414;
+    --line: #ffffff17;
+    --muted: #aaa;
+    background: var(--bg);
     color: #f2f2f2;
     font-family: Inter, Arial, sans-serif;
     margin: 0;
   }
-  .benchmark-grid {
+  :global(a) { color: inherit; text-decoration: none; }
+  h1, h2, p, figure { margin-top: 0; }
+
+  main {
     background-image: radial-gradient(#ffffff0c 1px, transparent 1px);
     background-size: 16px 16px;
-    border-inline: 1px solid #ffffff17;
+    padding-inline: clamp(20px, 4vw, 48px);
+  }
+
+  article {
+    background: var(--bg);
+    border-inline: 1px solid var(--line);
     margin-inline: auto;
     max-width: 1280px;
-    min-height: calc(100vh - 65px);
-    padding: clamp(32px, 5vw, 64px) clamp(20px, 4vw, 48px);
+    padding: clamp(56px, 9vw, 112px) clamp(24px, 7vw, 88px) 96px;
+  }
+
+  .article-head,
+  .prose,
+  .method {
+    margin-inline: auto;
+    max-width: 760px;
+  }
+
+  .article-head { margin-bottom: 72px; }
+  .meta {
+    color: #8da8c7;
+    font: 500 11px/1.2 "SFMono-Regular", Consolas, monospace;
+    letter-spacing: .04em;
+    margin-bottom: 24px;
+    text-transform: uppercase;
+  }
+
+  h1 {
+    font-size: clamp(46px, 7vw, 76px);
+    font-weight: 600;
+    letter-spacing: -.05em;
+    line-height: .98;
+    margin-bottom: 28px;
+  }
+
+  .deck {
+    color: #c5c5c5;
+    font-size: clamp(18px, 2.2vw, 22px);
+    line-height: 1.55;
+  }
+
+  .prose {
+    color: #bdbdbd;
+    font-size: 17px;
+    line-height: 1.75;
+  }
+
+  .prose p { margin-bottom: 24px; }
+  .prose strong { color: #f2f2f2; font-weight: 600; }
+  .prose h2 {
+    color: #f2f2f2;
+    font-size: clamp(30px, 4vw, 44px);
+    font-weight: 600;
+    letter-spacing: -.035em;
+    line-height: 1.08;
+    margin: 96px 0 28px;
+  }
+
+  blockquote {
+    border-left: 2px solid #6b9fe1;
+    color: #e2e2e2;
+    font-size: 23px;
+    line-height: 1.5;
+    margin: 42px 0;
+    padding-left: 28px;
+  }
+
+  .figure-wide {
+    margin: 58px auto 74px;
+    max-width: 70%;
+    width: 94%;
+  }
+
+  .figure-wide img {
+    background: #0d1219;
+    border: 1px solid #ffffff18;
+    border-radius: 8px;
+    display: block;
+    height: auto;
+    width: 100%;
+  }
+
+  figcaption {
+    color: #888;
+    font-size: 12px;
+    line-height: 1.55;
+    margin: 13px 2px 0;
+  }
+
+  .conclusion { border-top: 1px solid var(--line); margin-top: 104px; padding-top: 1px; }
+  .method { border-top: 1px solid var(--line); margin-top: 80px; }
+  .method summary {
+    align-items: center;
+    cursor: pointer;
+    display: flex;
+    font-size: 17px;
+    font-weight: 600;
+    justify-content: space-between;
+    list-style: none;
+    padding: 28px 0;
+  }
+  .method summary::-webkit-details-marker { display: none; }
+  .method summary span { color: #777; font-size: 24px; font-weight: 300; }
+  .method details[open] summary span { transform: rotate(45deg); }
+  .method-body { font-size: 14px; padding-bottom: 24px; }
+  .method-body a { color: #9ec7ff; display: inline-block; margin-top: 6px; }
+
+  @media (max-width: 640px) {
+    main { padding-inline: 14px; }
+    article { padding-inline: 20px; }
+    .article-head { margin-bottom: 52px; }
+    .prose { font-size: 16px; }
+    .prose h2 { margin-top: 72px; }
+    .figure-wide { margin-block: 42px 58px; }
+    blockquote { font-size: 20px; margin-inline: 0; }
   }
 </style>

@@ -25,6 +25,10 @@ export function startHttpServer(options: {
   oauth?: OAuthService;
   browserAvailable: boolean;
   widgetHtml: string;
+  iconFile: Bun.BunFile;
+  oauthDitherFile: Bun.BunFile;
+  openAiLogoFile: Bun.BunFile;
+  claudeLogoFile: Bun.BunFile;
   localPrincipalId: string;
   createServer(principalId: string, profile: McpProfile): McpServer;
 }) {
@@ -63,6 +67,35 @@ export function startHttpServer(options: {
       if (request.method === "GET" && url.pathname === "/widget") {
         return new Response(options.widgetHtml, {
           headers: { "content-type": "text/html; charset=utf-8" },
+        });
+      }
+      if (request.method === "GET" && url.pathname === "/icon.png") {
+        return new Response(options.iconFile, {
+          headers: {
+            "cache-control": "public, max-age=86400",
+            "content-type": "image/png",
+          },
+        });
+      }
+      if (request.method === "GET" && url.pathname === "/oauth-dither.js") {
+        return new Response(options.oauthDitherFile, {
+          headers: {
+            "cache-control": "no-store",
+            "content-type": "text/javascript; charset=utf-8",
+          },
+        });
+      }
+      const clientLogo = url.pathname === "/openai.svg"
+        ? options.openAiLogoFile
+        : url.pathname === "/claude.svg"
+          ? options.claudeLogoFile
+          : undefined;
+      if (request.method === "GET" && clientLogo) {
+        return new Response(clientLogo, {
+          headers: {
+            "cache-control": "public, max-age=86400",
+            "content-type": "image/svg+xml",
+          },
         });
       }
       const profile = MCP_PROFILE_PATHS[url.pathname];
@@ -294,7 +327,8 @@ function validateHostedEdge(
     return new Response("Misdirected request", { status: 421 });
   }
   const origin = request.headers.get("origin");
-  if (origin && !origins.has(origin)) {
+  const profile = MCP_PROFILE_PATHS[new URL(request.url).pathname];
+  if (profile && origin && !origins.has(origin)) {
     return new Response("Origin not allowed", { status: 403 });
   }
   return undefined;

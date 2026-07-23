@@ -27,4 +27,34 @@ const html = `<!doctype html>
 </html>`;
 
 await Bun.write(new URL("../dist/dataset-table.html", import.meta.url), html);
+
+const oauthDither = await Bun.build({
+  entrypoints: [
+    new URL("../src/connections/oauth-dither.tsx", import.meta.url).pathname,
+  ],
+  outdir: new URL("../dist/", import.meta.url).pathname,
+  target: "browser",
+  format: "esm",
+  minify: true,
+  naming: "oauth-dither.[ext]",
+  plugins: [{
+    name: "root-react",
+    setup(build) {
+      build.onResolve(
+        { filter: /^react(?:-dom)?(?:\/.*)?$/ },
+        ({ path }) => ({
+          path: Bun.resolveSync(
+            path,
+            new URL("../", import.meta.url).pathname,
+          ),
+        }),
+      );
+    },
+  }],
+});
+if (!oauthDither.success) {
+  for (const log of oauthDither.logs) console.error(log);
+  throw new Error("Bun failed to build the OAuth dither script.");
+}
+
 console.log("Built dist/dataset-table.html");

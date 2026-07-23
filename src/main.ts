@@ -201,13 +201,28 @@ if (
 const widgetFile = Bun.file(
   new URL("../dist/dataset-table.html", import.meta.url),
 );
+const oauthDitherFile = Bun.file(
+  new URL("../dist/oauth-dither.js", import.meta.url),
+);
 const iconFile = Bun.file(new URL("../assets/icon.png", import.meta.url));
+const openAiLogoFile = Bun.file(
+  new URL("../site/public/assets/openai.svg", import.meta.url),
+);
+const claudeLogoFile = Bun.file(
+  new URL("../site/public/assets/anthropic.svg", import.meta.url),
+);
 
 if (!(await widgetFile.exists())) {
   throw new Error('Dataset table bundle is missing. Run "bun run build" first.');
 }
+if (!(await oauthDitherFile.exists())) {
+  throw new Error('OAuth dither bundle is missing. Run "bun run build" first.');
+}
 if (!(await iconFile.exists())) {
   throw new Error("Bright MCP icon is missing at assets/icon.png.");
+}
+if (!(await openAiLogoFile.exists()) || !(await claudeLogoFile.exists())) {
+  throw new Error("OAuth client logos are missing from site/public/assets.");
 }
 
 const widgetHtml = await widgetFile.text();
@@ -296,6 +311,10 @@ if (transportName === "stdio") {
     oauth,
     browserAvailable: Boolean(browserProvider),
     widgetHtml,
+    iconFile,
+    oauthDitherFile,
+    openAiLogoFile,
+    claudeLogoFile,
     localPrincipalId: principalId,
     createServer,
   });

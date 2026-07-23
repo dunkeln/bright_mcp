@@ -558,7 +558,7 @@ function html(body: string, status = 200) {
     headers: {
       "cache-control": "no-store",
       "content-security-policy":
-        "default-src 'none'; img-src data:; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+        "default-src 'none'; img-src 'self'; script-src 'self'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
       "content-type": "text/html; charset=utf-8",
       "referrer-policy": "no-referrer",
       "x-content-type-options": "nosniff",
@@ -576,6 +576,7 @@ function connectPage(options: {
     ? `<p class="saved">A saved Bright key is ready on this browser. Continue, or paste a replacement below.</p>`
     : "";
   const error = options.error ? `<p class="error" role="alert">${escapeHtml(options.error)}</p>` : "";
+  const client = clientHeading(options.clientName);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -583,37 +584,49 @@ function connectPage(options: {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Connect Bright MCP</title>
   <style>
-    *{box-sizing:border-box}body{--bg:#141414;--line:#ffffff17;--muted:#aaa;background:var(--bg);color:#f2f2f2;font-family:Inter,Arial,sans-serif;margin:0;min-height:100vh}
-    header{background:#151515;border-bottom:1px solid var(--line)}.rail{border-inline:1px solid var(--line);margin:auto;max-width:1280px;width:100%}
-    .brand{align-items:center;display:flex;font-size:22px;font-weight:700;gap:16px;height:64px;padding:0 16px}.mark{background:#263348;border-radius:7px;display:grid;height:32px;place-items:center;width:32px}
-    main{align-items:center;background-image:radial-gradient(#ffffff0c 1px,transparent 1px);background-size:16px 16px;display:grid;min-height:calc(100vh - 64px);padding:48px 20px}
-    section{background:#202020;border:1px solid var(--line);border-radius:7px;margin:auto;max-width:480px;padding:32px;width:100%}
-    .label{color:#8da8c7;font:500 11px/1.2 SFMono-Regular,Consolas,monospace;text-transform:uppercase}h1{font-size:28px;line-height:1.1;margin:12px 0}p{color:#c7c7c7;font-size:14px;line-height:1.5}
-    label{display:block;font-size:13px;margin:24px 0 8px}input{background:#151515;border:1px solid #ffffff24;border-radius:7px;color:#fff;font:14px SFMono-Regular,Consolas,monospace;padding:12px;width:100%}
-    input:focus{border-color:#8da8c7;outline:2px solid #8da8c733}button{background:#f4f4f4;border:0;border-radius:7px;color:#171717;cursor:pointer;font-size:14px;font-weight:600;margin-top:16px;padding:12px 16px;width:100%}
-    button:hover{background:#fff}.saved{background:#263348;border:1px solid #8da8c744;border-radius:7px;padding:10px 12px}.error{color:#ffadad}.fine{color:#777;font-size:12px;margin:16px 0 0}
-    @media(max-width:760px){.rail{border-inline:0}section{padding:24px}}
+    *{box-sizing:border-box}body{--bg:#141414;--line:#ffffff17;--muted:#aaa;--accent:#8da8c7;background:var(--bg);color:#f2f2f2;font-family:Inter,Arial,sans-serif;margin:0;min-height:100vh}
+    header{background:#151515;border-bottom:1px solid var(--line);position:relative;z-index:2}.rail{border-inline:1px solid var(--line);margin:auto;max-width:1280px;width:100%}
+    .brand{align-items:center;display:flex;font-size:22px;font-weight:700;gap:16px;height:64px;padding:0 16px}.logo{display:block;height:32px;object-fit:cover;width:32px}
+    main{align-items:center;background:#20212a;display:flex;justify-content:center;min-height:calc(100vh - 64px);overflow:hidden;padding:70px 24px;position:relative;text-align:center}
+    .hero-media{background:#20212a;inset:0;overflow:hidden;position:absolute;z-index:0}.hero-media>div,.hero-media canvas{display:block;height:100%;width:100%}.hero-media::after{background:linear-gradient(#14151a22,#14151a77);content:"";inset:0;position:absolute}
+    section{max-width:760px;position:relative;width:100%;z-index:1}
+    h1{align-items:center;display:flex;font-size:clamp(34px,4vw,48px);font-weight:600;gap:16px;justify-content:center;letter-spacing:0;line-height:1;margin:0 0 18px}.client-logo{display:block;height:44px;object-fit:contain;width:44px}.client-logo.openai{filter:invert(1)}p{color:#d0d0d0;font-size:15px;line-height:1.5}.intro{font-style:italic;margin:0 auto;max-width:620px}
+    form{background:#141414;border:1px solid #ffffff24;display:grid;grid-template-columns:1fr auto;margin:34px auto 0;max-width:620px;width:100%}
+    input{background:transparent;border:0;color:#fff;font:13px SFMono-Regular,Consolas,monospace;min-width:0;padding:15px 16px}
+    input:focus{outline:2px solid var(--accent);outline-offset:-2px}button{background:#f4f4f4;border:0;border-left:1px solid #ffffff24;color:#171717;cursor:pointer;font-size:14px;font-weight:600;padding:15px 24px}
+    button:hover{background:#fff}.saved,.error{border:1px solid #8da8c744;margin:24px auto -14px;max-width:620px;padding:10px 12px}.saved{background:#263348}.error{background:#3a2020;color:#ffb5b5}.fine{color:#8f8f8f;font:11px/1.5 SFMono-Regular,Consolas,monospace;margin:18px auto 0;max-width:560px}
+    @media(max-width:760px){.rail{border-inline:0}main{padding:48px 20px}form{grid-template-columns:1fr}button{border-left:0;border-top:1px solid #ffffff24}}
   </style>
 </head>
 <body>
-  <header><div class="rail brand"><span class="mark">b</span>Bright MCP</div></header>
+  <header><div class="rail brand"><img class="logo" src="/icon.png" alt=""><span>Bright MCP</span></div></header>
   <main class="rail">
+    <div class="hero-media" aria-hidden="true"><div id="oauth-dither"></div></div>
     <section>
-      <div class="label">Client-owned access</div>
-      <h1>Connect ${escapeHtml(options.clientName)}</h1>
-      <p>Paste your Bright Data API key once. Bright MCP validates it, then returns an encrypted OAuth credential to your MCP client.</p>
+      <h1>Connect ${client}</h1>
+      <p class="intro">Paste your Bright Data API key once. Bright MCP validates it, then returns an encrypted OAuth credential to your MCP client.</p>
       ${saved}${error}
       <form method="post" action="/oauth/authorize">
         <input type="hidden" name="request" value="${escapeHtml(options.requestToken)}">
-        <label for="api_key">${options.hasSavedKey ? "Replace Bright Data API key (optional)" : "Bright Data API key"}</label>
-        <input id="api_key" name="api_key" type="password" ${options.hasSavedKey ? "" : "required"} autocomplete="off" spellcheck="false">
+        <input id="api_key" name="api_key" type="password" placeholder="${options.hasSavedKey ? "Replace Bright Data API key (optional)" : "Bright Data API key"}" aria-label="Bright Data API key" ${options.hasSavedKey ? "" : "required"} autocomplete="off" spellcheck="false">
         <button type="submit">${options.hasSavedKey ? "Continue with saved key" : "Connect Bright"}</button>
       </form>
       <p class="fine">The service keeps no credential database. Your key is sealed into credentials stored by this browser and your MCP client.</p>
     </section>
   </main>
+  <script type="module" src="/oauth-dither.js?v=react"></script>
 </body>
 </html>`;
+}
+
+function clientHeading(clientName: string) {
+  if (/(?:codex|openai|chatgpt)/i.test(clientName)) {
+    return `<img class="client-logo openai" src="/openai.svg" alt="OpenAI">`;
+  }
+  if (/(?:claude|anthropic)/i.test(clientName)) {
+    return `<img class="client-logo" src="/claude.svg" alt="Claude">`;
+  }
+  return `<span>${escapeHtml(clientName)}</span>`;
 }
 
 function escapeHtml(value: string) {

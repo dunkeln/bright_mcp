@@ -33,6 +33,7 @@
     "@modelcontextprotocol/ext-apps": "1.7.4",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@openai/apps-sdk-ui": "0.2.2",
+    "@paper-design/shaders-react": "0.0.77",
     "@pydantic/logfire-node": "^0.18.7",
     "clsx": "2.1.1",
     "d3-scale": "4.0.2",

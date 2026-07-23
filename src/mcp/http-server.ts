@@ -99,10 +99,15 @@ export function startHttpServer(options: {
             options.allowedOrigins,
           );
         }
-        credentialBinding = options.requestCredentials?.bind(
-          request.headers.get("x-bright-api-key"),
-          browserZone,
-        );
+        const apiKeyHeader = request.headers.get("x-bright-api-key");
+        const authorization = request.headers.get("authorization");
+        const bearer = /^Bearer ([^\s]{1,4096})$/.exec(authorization ?? "")?.[1];
+        const conflictingCredentials =
+          (authorization !== null && !bearer) ||
+          (apiKeyHeader !== null && bearer !== undefined && apiKeyHeader !== bearer);
+        credentialBinding = conflictingCredentials
+          ? undefined
+          : options.requestCredentials?.bind(apiKeyHeader ?? bearer ?? null, browserZone);
         if (!credentialBinding) {
           return withCors(
             new Response("Bright Data API key required", {
@@ -293,10 +298,11 @@ function withCors(
     headers.set("access-control-allow-origin", origin);
     headers.set("vary", "origin");
   }
+  if (protectedMode) headers.set("cache-control", "no-store");
   headers.set("access-control-allow-methods", "GET, POST, DELETE, OPTIONS");
   headers.set(
     "access-control-allow-headers",
-    "content-type, mcp-protocol-version, mcp-session-id, x-bright-api-key",
+    "authorization, content-type, mcp-protocol-version, mcp-session-id, x-bright-api-key",
   );
   headers.set("access-control-expose-headers", "mcp-session-id, www-authenticate");
   return new Response(response.body, {

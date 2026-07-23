@@ -8,7 +8,9 @@ Bright Data credential or silently substitute fixture data.
 Hosted Streamable HTTP clients MUST keep their Bright Data API key in a
 client-side secret store and send it as `X-Bright-API-Key` over HTTPS. The
 canonical `server.json` MUST declare this header as required and secret. The
-server MUST:
+Codex MAY send the same key as an `Authorization: Bearer` credential because
+that is its client-vault-backed plugin authentication path. If both forms are
+present, they MUST contain the same key. The server MUST:
 
 - require the key on every MCP request;
 - bind sessions, results, tasks, and resources to a one-way key digest;
@@ -20,9 +22,9 @@ Each hosted MCP session MUST receive an isolated task store. Closing the
 session or reaching a task TTL MUST cancel any still-running upstream work
 before its task state is discarded.
 
-`Authorization` is reserved for MCP authorization and MUST NOT carry the
-upstream Bright Data credential. Revocation and replacement happen in the
-caller’s Bright Data account and client-side secret store.
+Bearer compatibility precludes separate MCP OAuth on the same endpoint.
+Revocation and replacement happen in the caller’s Bright Data account and
+client-side secret store.
 
 The hosted browser profile MUST accept the same caller-owned API key through
 the `X-Bright-API-Key` header. It MUST discover active `browser_api` zones and

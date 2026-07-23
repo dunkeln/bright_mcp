@@ -20,6 +20,7 @@ import {
 import { Input } from "@openai/apps-sdk-ui/components/Input";
 import { Menu } from "@openai/apps-sdk-ui/components/Menu";
 import { useApp, useHostStyles } from "@modelcontextprotocol/ext-apps/react";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -70,7 +71,7 @@ function DatasetWorkbenchApp() {
     capabilities: {},
     onAppCreated(createdApp) {
       createdApp.ontoolresult = (toolResult) => {
-        const parsed = parseResult(toolResult.structuredContent);
+        const parsed = parseToolResult(toolResult);
         if (!parsed.ok) {
           setPageError(parsed.message);
           return;
@@ -663,6 +664,28 @@ function DatasetWorkbenchApp() {
       )}
     </main>
   );
+}
+
+function parseToolResult(result: CallToolResult) {
+  if (!result.isError) return parseResult(result.structuredContent);
+  const text = result.content.find((item) => item.type === "text")?.text;
+  if (!text) return { ok: false as const, message: "The dataset operation failed." };
+  try {
+    const failure = JSON.parse(text) as unknown;
+    if (failure && typeof failure === "object" && "message" in failure) {
+      const message = failure.message;
+      const nextAction = "nextAction" in failure ? failure.nextAction : undefined;
+      if (typeof message === "string") {
+        return {
+          ok: false as const,
+          message: typeof nextAction === "string" ? `${message} ${nextAction}` : message,
+        };
+      }
+    }
+  } catch {
+    // Plain-text tool errors are already suitable for display.
+  }
+  return { ok: false as const, message: text };
 }
 
 function parseResult(

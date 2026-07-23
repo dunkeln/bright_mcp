@@ -594,7 +594,7 @@ function connectPage(options: {
     form{background:#141414;border:1px solid #ffffff24;display:grid;grid-template-columns:1fr auto;margin:34px auto 0;max-width:620px;width:100%}
     input{background:transparent;border:0;color:#fff;font:13px SFMono-Regular,Consolas,monospace;min-width:0;padding:15px 16px}
     input:focus{outline:2px solid var(--accent);outline-offset:-2px}button{background:#f4f4f4;border:0;border-left:1px solid #ffffff24;color:#171717;cursor:pointer;font-size:14px;font-weight:600;padding:15px 24px}
-    button:hover{background:#fff}.saved,.error{border:1px solid #8da8c744;margin:24px auto -14px;max-width:620px;padding:10px 12px}.saved{background:#263348}.error{background:#3a2020;color:#ffb5b5}.fine{color:#8f8f8f;font:11px/1.5 SFMono-Regular,Consolas,monospace;margin:18px auto 0;max-width:560px}
+    button:hover{background:#fff}button:disabled,button[aria-disabled="true"],input:disabled,input[readonly]{cursor:not-allowed;opacity:.55}.saved,.error{border:1px solid #8da8c744;margin:24px auto -14px;max-width:620px;padding:10px 12px}.saved{background:#263348}.error{background:#3a2020;color:#ffb5b5}.status{color:#f2f2f2;font:12px/1.5 SFMono-Regular,Consolas,monospace;margin:14px auto 0}.fine{color:#8f8f8f;font:11px/1.5 SFMono-Regular,Consolas,monospace;margin:18px auto 0;max-width:560px}[hidden]{display:none}
     @media(max-width:760px){.rail{border-inline:0}main{padding:48px 20px}form{grid-template-columns:1fr}button{border-left:0;border-top:1px solid #ffffff24}}
   </style>
 </head>
@@ -606,11 +606,12 @@ function connectPage(options: {
       <h1>Connect ${client}</h1>
       <p class="intro">Paste your Bright Data API key once. Bright MCP validates it, then returns an encrypted OAuth credential to your MCP client.</p>
       ${saved}${error}
-      <form method="post" action="/oauth/authorize">
+      <form method="post" action="/oauth/authorize" data-expires-in="${CODE_TTL_SECONDS}">
         <input type="hidden" name="request" value="${escapeHtml(options.requestToken)}">
         <input id="api_key" name="api_key" type="password" placeholder="${options.hasSavedKey ? "Replace Bright Data API key (optional)" : "Bright Data API key"}" aria-label="Bright Data API key" ${options.hasSavedKey ? "" : "required"} autocomplete="off" spellcheck="false">
         <button type="submit">${options.hasSavedKey ? "Continue with saved key" : "Connect Bright"}</button>
       </form>
+      <p id="oauth-status" class="status" aria-live="polite" hidden></p>
       <p class="fine">The service keeps no credential database. Your key is sealed into credentials stored by this browser and your MCP client.</p>
     </section>
   </main>

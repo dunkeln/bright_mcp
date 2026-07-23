@@ -358,7 +358,7 @@ export function registerDatasetResources(
           csp: { connectDomains: [], resourceDomains: [] },
         },
         "openai/widgetDescription":
-          "Inspects structured web data through a table, profiles, quality checks, provenance, and exports.",
+          "Displays the complete interactive result. Do not repeat its rows in the response; summarize the conclusion and cite only the sources needed.",
       },
     },
     async () => ({
@@ -373,7 +373,7 @@ export function registerDatasetResources(
               csp: { connectDomains: [], resourceDomains: [] },
             },
             "openai/widgetDescription":
-              "Inspects structured web data through a table, profiles, quality checks, provenance, and exports.",
+              "Displays the complete interactive result. Do not repeat its rows in the response; summarize the conclusion and cite only the sources needed.",
           },
         },
       ],

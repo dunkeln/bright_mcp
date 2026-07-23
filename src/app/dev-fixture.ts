@@ -128,6 +128,24 @@ export const devSearchResult = {
           url: "https://github.com/modelcontextprotocol/servers",
           summary: "Reference MCP server implementations and community examples.",
         },
+        {
+          rank: 3,
+          title: "MCP Apps",
+          url: "https://github.com/modelcontextprotocol/ext-apps",
+          summary: "Interactive user interfaces for Model Context Protocol tools.",
+        },
+        {
+          rank: 4,
+          title: "MCP Inspector",
+          url: "https://github.com/modelcontextprotocol/inspector",
+          summary: "Developer tools for testing and debugging MCP servers.",
+        },
+        {
+          rank: 5,
+          title: "MCP Registry",
+          url: "https://github.com/modelcontextprotocol/registry",
+          summary: "A community registry for discoverable MCP servers.",
+        },
       ],
       topStories: [
         {

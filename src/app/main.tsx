@@ -47,6 +47,7 @@ import {
 type Sort = { key: string; direction: "ascending" | "descending" } | null;
 type Selection = { rowRef: string; row: JsonObject };
 type View = "table" | "overview" | WorkbenchPanel;
+const ROWS_PER_PAGE = 5;
 
 function DataWorkbenchApp() {
   const isBrowserPreview = Boolean(
@@ -60,6 +61,7 @@ function DataWorkbenchApp() {
     initial.unavailable ?? null,
   );
   const [pageIndex, setPageIndex] = useState(0);
+  const [rowPageIndex, setRowPageIndex] = useState(0);
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<Sort>(null);
   const [view, setView] = useState<View>("table");
@@ -93,6 +95,7 @@ function DataWorkbenchApp() {
         setPages([parsed.value]);
         setUnavailable(null);
         setPageIndex(0);
+        setRowPageIndex(0);
         setView("table");
         setProfileIndex(0);
         setColumnWidths({});
@@ -114,7 +117,7 @@ function DataWorkbenchApp() {
       ) ?? [],
     [hiddenColumnKeys, page],
   );
-  const visibleRows = useMemo(() => {
+  const filteredRows = useMemo(() => {
     if (!page) return [];
     const query = filter.trim().toLocaleLowerCase();
     const rows = page.rows.map((row, index) => ({
@@ -134,6 +137,14 @@ function DataWorkbenchApp() {
       return sort.direction === "ascending" ? order : -order;
     });
   }, [filter, page, sort]);
+  const rowPageCount = Math.max(
+    1,
+    Math.ceil(filteredRows.length / ROWS_PER_PAGE),
+  );
+  const visibleRows = filteredRows.slice(
+    rowPageIndex * ROWS_PER_PAGE,
+    (rowPageIndex + 1) * ROWS_PER_PAGE,
+  );
   const loadedRows = useMemo(
     () => pages.flatMap(({ rows }) => rows),
     [pages],
@@ -214,6 +225,7 @@ function DataWorkbenchApp() {
       </main>
     );
   }
+  const isSearch = page.dataset.id === "web-search";
 
   const loadNextPage = async () => {
     const uri = page.page.nextResourceUri;
@@ -230,6 +242,7 @@ function DataWorkbenchApp() {
       if (parsed.unavailable) throw new Error(parsed.unavailable.message);
       setPages((current) => [...current.slice(0, pageIndex + 1), parsed.value]);
       setPageIndex((current) => current + 1);
+      setRowPageIndex(0);
       setFilter("");
       setSort(null);
     } catch (loadError) {
@@ -244,6 +257,7 @@ function DataWorkbenchApp() {
   };
 
   const changeSort = (key: string) => {
+    setRowPageIndex(0);
     setSort((current) =>
       current?.key === key
         ? {
@@ -324,10 +338,12 @@ function DataWorkbenchApp() {
       ))}
 
       <section
-        className={`grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 ${
+        className={`grid items-center gap-2 ${
           view === "table"
-            ? "sm:grid-cols-[minmax(0,1fr)_auto_auto_224px]"
-            : ""
+            ? isSearch
+              ? "grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto_224px]"
+              : "grid-cols-[minmax(0,1fr)_auto_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto_224px]"
+            : "grid-cols-[minmax(0,1fr)_auto_auto]"
         }`}
       >
         <nav
@@ -345,22 +361,24 @@ function DataWorkbenchApp() {
           </button>
           {page.page.truncated && <Badge color="warning">Preview</Badge>}
         </nav>
-        <Button
-          variant="ghost"
-          color="secondary"
-          size="sm"
-          uniform
-          aria-label={view === "table" ? "Show overview" : "Show table"}
-          aria-pressed={view === "overview"}
-          title={view === "table" ? "Show overview" : "Show table"}
-          onClick={() =>
-            setView((current) =>
-              current === "table" ? "overview" : "table",
-            )
-          }
-        >
-          <BarChartIcon className="size-4" aria-hidden="true" />
-        </Button>
+        {!isSearch && (
+          <Button
+            variant="ghost"
+            color="secondary"
+            size="sm"
+            uniform
+            aria-label={view === "table" ? "Show overview" : "Show table"}
+            aria-pressed={view === "overview"}
+            title={view === "table" ? "Show overview" : "Show table"}
+            onClick={() =>
+              setView((current) =>
+                current === "table" ? "overview" : "table",
+              )
+            }
+          >
+            <BarChartIcon className="size-4" aria-hidden="true" />
+          </Button>
+        )}
         <Menu>
           <Menu.Trigger>
             <Button
@@ -375,10 +393,12 @@ function DataWorkbenchApp() {
             </Button>
           </Menu.Trigger>
           <Menu.Content align="end" minWidth={210}>
-            <Menu.Item onSelect={() => setView("quality")}>
-              <AnalyzeData className="size-4" aria-hidden="true" />
-              Data quality
-            </Menu.Item>
+            {!isSearch && (
+              <Menu.Item onSelect={() => setView("quality")}>
+                <AnalyzeData className="size-4" aria-hidden="true" />
+                Data quality
+              </Menu.Item>
+            )}
             <Menu.Item onSelect={() => setView("links")}>
               <Link className="size-4" aria-hidden="true" />
               Sources and links
@@ -408,14 +428,17 @@ function DataWorkbenchApp() {
         </Menu>
         {view === "table" && (
           <Input
-            className="col-span-3 w-full sm:col-span-1"
+            className={`${isSearch ? "col-span-2" : "col-span-3"} w-full sm:col-span-1`}
             type="search"
             aria-label="Filter rows on this page"
             placeholder="Search visible values"
             startAdornment={<Search className="size-4" aria-hidden="true" />}
             size="sm"
             value={filter}
-            onChange={(event) => setFilter(event.currentTarget.value)}
+            onChange={(event) => {
+              setFilter(event.currentTarget.value);
+              setRowPageIndex(0);
+            }}
           />
         )}
       </section>
@@ -437,6 +460,41 @@ function DataWorkbenchApp() {
           onBack={() => setView("table")}
           onOpenLink={(url) => void openLink(url)}
         />
+      ) : isSearch ? (
+        <div className="divide-y divide-subtle overflow-hidden rounded-xl border border-subtle">
+          {visibleRows.map(({ row, rowRef }) => {
+            const url = typeof row.url === "string" ? row.url : "";
+            return (
+              <article key={rowRef} className="space-y-1.5 p-3">
+                <div className="flex items-center gap-2 text-xs text-secondary">
+                  {typeof row.rank === "number" && <span>#{row.rank}</span>}
+                  <span>{displayValue(row.kind)}</span>
+                  {page.rows.some((candidate) => candidate.query !== row.query) && (
+                    <span className="min-w-0 truncate">· {displayValue(row.query)}</span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="block text-start text-sm font-medium text-primary hover:underline"
+                  onClick={() => url && void openLink(url)}
+                >
+                  {displayValue(row.title)}
+                </button>
+                {typeof row.summary === "string" && row.summary && (
+                  <p className="line-clamp-2 text-sm text-secondary">
+                    {displayValue(row.summary)}
+                  </p>
+                )}
+                {url && <p className="truncate text-xs text-secondary">{url}</p>}
+              </article>
+            );
+          })}
+          {visibleRows.length === 0 && (
+            <p className="p-4 text-center text-sm text-secondary" role="status">
+              No results match this filter.
+            </p>
+          )}
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-subtle">
           <table className="w-full min-w-max table-fixed border-collapse text-left text-sm">
@@ -632,9 +690,17 @@ function DataWorkbenchApp() {
           )}
         </div>
         <p className="text-center text-xs text-secondary" aria-live="polite">
-          {page.page.totalRows ?? page.rows.length} rows · page {pageIndex + 1}
+          {filteredRows.length
+            ? `${rowPageIndex * ROWS_PER_PAGE + 1}–${Math.min(
+                filteredRows.length,
+                (rowPageIndex + 1) * ROWS_PER_PAGE,
+              )} of ${filteredRows.length}`
+            : "0 rows"}
         </p>
-        {(selection.length > 0 || pageIndex > 0 || page.page.nextResourceUri) && (
+        {(selection.length > 0 ||
+          rowPageCount > 1 ||
+          pageIndex > 0 ||
+          page.page.nextResourceUri) && (
           <div className="flex justify-self-end gap-2">
             {selection.length > 0 && (
               <Button
@@ -657,7 +723,7 @@ function DataWorkbenchApp() {
                 <Download aria-hidden="true" />
               </Button>
             )}
-            {(pageIndex > 0 || page.page.nextResourceUri) && (
+            {(rowPageCount > 1 || pageIndex > 0 || page.page.nextResourceUri) && (
               <>
                 <Button
                   color="secondary"
@@ -666,11 +732,15 @@ function DataWorkbenchApp() {
                   iconSize="sm"
                   uniform
                   pill={false}
-                  disabled={pageIndex === 0}
+                  disabled={pageIndex === 0 && rowPageIndex === 0}
                   aria-label="Previous page"
                   title="Previous page"
                   onClick={() => {
-                    setPageIndex((current) => Math.max(0, current - 1));
+                    if (rowPageIndex > 0) {
+                      setRowPageIndex((current) => current - 1);
+                    } else {
+                      setPageIndex((current) => Math.max(0, current - 1));
+                    }
                     setFilter("");
                     setSort(null);
                   }}
@@ -685,10 +755,19 @@ function DataWorkbenchApp() {
                   uniform
                   pill={false}
                   loading={loadingPage}
-                  disabled={!page.page.nextResourceUri || !app}
+                  disabled={
+                    rowPageIndex >= rowPageCount - 1 &&
+                    (!page.page.nextResourceUri || !app)
+                  }
                   aria-label="Next page"
                   title="Next page"
-                  onClick={loadNextPage}
+                  onClick={() => {
+                    if (rowPageIndex < rowPageCount - 1) {
+                      setRowPageIndex((current) => current + 1);
+                    } else {
+                      void loadNextPage();
+                    }
+                  }}
                 >
                   <ArrowRight className="rtl:rotate-180" aria-hidden="true" />
                 </Button>

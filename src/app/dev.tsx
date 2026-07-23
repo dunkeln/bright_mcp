@@ -31,7 +31,7 @@ applyDocumentTheme(
 
 const themeButton = document.createElement("button");
 themeButton.className =
-  "fixed z-50 right-3 bottom-3 cursor-pointer rounded-full border border-subtle bg-surface-secondary px-3 py-1.5 text-xs text-primary";
+  "fixed z-50 left-3 bottom-3 cursor-pointer rounded-full border border-subtle bg-surface-secondary px-3 py-1.5 text-xs text-primary";
 themeButton.type = "button";
 themeButton.addEventListener("click", () => {
   applyDocumentTheme(getDocumentTheme() === "dark" ? "light" : "dark");

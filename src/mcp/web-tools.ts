@@ -79,7 +79,7 @@ export function registerWebTools(
     {
       title: "Search web",
       description:
-        "Find current public-web sources through a fast ordinary lookup when the relevant pages are not yet known. Submit one to five related queries together. Results contain compact titles, URLs, and summaries; answer from them when they already contain the requested fact. retrievedAt records when Bright MCP received the result, not when a source published or updated it. Do not infer a source date, quote time, or year unless that result's title or summary states it. On first use, Bright MCP may create the deterministic bright_mcp_serp zone in the caller's Bright Data account when no compatible SERP zone exists. Use discover_web instead when sources must be ranked against an explicit goal or constrained by geography, language, keywords, or dates. Use read_web only when page-level text is missing or explicitly required, not merely to verify a useful summary. Use a returned cursor only to continue that query. Do not repeat unchanged queries, and do not use this tool for known URLs, ad hoc extraction, or structured dataset records.",
+        "Find current public-web sources through a fast ordinary lookup when the relevant pages are not yet known. Submit one to five related queries together. Results contain compact titles, URLs, and summaries; answer from them when they already contain the requested fact. When the host renders the interactive result, use the complete evidence internally but do not restate its rows in chat—return only the requested conclusion and essential citations. retrievedAt records when Bright MCP received the result, not when a source published or updated it. Do not infer a source date, quote time, or year unless that result's title or summary states it. On first use, Bright MCP may create the deterministic bright_mcp_serp zone in the caller's Bright Data account when no compatible SERP zone exists. Use discover_web instead when sources must be ranked against an explicit goal or constrained by geography, language, keywords, or dates. Use read_web only when page-level text is missing or explicitly required, not merely to verify a useful summary. Use a returned cursor only to continue that query. Do not repeat unchanged queries, and do not use this tool for known URLs, ad hoc extraction, or structured dataset records.",
       inputSchema: searchInputSchema,
       outputSchema: searchResponseSchema,
       annotations: {
@@ -98,10 +98,13 @@ export function registerWebTools(
           (total, search) => total + search.results.length,
           0,
         );
-        return reply(
+        return {
           structuredContent,
-          `Found ${resultCount} results across ${structuredContent.searches.length} searches.`,
-        );
+          content: [{
+            type: "text" as const,
+            text: `Found ${resultCount} results across ${structuredContent.searches.length} searches. The complete first page is displayed interactively; do not restate its rows.`,
+          }],
+        };
       });
     },
   );

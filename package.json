@@ -33,6 +33,7 @@
     "@modelcontextprotocol/ext-apps": "1.7.4",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@openai/apps-sdk-ui": "0.2.2",
+    "@pydantic/logfire-node": "^0.18.7",
     "clsx": "2.1.1",
     "d3-scale": "4.0.2",
     "d3-shape": "3.2.0",
@@ -42,6 +43,8 @@
     "playwright-core": "1.61.1",
     "react": "19.2.7",
     "react-dom": "19.2.7",
+    "remark": "15.0.1",
+    "strip-markdown": "6.0.0",
     "tailwind-merge": "3.6.0",
     "tailwindcss": "4.3.3",
     "zod": "4.4.3"

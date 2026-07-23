@@ -1,4 +1,5 @@
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { logfire } from "./telemetry";
 import { createBrightDataDatasetAdapter } from "./adapters/brightdata/datasets";
 import { BrightDataGateway } from "./adapters/brightdata/gateway";
 import { createBrightDataWebAdapter } from "./adapters/brightdata/web";
@@ -214,6 +215,9 @@ const shutdown = async () => {
   activeBrowsers.clear();
   await Promise.allSettled(browsers.map((browser) => browser.shutdown()));
   closeTransport();
+  await logfire.shutdown({ timeoutMillis: 3_000 }).catch(() => {
+    console.error("Logfire shutdown did not complete before exit.");
+  });
   process.exit(0);
 };
 process.on("SIGINT", shutdown);

@@ -1,5 +1,6 @@
 import type { AuthInfo } from "@modelcontextprotocol/sdk/server/auth/types.js";
 import { CapabilityError, type RequestContext } from "../core/contracts";
+import { logfire } from "../telemetry";
 
 export function requestContext(
   principalId: string,
@@ -45,6 +46,11 @@ export async function runTool<T>(
           true,
           "Retry once. If it fails again, inspect the server logs with the request ID.",
         ));
+    logfire.error("MCP tool failed", {
+      "error.code": failure.code,
+      "error.retryable": failure.retryable,
+      "request.id": failure.requestId,
+    });
     return {
       isError: true as const,
       content: [

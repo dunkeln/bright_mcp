@@ -1,6 +1,7 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { isInitializeRequest } from "@modelcontextprotocol/sdk/types.js";
 import { LRUCache } from "lru-cache";
+import { logfire } from "../telemetry";
 import {
   MCP_PROFILE_PATHS,
   type McpProfile,
@@ -199,16 +200,29 @@ export function startHttpServer(options: {
         session = { principalId: requestPrincipal, profile, server, transport };
         await server.connect(transport);
       }
-      const handleRequest = () => session.transport.handleRequest(request, { parsedBody });
-      const response = credentialBinding
-        ? await credentialBinding.run(handleRequest)
-        : await handleRequest();
-      return withCors(
-        response,
-        request,
-        protectedMode,
-        options.allowedOrigins,
-      );
+      const { method: mcpMethod, tool: mcpTool } = mcpMetadata(parsedBody);
+      return logfire.span("MCP request", {
+        attributes: {
+          "http.request.method": request.method,
+          "mcp.method.name": mcpMethod,
+          "mcp.profile": profile,
+          "mcp.tool.name": mcpTool,
+          "url.path": url.pathname,
+        },
+        callback: async (span) => {
+          const handleRequest = () => session.transport.handleRequest(request, { parsedBody });
+          const response = credentialBinding
+            ? await credentialBinding.run(handleRequest)
+            : await handleRequest();
+          span.setAttribute("http.response.status_code", response.status);
+          return withCors(
+            response,
+            request,
+            protectedMode,
+            options.allowedOrigins,
+          );
+        },
+      });
     },
   });
 
@@ -221,6 +235,23 @@ export function startHttpServer(options: {
       httpServer.stop(true);
     },
   };
+}
+
+function mcpMetadata(body: unknown) {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return {};
+  const method = "method" in body && typeof body.method === "string" &&
+      /^[a-z][a-z0-9_/-]{0,63}$/.test(body.method)
+    ? body.method
+    : undefined;
+  const params = "params" in body && body.params && typeof body.params === "object" &&
+      !Array.isArray(body.params)
+    ? body.params
+    : undefined;
+  const tool = method === "tools/call" && params && "name" in params &&
+      typeof params.name === "string" && /^[a-z][a-z0-9_]{0,63}$/.test(params.name)
+    ? params.name
+    : undefined;
+  return { method, tool };
 }
 
 function isProtected(

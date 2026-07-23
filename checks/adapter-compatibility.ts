@@ -53,7 +53,11 @@ async function checkSearchShapes() {
   }, requests);
 
   assert(
-    JSON.stringify(organic) === JSON.stringify(results),
+    [...organic.searches, ...results.searches].every(
+      (search) => Number.isFinite(Date.parse(search.retrievedAt)),
+    ) &&
+      JSON.stringify(withoutRetrievedAt(organic)) ===
+        JSON.stringify(withoutRetrievedAt(results)),
     "Equivalent upstream SERP envelopes changed the canonical search result.",
   );
   assert(
@@ -64,6 +68,12 @@ async function checkSearchShapes() {
     ),
     "The gateway did not isolate credentials to the authorization header.",
   );
+}
+
+function withoutRetrievedAt(response: Awaited<ReturnType<typeof searchWith>>) {
+  return {
+    searches: response.searches.map(({ retrievedAt: _, ...search }) => search),
+  };
 }
 
 async function checkSearchCreatesSerpZone() {

@@ -35,6 +35,7 @@ export type DiscoverResponse = {
 export type SearchResponse = {
   searches: Array<{
     query: string;
+    retrievedAt: string;
     results: Array<{
       title: string;
       url: string;
@@ -55,6 +56,7 @@ export type ItemFailure = {
   message: string;
   retryable: boolean;
   nextAction?: string;
+  requestId?: string;
 };
 
 export type ReadItem = {

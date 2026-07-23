@@ -1,4 +1,6 @@
 import { LRUCache } from "lru-cache";
+import { remark } from "remark";
+import strip from "strip-markdown";
 import { z } from "zod";
 import { CapabilityError, type RequestContext } from "../../core/contracts";
 import type {
@@ -13,6 +15,13 @@ import { BrightDataGateway, pollBrightData } from "./gateway";
 
 const SEARCH_PAGE_SIZE = 10;
 const MAX_SEARCH_OFFSET = 90;
+const SEARCH_DEADLINE_MS = 21_000;
+const SEARCH_RETRY_DELAYS_MS = [300, 900] as const;
+const READ_LATENCY_SAMPLES = 20;
+const READ_LATENCY_WARMUP = 3;
+const READ_TIMEOUT_DEFAULT_MS = 15_000;
+const READ_TIMEOUT_MIN_MS = 8_000;
+const READ_TIMEOUT_MAX_MS = 30_000;
 const organicResultSchema = z.object({
   title: z.string().optional(),
   link: z.url().optional(),
@@ -62,6 +71,11 @@ export function createBrightDataWebAdapter(
     max: 1_000,
     ttl: 5 * 60_000,
   });
+  // ponytail: process-local history; persist only if restarts measurably hurt timeout quality.
+  const readLatencies = new LRUCache<string, number[]>({
+    max: 5_000,
+    ttl: 60 * 60_000,
+  });
   return {
     search: {
       async search(input, context) {
@@ -82,13 +96,22 @@ export function createBrightDataWebAdapter(
                 query,
                 context,
               );
-              return { query: query.query, ...result };
+              return {
+                query: query.query,
+                retrievedAt: new Date().toISOString(),
+                ...result,
+              };
             } catch (error) {
               const failure = error instanceof CapabilityError
                 ? error
                 : new CapabilityError("upstream_unavailable", "Bright Data search failed.", true);
               if (failure.code === "brightdata_connection_required") throw failure;
-              return { query: query.query, results: [], error: failureRecord(failure) };
+              return {
+                query: query.query,
+                retrievedAt: new Date().toISOString(),
+                results: [],
+                error: failureRecord(failure),
+              };
             }
           })),
         };
@@ -169,7 +192,13 @@ export function createBrightDataWebAdapter(
           context,
         );
         return Promise.all(
-          input.urls.map(async (url) => {
+          input.urls.map(async (url, itemIndex) => {
+            const startedAt = performance.now();
+            const hostname = new URL(url).hostname;
+            const latencyKey = `${context.principalId}\0${hostname}`;
+            const timeoutMs = readTimeout(readLatencies.get(latencyKey));
+            let outcome = "success";
+            let errorCode: string | undefined;
             try {
               const response = await gateway.requestText(
                 {
@@ -183,12 +212,17 @@ export function createBrightDataWebAdapter(
                       ? { data_format: "markdown" }
                       : {}),
                   },
-                  timeoutMs: 30_000,
+                  timeoutMs,
                   maxAttempts: 1,
                 },
                 context,
               );
-              const content = unwrapBody(response.data);
+              const rawContent = unwrapBody(response.data);
+              const content = input.representation === "readable"
+                ? String(await remark().use(strip, {
+                    keep: ["link", "linkReference", "code", "inlineCode"],
+                  }).process(rawContent))
+                : rawContent;
               if (/^this endpoint is not supported[.!]?$/i.test(content.trim())) {
                 throw new CapabilityError(
                   "unsupported_upstream_endpoint",
@@ -214,6 +248,8 @@ export function createBrightDataWebAdapter(
                     true,
                     "Retry the failed URL once.",
                   );
+              outcome = "error";
+              errorCode = failure.code;
               if (failure.code === "brightdata_connection_required") throw failure;
               return {
                 url,
@@ -223,12 +259,58 @@ export function createBrightDataWebAdapter(
                   : "text/markdown" as const,
                 error: failureRecord(failure),
               };
+            } finally {
+              const durationMs = Math.round(performance.now() - startedAt);
+              if (outcome === "success" || errorCode === "upstream_timeout") {
+                observeReadLatency(
+                  readLatencies,
+                  latencyKey,
+                  errorCode === "upstream_timeout" ? timeoutMs : durationMs,
+                );
+              }
+              gateway.logInfo({
+                operation: "read_web_item",
+                requestId: context.requestId,
+                itemIndex,
+                hostname,
+                urlHash: new Bun.CryptoHasher("sha256")
+                  .update(url)
+                  .digest("hex")
+                  .slice(0, 16),
+                durationMs,
+                timeoutMs,
+                outcome,
+                errorCode,
+              });
             }
           }),
         );
       },
     },
   };
+}
+
+function readTimeout(samples: number[] | undefined) {
+  if (!samples || samples.length < READ_LATENCY_WARMUP) {
+    return READ_TIMEOUT_DEFAULT_MS;
+  }
+  const sorted = samples.toSorted((left, right) => left - right);
+  const p90 = sorted[Math.ceil(sorted.length * 0.9) - 1]!;
+  return Math.min(
+    READ_TIMEOUT_MAX_MS,
+    Math.max(READ_TIMEOUT_MIN_MS, Math.ceil(p90 * 1.5)),
+  );
+}
+
+function observeReadLatency(
+  cache: LRUCache<string, number[]>,
+  key: string,
+  durationMs: number,
+) {
+  cache.set(key, [
+    ...(cache.get(key) ?? []).slice(-(READ_LATENCY_SAMPLES - 1)),
+    durationMs,
+  ]);
 }
 
 function parseDiscover<T>(schema: z.ZodType<T>, value: unknown): T {
@@ -253,26 +335,41 @@ async function searchSerp(
 ): Promise<SingleSearchResponse> {
   const zone = await resolveZone(gateway, cache, configuredZone, "serp", context);
   const offset = parseCursor(input.cursor);
-  const response = await gateway.requestJson(
-    {
-      method: "POST",
-      path: "/request",
-      body: {
-        zone,
-        url: searchUrl(input, offset),
-        format: "raw",
-        data_format: "parsed_light",
-      },
-      timeoutMs: 20_000,
-      maxAttempts: 1,
-    },
-    context,
-  );
-  const parsed = searchEnvelopeSchema.safeParse(unwrapJsonBody(response.data));
-  if (!parsed.success || (!parsed.data.organic && !parsed.data.results)) {
-    throw malformedSearch();
+  const deadline = Date.now() + SEARCH_DEADLINE_MS;
+  let envelope: z.infer<typeof searchEnvelopeSchema> | undefined;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const remainingMs = deadline - Date.now();
+      if (remainingMs <= 0) throw searchTimeout();
+      const response = await gateway.requestJson(
+        {
+          method: "POST",
+          path: "/request",
+          body: {
+            zone,
+            url: searchUrl(input, offset),
+            format: "raw",
+            data_format: "parsed_light",
+          },
+          timeoutMs: remainingMs,
+          maxAttempts: 1,
+        },
+        context,
+        parseSearchEnvelope,
+      );
+      envelope = response.data;
+      break;
+    } catch (error) {
+      if (
+        !(error instanceof CapabilityError) ||
+        error.code !== "malformed_upstream_response"
+      ) throw error;
+      if (attempt === 3) throw malformedSearch(true, context.requestId);
+      await waitForSearchRetry(attempt, deadline, context);
+    }
   }
-  const results = (parsed.data.organic ?? parsed.data.results ?? [])
+  if (!envelope) throw malformedSearch(true, context.requestId);
+  const results = (envelope.organic ?? envelope.results ?? [])
     .filter((item) => !item.type || item.type === "organic")
     .flatMap((item) => {
       const url = item.link ?? item.url;
@@ -287,6 +384,29 @@ async function searchSerp(
       ? `search_${offset + SEARCH_PAGE_SIZE}`
       : undefined,
   };
+}
+
+function parseSearchEnvelope(value: unknown) {
+  const parsed = searchEnvelopeSchema.safeParse(unwrapJsonBody(value));
+  if (!parsed.success || (!parsed.data.organic && !parsed.data.results)) {
+    throw malformedSearch();
+  }
+  return parsed.data;
+}
+
+async function waitForSearchRetry(
+  attempt: number,
+  deadline: number,
+  context: RequestContext,
+) {
+  const baseDelay = SEARCH_RETRY_DELAYS_MS[attempt - 1]!;
+  const delayMs = Math.round(baseDelay * (0.8 + Math.random() * 0.4));
+  const remainingMs = deadline - Date.now();
+  if (remainingMs <= delayMs) throw malformedSearch(true, context.requestId);
+  await Bun.sleep(delayMs);
+  if (context.signal?.aborted) {
+    throw new CapabilityError("cancelled", "The Bright Data search was cancelled.");
+  }
 }
 
 async function resolveZone(
@@ -423,12 +543,26 @@ function unwrapJsonBody(value: unknown) {
   }
 }
 
-function malformedSearch() {
+function malformedSearch(exhausted = false, requestId?: string) {
   return new CapabilityError(
     "malformed_upstream_response",
-    "Bright Data returned an unexpected SERP response shape.",
-    false,
-    "Retry once. If this persists, verify the SERP zone output format.",
+    exhausted
+      ? "Bright Data returned malformed SERP responses after three attempts."
+      : "Bright Data returned an unexpected SERP response shape.",
+    !exhausted,
+    exhausted
+      ? "The server exhausted bounded recovery; verify the SERP zone and report the request ID."
+      : undefined,
+    requestId,
+  );
+}
+
+function searchTimeout() {
+  return new CapabilityError(
+    "upstream_timeout",
+    "Bright Data did not return a valid SERP response within 21 seconds.",
+    true,
+    "Retry once or use another search engine.",
   );
 }
 
@@ -438,5 +572,6 @@ function failureRecord(error: CapabilityError): ItemFailure {
     message: error.message,
     retryable: error.retryable,
     nextAction: error.nextAction,
+    requestId: error.requestId,
   };
 }

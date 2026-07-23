@@ -3,6 +3,7 @@ import {
   CredentialResolutionError,
   type CredentialProvider,
 } from "../../connections/credentials";
+import { logfire } from "../../telemetry";
 
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const MAX_RESPONSE_BYTES = 2_000_000;
@@ -28,20 +29,39 @@ export class BrightDataGateway {
     },
   ) {}
 
-  async requestJson(
+  logInfo(record: LogRecord) {
+    this.options.logger.info(record);
+  }
+
+  async requestJson<T = unknown>(
     request: GatewayRequest,
     context: RequestContext,
-  ): Promise<{ status: number; data: unknown; requestId?: string }> {
-    return this.request(request, context, (text) => {
+    validate?: (value: unknown) => T,
+  ): Promise<{ status: number; data: T; requestId?: string }> {
+    return this.request(request, context, (text, response) => {
+      let data: unknown;
       try {
-        return text.length ? JSON.parse(text) : null;
+        data = text.length ? JSON.parse(text) : null;
       } catch {
+        recordMalformedResponse(request, context, response, text);
         throw new CapabilityError(
           "malformed_upstream_response",
           "Bright Data returned a response that was not valid JSON.",
           false,
           "Retry once. If this persists, verify the configured Bright Data product.",
         );
+      }
+      if (!validate) return data as T;
+      try {
+        return validate(data);
+      } catch (error) {
+        if (
+          error instanceof CapabilityError &&
+          error.code === "malformed_upstream_response"
+        ) {
+          recordMalformedResponse(request, context, response, text);
+        }
+        throw error;
       }
     });
   }
@@ -56,7 +76,21 @@ export class BrightDataGateway {
   private async request<T>(
     request: GatewayRequest,
     context: RequestContext,
-    parse: (text: string) => T,
+    parse: (text: string, response: Response) => T,
+  ): Promise<{ status: number; data: T; requestId?: string }> {
+    return logfire.span("Bright Data request", {
+      attributes: {
+        "brightdata.operation": `${request.method} ${request.path}`,
+        "brightdata.request_id": context.requestId,
+      },
+      callback: () => this.executeRequest(request, context, parse),
+    });
+  }
+
+  private async executeRequest<T>(
+    request: GatewayRequest,
+    context: RequestContext,
+    parse: (text: string, response: Response) => T,
   ): Promise<{ status: number; data: T; requestId?: string }> {
     const startedAt = performance.now();
     const url = new URL(
@@ -116,7 +150,7 @@ export class BrightDataGateway {
           request.maxResponseBytes ?? MAX_RESPONSE_BYTES,
         );
 
-        const data = parse(text);
+        const data = parse(text, response);
 
         this.options.logger.info({
           operation: `${request.method} ${request.path}`,
@@ -178,7 +212,37 @@ export class BrightDataGateway {
   }
 }
 
-export async function pollBrightData<T>(options: {
+function recordMalformedResponse(
+  request: GatewayRequest,
+  context: RequestContext,
+  response: Response,
+  body: string,
+) {
+  logfire.error("Malformed Bright Data response", {
+    "brightdata.operation": `${request.method} ${request.path}`,
+    "brightdata.request_id": context.requestId,
+    "http.response.status_code": response.status,
+    "http.response.content_type": response.headers
+      .get("content-type")
+      ?.slice(0, 100) ?? "missing",
+    "http.response.body_bytes": new TextEncoder().encode(body).byteLength,
+    "http.response.body_hash": new Bun.CryptoHasher("sha256")
+      .update(body)
+      .digest("hex")
+      .slice(0, 16),
+    "http.response.body_class": classifyBody(body),
+  });
+}
+
+function classifyBody(body: string) {
+  const prefix = body.trimStart();
+  if (!prefix) return "empty";
+  if (prefix.startsWith("<")) return "html";
+  if (prefix.startsWith("{") || prefix.startsWith("[")) return "json-like";
+  return "text";
+}
+
+type PollOptions<T> = {
   context: RequestContext;
   deadlineMs: number;
   intervalMs: number;
@@ -186,17 +250,32 @@ export async function pollBrightData<T>(options: {
   state(value: T): "pending" | "ready" | "failed";
   failed(value: T): CapabilityError;
   timeout: CapabilityError;
-}) {
+};
+
+export async function pollBrightData<T>(options: PollOptions<T>) {
+  return logfire.span("Bright Data poll", {
+    attributes: {
+      "brightdata.poll.deadline_ms": options.deadlineMs,
+      "brightdata.poll.interval_ms": options.intervalMs,
+    },
+    callback: () => executePoll(options),
+  });
+}
+
+async function executePoll<T>(options: PollOptions<T>) {
   const deadline = Date.now() + options.deadlineMs;
   while (Date.now() < deadline) {
     if (options.context.signal?.aborted) {
       throw new CapabilityError("cancelled", "The Bright Data operation was cancelled.");
     }
-    await Bun.sleep(options.intervalMs);
     const value = await options.load();
     const state = options.state(value);
     if (state === "ready") return value;
     if (state === "failed") throw options.failed(value);
+    const remainingMs = deadline - Date.now();
+    if (remainingMs > 0) {
+      await Bun.sleep(Math.min(options.intervalMs, remainingMs));
+    }
   }
   throw options.timeout;
 }

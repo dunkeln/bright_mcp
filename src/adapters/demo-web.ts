@@ -24,6 +24,7 @@ export function createDemoWebAdapter(): {
         return {
           searches: input.queries.map(({ query }) => ({
             query,
+            retrievedAt: new Date().toISOString(),
             results: pages.filter((page) =>
               `${page.title} ${page.summary}`.toLowerCase().includes(query.toLowerCase()),
             ),

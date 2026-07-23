@@ -22,6 +22,7 @@ const itemFailureSchema = z.object({
   message: z.string(),
   retryable: z.boolean(),
   nextAction: z.string().optional(),
+  requestId: z.string().optional(),
 });
 
 const readItemSchema = z.object({
@@ -87,11 +88,12 @@ export function registerWebTools(
     {
       title: "Search web",
       description:
-        "Find current public-web sources through a fast ordinary lookup when the relevant pages are not yet known. Submit one to five related queries together. Results contain compact titles, URLs, and summaries; answer from them when they already contain the requested fact. On first use, Bright MCP may create the deterministic bright_mcp_serp zone in the caller's Bright Data account when no compatible SERP zone exists. Use discover_web instead when sources must be ranked against an explicit goal or constrained by geography, language, keywords, or dates. Use read_web only when page-level text is missing or explicitly required, not merely to verify a useful summary. Use a returned cursor only to continue that query. Do not repeat unchanged queries, and do not use this tool for known URLs, ad hoc extraction, or structured dataset records.",
+        "Find current public-web sources through a fast ordinary lookup when the relevant pages are not yet known. Submit one to five related queries together. Results contain compact titles, URLs, and summaries; answer from them when they already contain the requested fact. retrievedAt records when Bright MCP received the result, not when a source published or updated it. Do not infer a source date, quote time, or year unless that result's title or summary states it. On first use, Bright MCP may create the deterministic bright_mcp_serp zone in the caller's Bright Data account when no compatible SERP zone exists. Use discover_web instead when sources must be ranked against an explicit goal or constrained by geography, language, keywords, or dates. Use read_web only when page-level text is missing or explicitly required, not merely to verify a useful summary. Use a returned cursor only to continue that query. Do not repeat unchanged queries, and do not use this tool for known URLs, ad hoc extraction, or structured dataset records.",
       inputSchema: searchInputSchema,
       outputSchema: {
         searches: z.array(z.object({
           query: z.string(),
+          retrievedAt: z.iso.datetime(),
           results: z.array(searchResultSchema),
           nextCursor: z.string().optional(),
           error: itemFailureSchema.optional(),

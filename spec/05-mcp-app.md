@@ -53,8 +53,8 @@ outside this app contract. The separate browser profile has no required MCP app.
 - Focus order, selection state, sort state, warnings, and pagination changes
   MUST be programmatically exposed.
 - Light, dark, narrow, and embedded layouts MUST preserve readable data.
-- Breaking widget changes MUST use a new resource URI. V2 is
-  `ui://bright-mcp/dataset-workbench-v2.html`.
+- Breaking widget changes MUST use a new resource URI. V3 is
+  `ui://bright-mcp/dataset-workbench-v3.html`.
 
 ## Payload bounds
 

@@ -31,7 +31,7 @@ import type { ResultStore } from "../core/results";
 import { jsonResourceReply, reply, requestContext, runTool } from "./support";
 import type { CancellableTaskStore } from "./task-store";
 
-export const DATASET_WORKBENCH_URI = "ui://bright-mcp/dataset-workbench-v2.html";
+export const DATASET_WORKBENCH_URI = "ui://bright-mcp/dataset-workbench-v3.html";
 
 const annotations = {
   readOnlyHint: true,

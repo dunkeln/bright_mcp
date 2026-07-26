@@ -1,4 +1,3 @@
-import { Badge } from "@openai/apps-sdk-ui/components/Badge";
 import { Button } from "@openai/apps-sdk-ui/components/Button";
 import { Checkbox } from "@openai/apps-sdk-ui/components/Checkbox";
 import {
@@ -34,15 +33,8 @@ import {
 } from "../core/contracts";
 import { profileDataset } from "../core/profiles";
 import { DatasetOverview } from "./DatasetOverview";
-import {
-  DatasetWorkbench,
-  type WorkbenchPanel,
-} from "./DatasetWorkbench";
-import {
-  compareValues,
-  displayValue,
-  downloadRows,
-} from "./dataset-utils";
+import { DatasetWorkbench, type WorkbenchPanel } from "./DatasetWorkbench";
+import { compareValues, displayValue, downloadRows } from "./dataset-utils";
 
 type Sort = { key: string; direction: "ascending" | "descending" } | null;
 type Selection = { rowRef: string; row: JsonObject };
@@ -71,10 +63,13 @@ function DataWorkbenchApp() {
   const [menuColumnKey, setMenuColumnKey] = useState<string | null>(null);
   const [selection, setSelection] = useState<Selection[]>([]);
   const [focusedRow, setFocusedRow] = useState<Selection | null>(null);
-  const [pageError, setPageError] = useState<string | null>(initial.error ?? null);
+  const [pageError, setPageError] = useState<string | null>(
+    initial.error ?? null,
+  );
   const [contextError, setContextError] = useState<string | null>(null);
   const [loadingPage, setLoadingPage] = useState(false);
   const activeResize = useRef<AbortController | null>(null);
+  const sharedSelection = useRef(false);
 
   const { app, isConnected, error } = useApp({
     appInfo: { name: "bright-data-workbench", version: "0.4.0" },
@@ -145,13 +140,11 @@ function DataWorkbenchApp() {
     rowPageIndex * ROWS_PER_PAGE,
     (rowPageIndex + 1) * ROWS_PER_PAGE,
   );
-  const loadedRows = useMemo(
-    () => pages.flatMap(({ rows }) => rows),
-    [pages],
-  );
+  const loadedRows = useMemo(() => pages.flatMap(({ rows }) => rows), [pages]);
 
   const shareSelection = async () => {
     if (!app || !app.getHostCapabilities()?.updateModelContext) return;
+    if (selection.length === 0 && !sharedSelection.current) return;
     const rows = selection.slice(0, 20);
     while (
       rows.length > 0 &&
@@ -172,6 +165,7 @@ function DataWorkbenchApp() {
           },
         ],
       });
+      sharedSelection.current = selection.length > 0;
       setContextError(null);
     } catch {
       setContextError("The host could not receive the current selection.");
@@ -212,16 +206,68 @@ function DataWorkbenchApp() {
   }
 
   if (!page) {
+    if (!pageError && !error) {
+      return (
+        <main
+          className="flex min-h-80 items-center justify-center"
+          aria-live="polite"
+          role="status"
+        >
+          <div className="flex flex-col items-center gap-3">
+            <svg
+              className="h-16 w-11"
+              viewBox="0 0 55 80"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="hsl(228 97% 42%)"
+              aria-hidden="true"
+            >
+              <g transform="matrix(1 0 0 -1 0 80)">
+                <rect width="10" height="20" rx="3">
+                  <animate
+                    attributeName="height"
+                    dur="4.3s"
+                    values="20;45;57;80;64;32;66;45;64;23;66;13;64;56;34;34;2;23;76;79;20"
+                    repeatCount="indefinite"
+                  />
+                </rect>
+                <rect x="15" width="10" height="80" rx="3">
+                  <animate
+                    attributeName="height"
+                    dur="2s"
+                    values="80;55;33;5;75;23;73;33;12;14;60;80"
+                    repeatCount="indefinite"
+                  />
+                </rect>
+                <rect x="30" width="10" height="50" rx="3">
+                  <animate
+                    attributeName="height"
+                    dur="1.4s"
+                    values="50;34;78;23;56;23;34;76;80;54;21;50"
+                    repeatCount="indefinite"
+                  />
+                </rect>
+                <rect x="45" width="10" height="30" rx="3">
+                  <animate
+                    attributeName="height"
+                    dur="2s"
+                    values="30;45;13;80;56;72;45;76;34;23;67;30"
+                    repeatCount="indefinite"
+                  />
+                </rect>
+              </g>
+            </svg>
+            <p className="text-sm text-secondary">brightling...</p>
+          </div>
+        </main>
+      );
+    }
     return (
       <main
         className="p-4 text-sm text-secondary"
         aria-live="polite"
         role={pageError ? "alert" : "status"}
       >
-        {pageError ??
-          (error
-            ? "This workbench is waiting for a supported MCP Apps host."
-            : "Waiting for structured data…")}
+        {pageError ?? "This workbench is waiting for a supported MCP Apps host."}
       </main>
     );
   }
@@ -315,7 +361,11 @@ function DataWorkbenchApp() {
     setMenuColumnKey(null);
   };
 
-  const toggleSelection = (rowRef: string, row: JsonObject, checked: boolean) => {
+  const toggleSelection = (
+    rowRef: string,
+    row: JsonObject,
+    checked: boolean,
+  ) => {
     setSelection((current) =>
       checked
         ? current.some((item) => item.rowRef === rowRef)
@@ -326,11 +376,19 @@ function DataWorkbenchApp() {
   };
 
   return (
-    <main className="flex min-w-0 flex-col gap-3 p-3 sm:p-4">
+    <main
+      className={`flex min-w-0 flex-col ${
+        isSearch ? "gap-2 px-1 py-1" : "gap-3 p-3 sm:p-4"
+      }`}
+    >
       {page.warnings?.map((warning) => (
         <p
           key={warning.code}
-          className="rounded-lg border border-subtle bg-surface-secondary p-2 text-sm"
+          className={`text-sm ${
+            isSearch
+              ? "border-l-2 border-warning px-3 py-2 text-secondary"
+              : "rounded-lg border border-subtle bg-surface-secondary p-2"
+          }`}
           role="status"
         >
           {warning.message}
@@ -339,46 +397,45 @@ function DataWorkbenchApp() {
 
       <section
         className={`grid items-center gap-2 ${
-          view === "table"
-            ? isSearch
-              ? "grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1fr)_auto_224px]"
-              : "grid-cols-[minmax(0,1fr)_auto_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto_224px]"
-            : "grid-cols-[minmax(0,1fr)_auto_auto]"
+          isSearch
+            ? view === "table"
+              ? "grid-cols-[auto_auto_minmax(0,1fr)] justify-start px-1"
+              : "grid-cols-[auto_auto] justify-start px-1"
+            : view === "table"
+              ? "grid-cols-[minmax(0,1fr)_auto_auto] sm:grid-cols-[minmax(0,1fr)_auto_auto_224px]"
+              : "grid-cols-[minmax(0,1fr)_auto_auto]"
         }`}
       >
-        <nav
-          className="flex min-w-0 items-center gap-2 overflow-x-auto"
-          role="tablist"
-          aria-label="Open tables"
-        >
-          <button
-            className="max-w-full truncate rounded-lg bg-surface-secondary px-3 py-1.5 text-sm font-medium"
-            type="button"
-            role="tab"
-            aria-selected="true"
-          >
-            {page.dataset.title}
-          </button>
-          {page.page.truncated && <Badge color="warning">Preview</Badge>}
-        </nav>
         {!isSearch && (
-          <Button
-            variant="ghost"
-            color="secondary"
-            size="sm"
-            uniform
-            aria-label={view === "table" ? "Show overview" : "Show table"}
-            aria-pressed={view === "overview"}
-            title={view === "table" ? "Show overview" : "Show table"}
-            onClick={() =>
-              setView((current) =>
-                current === "table" ? "overview" : "table",
-              )
-            }
+          <nav
+            className="flex min-w-0 items-center gap-2 overflow-x-auto"
+            role="tablist"
+            aria-label="Open tables"
           >
-            <BarChartIcon className="size-4" aria-hidden="true" />
-          </Button>
+            <button
+              className="max-w-full truncate rounded-lg bg-surface-secondary px-3 py-1.5 text-sm font-medium"
+              type="button"
+              role="tab"
+              aria-selected="true"
+            >
+              {page.dataset.title}
+            </button>
+          </nav>
         )}
+        <Button
+          variant="ghost"
+          color="secondary"
+          size="sm"
+          uniform
+          aria-label={view === "table" ? "Show overview" : "Show table"}
+          aria-pressed={view === "overview"}
+          title={view === "table" ? "Show overview" : "Show table"}
+          onClick={() =>
+            setView((current) => (current === "table" ? "overview" : "table"))
+          }
+        >
+          <BarChartIcon className="size-4" aria-hidden="true" />
+        </Button>
         <Menu>
           <Menu.Trigger>
             <Button
@@ -410,7 +467,12 @@ function DataWorkbenchApp() {
             <Menu.Separator />
             <Menu.Item
               onSelect={() =>
-                downloadRows("csv", page.dataset.title, page.columns, loadedRows)
+                downloadRows(
+                  "csv",
+                  page.dataset.title,
+                  page.columns,
+                  loadedRows,
+                )
               }
             >
               <Download className="size-4" aria-hidden="true" />
@@ -418,7 +480,12 @@ function DataWorkbenchApp() {
             </Menu.Item>
             <Menu.Item
               onSelect={() =>
-                downloadRows("json", page.dataset.title, page.columns, loadedRows)
+                downloadRows(
+                  "json",
+                  page.dataset.title,
+                  page.columns,
+                  loadedRows,
+                )
               }
             >
               <Download className="size-4" aria-hidden="true" />
@@ -428,7 +495,7 @@ function DataWorkbenchApp() {
         </Menu>
         {view === "table" && (
           <Input
-            className={`${isSearch ? "col-span-2" : "col-span-3"} w-full sm:col-span-1`}
+            className={isSearch ? "w-full" : "col-span-3 w-full sm:col-span-1"}
             type="search"
             aria-label="Filter rows on this page"
             placeholder="Search visible values"
@@ -461,32 +528,59 @@ function DataWorkbenchApp() {
           onOpenLink={(url) => void openLink(url)}
         />
       ) : isSearch ? (
-        <div className="divide-y divide-subtle overflow-hidden rounded-xl border border-subtle">
-          {visibleRows.map(({ row, rowRef }) => {
+        <div className="space-y-1">
+          {visibleRows.map(({ row, rowRef }, visibleIndex) => {
             const url = typeof row.url === "string" ? row.url : "";
+            const checked = selection.some((item) => item.rowRef === rowRef);
+            const showQuery =
+              visibleIndex === 0 ||
+              visibleRows[visibleIndex - 1]?.row.query !== row.query;
             return (
-              <article key={rowRef} className="space-y-1.5 p-3">
-                <div className="flex items-center gap-2 text-xs text-secondary">
-                  {typeof row.rank === "number" && <span>#{row.rank}</span>}
-                  <span>{displayValue(row.kind)}</span>
-                  {page.rows.some((candidate) => candidate.query !== row.query) && (
-                    <span className="min-w-0 truncate">· {displayValue(row.query)}</span>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  className="block text-start text-sm font-medium text-primary hover:underline"
-                  onClick={() => url && void openLink(url)}
-                >
-                  {displayValue(row.title)}
-                </button>
-                {typeof row.summary === "string" && row.summary && (
-                  <p className="line-clamp-2 text-sm text-secondary">
-                    {displayValue(row.summary)}
-                  </p>
+              <div key={rowRef}>
+                {showQuery && (
+                  <h2 className="truncate px-2 pb-1 pt-2 text-xs font-medium text-secondary">
+                    {displayValue(row.query)}
+                  </h2>
                 )}
-                {url && <p className="truncate text-xs text-secondary">{url}</p>}
-              </article>
+                <article className="flex items-start gap-3 rounded-lg px-2 py-3 transition-colors hover:bg-surface-secondary">
+                  <Checkbox
+                    checked={checked}
+                    label={
+                      <span className="sr-only">
+                        {checked ? "Deselect" : "Select"}{" "}
+                        {displayValue(row.title)}
+                      </span>
+                    }
+                    onCheckedChange={(nextChecked) =>
+                      toggleSelection(rowRef, row, nextChecked)
+                    }
+                  />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <div className="flex items-baseline gap-2">
+                      {typeof row.rank === "number" && (
+                        <span className="shrink-0 text-xs tabular-nums text-secondary">
+                          #{row.rank}
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        className="text-start text-sm font-medium text-primary hover:underline"
+                        onClick={() => url && void openLink(url)}
+                      >
+                        {displayValue(row.title)}
+                      </button>
+                    </div>
+                    <div className="text-xs text-secondary">
+                      {url && <span className="truncate">{urlHost(url)}</span>}
+                    </div>
+                    {typeof row.summary === "string" && row.summary && (
+                      <p className="line-clamp-2 text-sm text-secondary">
+                        {displayValue(row.summary)}
+                      </p>
+                    )}
+                  </div>
+                </article>
+              </div>
             );
           })}
           {visibleRows.length === 0 && (
@@ -498,170 +592,183 @@ function DataWorkbenchApp() {
       ) : (
         <div className="overflow-x-auto rounded-xl border border-subtle">
           <table className="w-full min-w-max table-fixed border-collapse text-left text-sm">
-          <colgroup>
-            <col className="w-16" />
-            {visibleColumns.map((column) => (
-              <col
-                key={column.key}
-                style={{ width: columnWidths[column.key] ?? 180 }}
-              />
-            ))}
-          </colgroup>
-          <thead className="bg-surface-secondary">
-            <tr>
-              <th className="w-16 border-b border-subtle px-2 py-2">
-                <span className="sr-only">Select row</span>
-              </th>
+            <colgroup>
+              <col className="w-16" />
               {visibleColumns.map((column) => (
-                <th
+                <col
                   key={column.key}
-                  className="column-header border-b border-subtle font-medium"
-                  aria-sort={sort?.key === column.key ? sort.direction : "none"}
-                  onContextMenu={(event) => {
-                    event.preventDefault();
-                    setMenuColumnKey(column.key);
-                  }}
-                >
-                  <button
-                    type="button"
-                    className="flex h-full w-full items-center gap-1 overflow-hidden rounded-sm text-start"
-                    onClick={() => changeSort(column.key)}
-                    aria-label={`Sort by ${column.label}`}
-                  >
-                    <span className="truncate">{column.label}</span>
-                    {sort?.key === column.key &&
-                      (sort.direction === "ascending" ? " ↑" : " ↓")}
-                  </button>
-                  <Menu
-                    forceOpen={menuColumnKey === column.key}
-                    onClose={() => setMenuColumnKey(null)}
-                  >
-                    <Menu.Trigger>
-                      <Button
-                        className="column-menu"
-                        variant="ghost"
-                        color="secondary"
-                        size="xs"
-                        uniform
-                        aria-label={`Options for ${column.label}`}
-                        title={`Options for ${column.label}`}
-                        onClick={() => setMenuColumnKey(column.key)}
-                      >
-                        <DotsVerticalMoreMenu className="size-4" aria-hidden="true" />
-                      </Button>
-                    </Menu.Trigger>
-                    <Menu.Content align="end" minWidth="auto">
-                      <Menu.Item
-                        onSelect={() =>
-                          setSort({ key: column.key, direction: "ascending" })
-                        }
-                      >
-                        <ArrowUpSm className="size-4" aria-hidden="true" />
-                        Sort ascending
-                      </Menu.Item>
-                      <Menu.Item
-                        onSelect={() =>
-                          setSort({ key: column.key, direction: "descending" })
-                        }
-                      >
-                        <ArrowDownSm className="size-4" aria-hidden="true" />
-                        Sort descending
-                      </Menu.Item>
-                      <Menu.Item
-                        disabled={visibleColumns.length === 1}
-                        onSelect={() => hideColumn(column.key)}
-                      >
-                        <EyeOff className="size-4" aria-hidden="true" />
-                        Hide column
-                      </Menu.Item>
-                      {hiddenColumnKeys.length > 0 && (
-                        <Menu.Sub>
-                          <Menu.SubTrigger>
-                            <Eye className="size-4" aria-hidden="true" />
-                            Show columns
-                          </Menu.SubTrigger>
-                          <Menu.SubContent minWidth={180}>
-                            {page.columns
-                              .filter((candidate) =>
-                                hiddenColumnKeys.includes(candidate.key),
-                              )
-                              .map((hiddenColumn) => (
-                                <Menu.Item
-                                  key={hiddenColumn.key}
-                                  onSelect={() =>
-                                    setHiddenColumnKeys((current) =>
-                                      current.filter(
-                                        (key) => key !== hiddenColumn.key,
-                                      ),
-                                    )
-                                  }
-                                >
-                                  {hiddenColumn.label}
-                                </Menu.Item>
-                              ))}
-                          </Menu.SubContent>
-                        </Menu.Sub>
-                      )}
-                    </Menu.Content>
-                  </Menu>
-                  <button
-                    className="resize-handle"
-                    type="button"
-                    aria-label={`Resize ${column.label} column`}
-                    title="Drag to resize"
-                    onPointerDown={(event) =>
-                      beginColumnResize(event, column.key)
-                    }
-                  />
-                </th>
+                  style={{ width: columnWidths[column.key] ?? 180 }}
+                />
               ))}
-            </tr>
-          </thead>
-          <tbody>
-            {visibleRows.map(({ row, rowRef }) => {
-              const checked = selection.some((item) => item.rowRef === rowRef);
-              return (
-                <tr key={rowRef} className="border-b border-subtle last:border-0">
-                  <td className="px-2 py-1.5 align-top">
-                    <div className="flex items-center gap-1">
-                      <Checkbox
-                        checked={checked}
-                        label={
-                          <span className="sr-only">
-                            {checked ? "Deselect" : "Select"} row {rowRef}
-                          </span>
-                        }
-                        onCheckedChange={(nextChecked) =>
-                          toggleSelection(rowRef, row, nextChecked)
-                        }
-                      />
-                      <Button
-                        variant="ghost"
-                        color="secondary"
-                        size="xs"
-                        uniform
-                        aria-label={`Inspect row ${rowRef}`}
-                        title="Inspect row"
-                        onClick={() => {
-                          setFocusedRow({ rowRef, row });
-                          setView("details");
-                        }}
-                      >
-                        <InfoCircle className="size-3.5" aria-hidden="true" />
-                      </Button>
-                    </div>
-                  </td>
-                  {visibleColumns.map((column) => (
-                    <td key={column.key} className="px-3 py-2 align-top">
-                      <span className="line-clamp-3 break-words">
-                        {displayValue(row[column.key])}
-                      </span>
+            </colgroup>
+            <thead className="bg-surface-secondary">
+              <tr>
+                <th className="w-16 border-b border-subtle px-2 py-2">
+                  <span className="sr-only">Select row</span>
+                </th>
+                {visibleColumns.map((column) => (
+                  <th
+                    key={column.key}
+                    className="column-header border-b border-subtle font-medium"
+                    aria-sort={
+                      sort?.key === column.key ? sort.direction : "none"
+                    }
+                    onContextMenu={(event) => {
+                      event.preventDefault();
+                      setMenuColumnKey(column.key);
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className="flex h-full w-full items-center gap-1 overflow-hidden rounded-sm text-start"
+                      onClick={() => changeSort(column.key)}
+                      aria-label={`Sort by ${column.label}`}
+                    >
+                      <span className="truncate">{column.label}</span>
+                      {sort?.key === column.key &&
+                        (sort.direction === "ascending" ? " ↑" : " ↓")}
+                    </button>
+                    <Menu
+                      forceOpen={menuColumnKey === column.key}
+                      onClose={() => setMenuColumnKey(null)}
+                    >
+                      <Menu.Trigger>
+                        <Button
+                          className="column-menu"
+                          variant="ghost"
+                          color="secondary"
+                          size="xs"
+                          uniform
+                          aria-label={`Options for ${column.label}`}
+                          title={`Options for ${column.label}`}
+                          onClick={() => setMenuColumnKey(column.key)}
+                        >
+                          <DotsVerticalMoreMenu
+                            className="size-4"
+                            aria-hidden="true"
+                          />
+                        </Button>
+                      </Menu.Trigger>
+                      <Menu.Content align="end" minWidth="auto">
+                        <Menu.Item
+                          onSelect={() =>
+                            setSort({ key: column.key, direction: "ascending" })
+                          }
+                        >
+                          <ArrowUpSm className="size-4" aria-hidden="true" />
+                          Sort ascending
+                        </Menu.Item>
+                        <Menu.Item
+                          onSelect={() =>
+                            setSort({
+                              key: column.key,
+                              direction: "descending",
+                            })
+                          }
+                        >
+                          <ArrowDownSm className="size-4" aria-hidden="true" />
+                          Sort descending
+                        </Menu.Item>
+                        <Menu.Item
+                          disabled={visibleColumns.length === 1}
+                          onSelect={() => hideColumn(column.key)}
+                        >
+                          <EyeOff className="size-4" aria-hidden="true" />
+                          Hide column
+                        </Menu.Item>
+                        {hiddenColumnKeys.length > 0 && (
+                          <Menu.Sub>
+                            <Menu.SubTrigger>
+                              <Eye className="size-4" aria-hidden="true" />
+                              Show columns
+                            </Menu.SubTrigger>
+                            <Menu.SubContent minWidth={180}>
+                              {page.columns
+                                .filter((candidate) =>
+                                  hiddenColumnKeys.includes(candidate.key),
+                                )
+                                .map((hiddenColumn) => (
+                                  <Menu.Item
+                                    key={hiddenColumn.key}
+                                    onSelect={() =>
+                                      setHiddenColumnKeys((current) =>
+                                        current.filter(
+                                          (key) => key !== hiddenColumn.key,
+                                        ),
+                                      )
+                                    }
+                                  >
+                                    {hiddenColumn.label}
+                                  </Menu.Item>
+                                ))}
+                            </Menu.SubContent>
+                          </Menu.Sub>
+                        )}
+                      </Menu.Content>
+                    </Menu>
+                    <button
+                      className="resize-handle"
+                      type="button"
+                      aria-label={`Resize ${column.label} column`}
+                      title="Drag to resize"
+                      onPointerDown={(event) =>
+                        beginColumnResize(event, column.key)
+                      }
+                    />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {visibleRows.map(({ row, rowRef }) => {
+                const checked = selection.some(
+                  (item) => item.rowRef === rowRef,
+                );
+                return (
+                  <tr
+                    key={rowRef}
+                    className="border-b border-subtle last:border-0"
+                  >
+                    <td className="px-2 py-1.5 align-top">
+                      <div className="flex items-center gap-1">
+                        <Checkbox
+                          checked={checked}
+                          label={
+                            <span className="sr-only">
+                              {checked ? "Deselect" : "Select"} row {rowRef}
+                            </span>
+                          }
+                          onCheckedChange={(nextChecked) =>
+                            toggleSelection(rowRef, row, nextChecked)
+                          }
+                        />
+                        <Button
+                          variant="ghost"
+                          color="secondary"
+                          size="xs"
+                          uniform
+                          aria-label={`Inspect row ${rowRef}`}
+                          title="Inspect row"
+                          onClick={() => {
+                            setFocusedRow({ rowRef, row });
+                            setView("details");
+                          }}
+                        >
+                          <InfoCircle className="size-3.5" aria-hidden="true" />
+                        </Button>
+                      </div>
                     </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
+                    {visibleColumns.map((column) => (
+                      <td key={column.key} className="px-3 py-2 align-top">
+                        <span className="line-clamp-3 break-words">
+                          {displayValue(row[column.key])}
+                        </span>
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
           </table>
           {visibleRows.length === 0 && (
             <p className="p-4 text-center text-sm text-secondary" role="status">
@@ -672,109 +779,122 @@ function DataWorkbenchApp() {
       )}
 
       {view === "table" && (
-        <footer className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
-        <div className="flex min-w-0 items-center gap-2">
-          {!isBrowserPreview && (
-            <p className="truncate text-xs text-secondary" aria-live="polite">
-              {pageError ??
-                contextError ??
-                (isConnected
-                  ? "Connected to host"
-                  : "Display remains available offline")}
-            </p>
-          )}
-          {contextError && (
-            <Button color="secondary" variant="ghost" size="sm" onClick={shareSelection}>
-              Retry selection context
-            </Button>
-          )}
-        </div>
-        <p className="text-center text-xs text-secondary" aria-live="polite">
-          {filteredRows.length
-            ? `${rowPageIndex * ROWS_PER_PAGE + 1}–${Math.min(
-                filteredRows.length,
-                (rowPageIndex + 1) * ROWS_PER_PAGE,
-              )} of ${filteredRows.length}`
-            : "0 rows"}
-        </p>
-        {(selection.length > 0 ||
-          rowPageCount > 1 ||
-          pageIndex > 0 ||
-          page.page.nextResourceUri) && (
-          <div className="flex justify-self-end gap-2">
-            {selection.length > 0 && (
+        <footer
+          className={
+            isSearch
+              ? "flex items-center justify-between gap-2 px-1"
+              : "grid grid-cols-[1fr_auto_1fr] items-center gap-2"
+          }
+        >
+          <div className="flex min-w-0 items-center gap-2">
+            {!isSearch && !isBrowserPreview && (
+              <p className="truncate text-xs text-secondary" aria-live="polite">
+                {pageError ??
+                  contextError ??
+                  (isConnected
+                    ? "Connected to host"
+                    : "Display remains available offline")}
+              </p>
+            )}
+            {contextError && (
               <Button
                 color="secondary"
                 variant="ghost"
-                size="md"
-                iconSize="sm"
-                uniform
-                aria-label="Export selected rows as CSV"
-                title="Export selected rows"
-                onClick={() =>
-                  downloadRows(
-                    "csv",
-                    `${page.dataset.title}-selection`,
-                    page.columns,
-                    selection.map(({ row }) => row),
-                  )
-                }
+                size="sm"
+                onClick={shareSelection}
               >
-                <Download aria-hidden="true" />
+                Retry selection context
               </Button>
             )}
-            {(rowPageCount > 1 || pageIndex > 0 || page.page.nextResourceUri) && (
-              <>
-                <Button
-                  color="secondary"
-                  variant="soft"
-                  size="md"
-                  iconSize="sm"
-                  uniform
-                  pill={false}
-                  disabled={pageIndex === 0 && rowPageIndex === 0}
-                  aria-label="Previous page"
-                  title="Previous page"
-                  onClick={() => {
-                    if (rowPageIndex > 0) {
-                      setRowPageIndex((current) => current - 1);
-                    } else {
-                      setPageIndex((current) => Math.max(0, current - 1));
-                    }
-                    setFilter("");
-                    setSort(null);
-                  }}
-                >
-                  <ArrowLeft className="rtl:rotate-180" aria-hidden="true" />
-                </Button>
-                <Button
-                  color="secondary"
-                  variant="soft"
-                  size="md"
-                  iconSize="sm"
-                  uniform
-                  pill={false}
-                  loading={loadingPage}
-                  disabled={
-                    rowPageIndex >= rowPageCount - 1 &&
-                    (!page.page.nextResourceUri || !app)
-                  }
-                  aria-label="Next page"
-                  title="Next page"
-                  onClick={() => {
-                    if (rowPageIndex < rowPageCount - 1) {
-                      setRowPageIndex((current) => current + 1);
-                    } else {
-                      void loadNextPage();
-                    }
-                  }}
-                >
-                  <ArrowRight className="rtl:rotate-180" aria-hidden="true" />
-                </Button>
-              </>
-            )}
           </div>
-        )}
+          <p className="text-center text-xs text-secondary" aria-live="polite">
+            {filteredRows.length
+              ? `${rowPageIndex * ROWS_PER_PAGE + 1}–${Math.min(
+                  filteredRows.length,
+                  (rowPageIndex + 1) * ROWS_PER_PAGE,
+                )} of ${filteredRows.length}`
+              : "0 rows"}
+          </p>
+          {(selection.length > 0 ||
+            rowPageCount > 1 ||
+            pageIndex > 0 ||
+            page.page.nextResourceUri) && (
+            <div className="flex justify-self-end gap-2">
+              {selection.length > 0 && (
+                <Button
+                  color="secondary"
+                  variant="ghost"
+                  size="md"
+                  iconSize="sm"
+                  uniform
+                  aria-label="Export selected rows as CSV"
+                  title="Export selected rows"
+                  onClick={() =>
+                    downloadRows(
+                      "csv",
+                      `${page.dataset.title}-selection`,
+                      page.columns,
+                      selection.map(({ row }) => row),
+                    )
+                  }
+                >
+                  <Download aria-hidden="true" />
+                </Button>
+              )}
+              {(rowPageCount > 1 ||
+                pageIndex > 0 ||
+                page.page.nextResourceUri) && (
+                <>
+                  <Button
+                    color="secondary"
+                    variant="soft"
+                    size="md"
+                    iconSize="sm"
+                    uniform
+                    pill={false}
+                    disabled={pageIndex === 0 && rowPageIndex === 0}
+                    aria-label="Previous page"
+                    title="Previous page"
+                    onClick={() => {
+                      if (rowPageIndex > 0) {
+                        setRowPageIndex((current) => current - 1);
+                      } else {
+                        setPageIndex((current) => Math.max(0, current - 1));
+                      }
+                      setFilter("");
+                      setSort(null);
+                    }}
+                  >
+                    <ArrowLeft className="rtl:rotate-180" aria-hidden="true" />
+                  </Button>
+                  <Button
+                    color="secondary"
+                    variant="soft"
+                    size="md"
+                    iconSize="sm"
+                    uniform
+                    pill={false}
+                    loading={loadingPage}
+                    disabled={
+                      rowPageIndex >= rowPageCount - 1 &&
+                      (!page.page.nextResourceUri || !app)
+                    }
+                    aria-label="Next page"
+                    title="Next page"
+                    onClick={() => {
+                      if (rowPageIndex < rowPageCount - 1) {
+                        setRowPageIndex((current) => current + 1);
+                      } else {
+                        void loadNextPage();
+                      }
+                    }}
+                  >
+                    <ArrowRight className="rtl:rotate-180" aria-hidden="true" />
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
         </footer>
       )}
     </main>
@@ -784,16 +904,21 @@ function DataWorkbenchApp() {
 function parseToolResult(result: CallToolResult) {
   if (!result.isError) return parseResult(result.structuredContent);
   const text = result.content.find((item) => item.type === "text")?.text;
-  if (!text) return { ok: false as const, message: "The dataset operation failed." };
+  if (!text)
+    return { ok: false as const, message: "The dataset operation failed." };
   try {
     const failure = JSON.parse(text) as unknown;
     if (failure && typeof failure === "object" && "message" in failure) {
       const message = failure.message;
-      const nextAction = "nextAction" in failure ? failure.nextAction : undefined;
+      const nextAction =
+        "nextAction" in failure ? failure.nextAction : undefined;
       if (typeof message === "string") {
         return {
           ok: false as const,
-          message: typeof nextAction === "string" ? `${message} ${nextAction}` : message,
+          message:
+            typeof nextAction === "string"
+              ? `${message} ${nextAction}`
+              : message,
         };
       }
     }
@@ -883,9 +1008,10 @@ function searchToDataset(search: SearchResponse): DatasetResult {
     resultId: `search-${first?.retrievedAt ?? "empty"}`,
     dataset: {
       id: "web-search",
-      title: search.searches.length === 1
-        ? `Search · ${first?.query ?? ""}`
-        : `Web search · ${search.searches.length} queries`,
+      title:
+        search.searches.length === 1
+          ? `Search · ${first?.query ?? ""}`
+          : `Web search · ${search.searches.length} queries`,
     },
     operation: "search",
     columns,
@@ -904,14 +1030,21 @@ function searchToDataset(search: SearchResponse): DatasetResult {
   };
 }
 
+function urlHost(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
 function readInitialResult(): {
   result?: DatasetResult;
   unavailable?: DatasetUnavailable;
   error?: string;
 } {
-  const value = (
-    window as Window & { openai?: { toolOutput?: unknown } }
-  ).openai?.toolOutput;
+  const value = (window as Window & { openai?: { toolOutput?: unknown } })
+    .openai?.toolOutput;
   if (value === undefined) return {};
   const parsed = parseResult(value);
   if (!parsed.ok) return { error: parsed.message };

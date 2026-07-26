@@ -564,7 +564,7 @@ function DataWorkbenchApp() {
                       )}
                       <button
                         type="button"
-                        className="text-start text-sm font-medium text-primary hover:underline"
+                        className="result-link text-start text-sm font-medium text-primary hover:underline"
                         onClick={() => url && void openLink(url)}
                       >
                         {displayValue(row.title)}
@@ -779,13 +779,7 @@ function DataWorkbenchApp() {
       )}
 
       {view === "table" && (
-        <footer
-          className={
-            isSearch
-              ? "flex items-center justify-between gap-2 px-1"
-              : "grid grid-cols-[1fr_auto_1fr] items-center gap-2"
-          }
-        >
+        <footer className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-1">
           <div className="flex min-w-0 items-center gap-2">
             {!isSearch && !isBrowserPreview && (
               <p className="truncate text-xs text-secondary" aria-live="polite">
@@ -806,15 +800,25 @@ function DataWorkbenchApp() {
                 Retry selection context
               </Button>
             )}
+            <p
+              className="shrink-0 text-xs text-secondary"
+              aria-live="polite"
+            >
+              {filteredRows.length
+                ? `${rowPageIndex * ROWS_PER_PAGE + 1}–${Math.min(
+                    filteredRows.length,
+                    (rowPageIndex + 1) * ROWS_PER_PAGE,
+                  )} of ${filteredRows.length}`
+                : "0 rows"}
+            </p>
           </div>
-          <p className="text-center text-xs text-secondary" aria-live="polite">
-            {filteredRows.length
-              ? `${rowPageIndex * ROWS_PER_PAGE + 1}–${Math.min(
-                  filteredRows.length,
-                  (rowPageIndex + 1) * ROWS_PER_PAGE,
-                )} of ${filteredRows.length}`
-              : "0 rows"}
-          </p>
+          <button
+            type="button"
+            className="text-[11px] text-[#6fb7ff] opacity-75 hover:opacity-100"
+            onClick={() => void openLink("https://brightdata.com")}
+          >
+            ↗ Bright Data
+          </button>
           {(selection.length > 0 ||
             rowPageCount > 1 ||
             pageIndex > 0 ||

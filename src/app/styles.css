@@ -11,11 +11,16 @@
   --color-popover: var(--color-background-primary, #fff);
   --color-popover-foreground: var(--color-text-primary, #1f1f1f);
   --color-border: var(--color-border-default, #d9d9d9);
+  --app-interactive: var(--color-text-info, var(--color-text-primary, #1f1f1f));
+  --focus-ring-color: var(
+    --color-ring-primary,
+    var(--color-ring-info, #2563eb)
+  );
 }
 
-html,
-body,
-#root {
+html[data-preview="true"],
+html[data-preview="true"] body,
+html[data-preview="true"] #root {
   min-height: 100%;
 }
 
@@ -30,10 +35,17 @@ html[data-preview="true"] body {
   background: var(--color-surface);
 }
 
-button:focus-visible,
-input:focus-visible {
-  outline: 2px solid var(--focus-ring-color, #2563eb);
+button:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
   outline-offset: 2px;
+}
+
+input:focus-visible {
+  outline: none;
+}
+
+.result-link:hover {
+  color: var(--app-interactive);
 }
 
 .column-header {

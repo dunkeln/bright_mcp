@@ -26,6 +26,8 @@ The server MUST expose these application-controlled resource families:
 - `brightdata://web/{token}`: complete principal-bound Markdown or HTML behind a
   bounded `read_web` preview.
 - `ui://bright-mcp/dataset-workbench-v3.html`: static workbench app document.
+- `ui://bright-mcp/dataset-workbench-v2.html`: compatibility alias for clients
+  holding the previous tool metadata.
 - Opaque browser session and observation resources when the browser profile is enabled.
 
 Dataset definitions are returned directly by `find_datasets`. Result resources

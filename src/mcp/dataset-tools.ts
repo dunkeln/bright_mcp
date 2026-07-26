@@ -32,6 +32,8 @@ import { jsonResourceReply, reply, requestContext, runTool } from "./support";
 import type { CancellableTaskStore } from "./task-store";
 
 export const DATASET_WORKBENCH_URI = "ui://bright-mcp/dataset-workbench-v3.html";
+const LEGACY_DATASET_WORKBENCH_URI =
+  "ui://bright-mcp/dataset-workbench-v2.html";
 
 const annotations = {
   readOnlyHint: true,
@@ -345,40 +347,46 @@ export function registerDatasetResources(
       ),
   );
 
-  registerAppResource(
-    server,
-    "Data workbench",
-    DATASET_WORKBENCH_URI,
-    {
-      mimeType: RESOURCE_MIME_TYPE,
-      description: "Transient inspection and handoff surface for structured web data",
-      _meta: {
-        ui: {
-          prefersBorder: true,
-          csp: { connectDomains: [], resourceDomains: [] },
-        },
-        "openai/widgetDescription":
-          "Displays the complete interactive result. Do not repeat its rows in the response; summarize the conclusion and cite only the sources needed.",
-      },
-    },
-    async () => ({
-      contents: [
-        {
-          uri: DATASET_WORKBENCH_URI,
-          mimeType: RESOURCE_MIME_TYPE,
-          text: dependencies.widgetHtml,
-          _meta: {
-            ui: {
-              prefersBorder: true,
-              csp: { connectDomains: [], resourceDomains: [] },
-            },
-            "openai/widgetDescription":
-              "Displays the complete interactive result. Do not repeat its rows in the response; summarize the conclusion and cite only the sources needed.",
+  for (const [name, uri] of [
+    ["Data workbench", DATASET_WORKBENCH_URI],
+    ["Data workbench v2 compatibility", LEGACY_DATASET_WORKBENCH_URI],
+  ] as const) {
+    registerAppResource(
+      server,
+      name,
+      uri,
+      {
+        mimeType: RESOURCE_MIME_TYPE,
+        description:
+          "Transient inspection and handoff surface for structured web data",
+        _meta: {
+          ui: {
+            prefersBorder: true,
+            csp: { connectDomains: [], resourceDomains: [] },
           },
+          "openai/widgetDescription":
+            "Displays the complete interactive result. Do not repeat its rows in the response; summarize the conclusion and cite only the sources needed.",
         },
-      ],
-    }),
-  );
+      },
+      async () => ({
+        contents: [
+          {
+            uri,
+            mimeType: RESOURCE_MIME_TYPE,
+            text: dependencies.widgetHtml,
+            _meta: {
+              ui: {
+                prefersBorder: true,
+                csp: { connectDomains: [], resourceDomains: [] },
+              },
+              "openai/widgetDescription":
+                "Displays the complete interactive result. Do not repeat its rows in the response; summarize the conclusion and cite only the sources needed.",
+            },
+          },
+        ],
+      }),
+    );
+  }
 }
 
 function executeRunDataset(
